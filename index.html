@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Feuille de chantier PV — We Green Energy</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f4f0; color: #1a1a1a; font-size: 14px; }
+input, select, textarea { font-family: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid #d0d0c8; border-radius: 6px; background: #fff; color: #1a1a1a; outline: none; transition: border-color 0.15s; }
+input:focus, select:focus, textarea:focus { border-color: #1B6B3A; }
+input[type="number"] { -moz-appearance: textfield; }
+button { font-family: inherit; cursor: pointer; }
+@media print {
+  @page { size: A4 portrait; margin: 12mm 14mm; }
+  body { background: white; margin: 0; }
+  #no-print { display: none !important; }
+  #preview-doc { display: block !important; padding: 0 !important; max-width: 100% !important; }
+  .preview-table { font-size: 11px; }
+  img { max-width: 100%; }
+}
+.preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.preview-table td, .preview-table th { padding: 6px 10px; border: 0.5px solid #ddd; }
+.preview-table th { background: #f0f7f2; font-weight: 500; text-align: left; width: 38%; color: #1B6B3A; }
+.photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef } = React;
+
+const PHOTO_CATS = [
+  { key: "vue_generale", label: "1. Vue générale du chantier" },
+  { key: "toiture", label: "2. État / photos de la toiture" },
+  { key: "cablage", label: "3. Câblage DC & AC" },
+  { key: "strings_design", label: "4. Design des strings" },
+  { key: "onduleur", label: "5. Emplacement de l'onduleur" },
+  { key: "compteur", label: "6. Compteur électrique & disjoncteur général" },
+  { key: "tgbt", label: "7. Tableau(x) TGBT" },
+  { key: "td", label: "8. TD", hasNote: true },
+];
+
+const PM_DATA = {
+  "Thibaut Cougnet":         { tel: "+32 494 47 11 85", email: "thibaut.cougnet@we-green.be" },
+  "Teresa Rousselle":        { tel: "+32 497 69 26 27", email: "teresa.rousselle@we-green.be" },
+  "Enguerrand de Formanoir": { tel: "+32 495 87 09 86", email: "enguerrand.deformanoir@we-green.be" },
+  "Hugues Léglise":          { tel: "0496 57 68 66",   email: "hugues.leglise@gmail.com" },
+  "Alexander Vos":           { tel: "+32 475 86 92 76", email: "alexander.vos@we-green.be" },
+  "Valentin Dabauvalle":     { tel: "+32 470 63 53 80", email: "valentin.dabauvalle@we-green.be" },
+  "Nelson Hohlweg":          { tel: "0496 77 54 43",   email: "nelson.hohlweg@we-green.be" },
+  "Wissam Elhage":           { tel: "+32 471 91 63 13", email: "wissam.elhage@we-green.be" },
+  "Benjamin Hers":           { tel: "+32 479 62 75 11", email: "benjamin.hers@we-green.be" },
+  "Dominic Rousselle":       { tel: "+32 495 81 16 70", email: "dominic.rousselle@we-green.be" },
+  "Wajdi Habib":             { tel: "+32 495 28 86 66", email: "wajdi.habib@we-green.be" },
+  "Romain Janssens":         { tel: "+32 493 56 93 51", email: "romain.janssens@we-green.be" },
+  "Yohan Poullain":          { tel: "+33 6 42 96 82 63", email: "yohan.poullain@we-green.be" },
+  "Nassim Fekreche":         { tel: "", email: "" },
+  "Paul Bonnefont":          { tel: "", email: "" },
+};
+const ORIENTS = ["Nord","Sud","Est","Ouest"];
+
+const GREEN = "#1B6B3A";
+const GREEN_LIGHT = "#f0f7f2";
+const GREEN_MID = "#d4ead9";
+const BORDER = "#d0d0c8";
+const BG = "#f4f4f0";
+const WHITE = "#ffffff";
+const TEXT = "#1a1a1a";
+const MUTED = "#666660";
+const CARD = { background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "1rem 1.25rem" };
+const SH = { fontSize: 11, fontWeight: 600, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", paddingBottom: 8, borderBottom: `1px solid ${GREEN_MID}`, marginBottom: 14 };
+const SUBH = { fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 };
+const LBL = { fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 4, display: "block" };
+const G2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+const G3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 };
+
+const chipSt = sel => ({
+  padding: "5px 11px", borderRadius: 6,
+  border: `1px solid ${sel ? GREEN : BORDER}`,
+  background: sel ? GREEN_LIGHT : WHITE,
+  color: sel ? GREEN : MUTED,
+  fontSize: 13, fontWeight: sel ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap"
+});
+const Chip = ({ label, selected, onClick }) => <button onClick={onClick} style={chipSt(selected)}>{label}</button>;
+const Toggle = ({ value, onChange }) => (
+  <div style={{ display: "flex", gap: 5 }}>
+    {["OUI", "NON"].map(o => <button key={o} onClick={() => onChange(value === o ? null : o)} style={chipSt(value === o)}>{o}</button>)}
+  </div>
+);
+const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }) => (
+  <div>
+    <label style={LBL}>{label}</label>
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, minWidth: 0 }} />
+      {unit && <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{unit}</span>}
+    </div>
+  </div>
+);
+
+function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, onNoteChange }) {
+  const [drag, setDrag] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const ref = useRef();
+  const zoneRef = useRef();
+
+  const fileToDataURL = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+
+  const handleFiles = async (files) => {
+    const arr = Array.from(files).filter(f => f.type.startsWith("image/") || f.type === "application/pdf");
+    const result = await Promise.all(arr.map(async f => ({ name: f.name, url: f.type.startsWith("image/") ? await fileToDataURL(f) : null, type: f.type })));
+    onAdd(result);
+  };
+
+  const handlePaste = async (e) => {
+    const items2 = Array.from(e.clipboardData.items || []);
+    const imageItems = items2.filter(i => i.type.startsWith("image/"));
+    if (imageItems.length === 0) return;
+    e.preventDefault();
+    const result = await Promise.all(imageItems.map(async (item) => {
+      const blob = item.getAsFile();
+      const url = await fileToDataURL(blob);
+      return { name: "collé_" + Date.now() + ".png", url, type: blob.type };
+    }));
+    onAdd(result);
+  };
+
+  const handleItemDragStart = (i) => setDragIdx(i);
+  const handleItemDragOver = (e, i) => { e.preventDefault(); setOverIdx(i); };
+  const handleItemDrop = (e, i) => {
+    e.preventDefault();
+    if (dragIdx !== null && dragIdx !== i) onReorder(dragIdx, i);
+    setDragIdx(null); setOverIdx(null);
+  };
+
+  return (
+    <div>
+      <div style={{ ...LBL, cursor: "pointer", userSelect: "none" }} onClick={() => zoneRef.current && zoneRef.current.focus()} title="Cliquer puis Ctrl+V pour coller">{label} {items.length > 0 && <span style={{ color: GREEN, fontWeight: 600 }}>({items.length})</span>} <span style={{ fontSize: 10, color: MUTED, fontWeight: 400 }}>↵ coller</span></div>
+      <div
+        ref={zoneRef}
+        onPaste={handlePaste}
+        onDragOver={e => { if (!dragIdx && dragIdx !== 0) { e.preventDefault(); setDrag(true); } }}
+        onDragLeave={e => { if (!zoneRef.current.contains(e.relatedTarget)) setDrag(false); }}
+        onDrop={e => {
+          if (dragIdx !== null) return;
+          e.preventDefault(); setDrag(false);
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+        }}
+        tabIndex={0}
+        style={{ border: `1.5px dashed ${drag ? GREEN : BORDER}`, background: drag ? GREEN_LIGHT : BG, borderRadius: 8, padding: 8, minHeight: 72, cursor: "default", outline: "none" }}
+      >
+        {items.length === 0 && (
+          <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <span onClick={() => ref.current && ref.current.click()} style={{ fontSize: 12, color: GREEN, cursor: "pointer", textDecoration: "underline" }}>Parcourir</span>
+            <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
+            <span style={{ fontSize: 12, color: "#aaa" }}>Drop ici</span>
+            <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
+            <span style={{ fontSize: 12, color: "#aaa" }}>Ctrl+V après focus</span>
+          </div>
+        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {items.map((item, i) => (
+            <div
+              key={i}
+              draggable
+              onDragStart={() => handleItemDragStart(i)}
+              onDragOver={e => handleItemDragOver(e, i)}
+              onDrop={e => handleItemDrop(e, i)}
+              onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
+              style={{ position: "relative", opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? `2px solid ${GREEN}` : "none", borderRadius: 4, cursor: "grab" }}
+            >
+              {item.url
+                ? <img src={item.url} alt={item.name} style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 4, border: `1px solid ${BORDER}`, display: "block" }} />
+                : <div style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", borderRadius: 4, fontSize: 9, color: MUTED, border: `1px solid ${BORDER}`, textAlign: "center", padding: 2 }}>PDF</div>
+              }
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(i); }}
+                style={{ position: "absolute", top: -5, right: -5, width: 16, height: 16, borderRadius: "50%", background: "#e74c3c", color: WHITE, border: "none", cursor: "pointer", fontSize: 10, lineHeight: "16px", textAlign: "center", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >×</button>
+            </div>
+          ))}
+          {items.length > 0 && (
+            <div onClick={() => ref.current && ref.current.click()} style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", border: `1.5px dashed ${BORDER}`, borderRadius: 4, cursor: "pointer", fontSize: 20, color: MUTED }}>+</div>
+          )}
+        </div>
+      </div>
+      {hasNote && <textarea value={note || ""} onChange={e => onNoteChange(e.target.value)} placeholder="Notes / précisions sur le TD..." rows={2} style={{ width: "100%", marginTop: 5, fontSize: 12, resize: "vertical", boxSizing: "border-box" }} />}
+      <input ref={ref} type="file" multiple accept="image/*,application/pdf,.heic,.heif" style={{ display: "none" }} onChange={e => e.target.files && e.target.files.length && handleFiles(e.target.files)} />
+    </div>
+  );
+}
+
+function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, minWidth: 52, paddingTop: 26 }}>STR {idx + 1}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr", gap: 8, flex: 1, alignItems: "end" }}>
+        <div>
+          <label style={LBL}>Onduleur</label>
+          <select value={row.onduleur} onChange={e => onChange({ ...row, onduleur: e.target.value })} style={{ width: "100%" }}>
+            {Array.from({ length: maxOnd }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={LBL}>Nbr PV</label>
+          <input type="number" min="1" value={row.count} onChange={e => onChange({ ...row, count: e.target.value })} style={{ width: "100%" }} placeholder="10" />
+        </div>
+        <div>
+          <label style={LBL}>Orientation</label>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            {ORIENTS.map(o => <button key={o} onClick={() => onChange({ ...row, orient: o, orientLibre: "" })} style={{ ...chipSt(row.orient === o), padding: "3px 8px", fontSize: 12 }}>{o}</button>)}
+            <button onClick={() => onChange({ ...row, orient: "Libre" })} style={{ ...chipSt(row.orient === "Libre"), padding: "3px 8px", fontSize: 12 }}>Libre</button>
+            {row.orient === "Libre" && <input value={row.orientLibre || ""} onChange={e => onChange({ ...row, orientLibre: e.target.value })} placeholder="ex: Nord-Est" style={{ width: 90, fontSize: 12, padding: "3px 6px" }} />}
+          </div>
+        </div>
+      </div>
+      <button onClick={onRemove} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginTop: 22 }}>×</button>
+    </div>
+  );
+}
+
+function PreviewDoc({ data }) {
+  const tv = v => v || "—";
+  const strLabel = s => `${s.count || "?"} × PV ${s.orient === "Libre" ? (s.orientLibre || "?") : s.orient || "?"}`;
+  const groupedStrings = {};
+  data.strings.forEach((s, i) => {
+    const key = `Onduleur ${s.onduleur}`;
+    if (!groupedStrings[key]) groupedStrings[key] = [];
+    groupedStrings[key].push({ ...s, idx: i });
+  });
+  return (
+    <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "2rem 1.5rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
+      {data.calepinage && data.calepinage.image && (
+        <div style={{ marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${BORDER}` }}>
+          <img src={data.calepinage.image} alt="Calepinage" style={{ width: "100%", maxHeight: 400, objectFit: "contain", display: "block" }} />
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, paddingBottom: 16, borderBottom: `2px solid ${GREEN}` }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV</div>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 13, color: MUTED }}>
+          <div>{data.date || "Date non définie"}</div>
+          <div style={{ fontWeight: 600, color: TEXT }}>{tv(data.weGreen.manager)}</div>
+          {data.weGreen.tel && <div>{data.weGreen.tel}</div>}
+          {data.weGreen.email && <div style={{ color: GREEN }}>{data.weGreen.email}</div>}
+        </div>
+      </div>
+
+      <div style={{ ...G2, marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Client</div>
+          <table className="preview-table"><tbody>
+            <tr><th>Nom</th><td>{tv(data.client.nom)}</td></tr>
+            <tr><th>Adresse</th><td>{tv(data.client.adresse)}</td></tr>
+            <tr><th>Téléphone</th><td>{tv(data.client.tel)}</td></tr>
+            <tr><th>Email</th><td>{tv(data.client.email)}</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Logistique</div>
+          <table className="preview-table"><tbody>
+            <tr><th>Parking</th><td>{tv(data.logistique.parking)}</td></tr>
+            <tr><th>Haut. corniche</th><td>{data.logistique.hauteurCorniche ? data.logistique.hauteurCorniche + " m" : "—"}</td></tr>
+            <tr><th>Haut. toit plat</th><td>{data.logistique.hauteurToitPlat ? data.logistique.hauteurToitPlat + " m" : "—"}</td></tr>
+            <tr><th>Accès toiture</th><td>{data.logistique.acces === "Autre" ? (data.logistique.autreAcces || "Autre") : tv(data.logistique.acces)}</td></tr>
+            {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(([k]) => data.logistique[k] === "OUI").length > 0 && <tr><th>Engins</th><td>{[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(function(p){ return data.logistique[p[0]] === "OUI"; }).map(function(p){ return p[1]; }).join(", ")}</td></tr>}
+            <tr><th>Tuiles réserve</th><td>{tv(data.logistique.tuileReserve)}</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 18, pageBreakBefore: "always" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
+        <table className="preview-table"><tbody>
+          <tr><th>Panneaux</th><td>{[data.tech.panneaux.type, data.tech.panneaux.nbr && data.tech.panneaux.nbr + " pcs", data.tech.panneaux.kWc && data.tech.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
+          <tr><th>Toiture</th><td>{[data.tech.toiture.main, data.tech.toiture.main === "Plat" && data.tech.toiture.orientPlat, ...data.tech.toiture.sub, data.tech.toiture.sub.includes("Autre") && data.tech.toiture.autreText].filter(Boolean).join(" / ") || "—"}</td></tr>
+          {data.tech.onduleurs.map((o, i) => <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>)}
+          <tr><th>Energy meter</th><td>{tv(data.tech.energyMeter)}</td></tr>
+          <tr><th>Batterie</th><td>{data.tech.batterie.inclus === "OUI" ? [data.tech.batterie.qty && data.tech.batterie.qty + "×", data.tech.batterie.kwh && data.tech.batterie.kwh + " kWh", data.tech.batterie.type].filter(Boolean).join(" ") || "OUI" : tv(data.tech.batterie.inclus)}</td></tr>
+          <tr><th>Borne recharge</th><td>{data.tech.borne.inclus === "OUI" ? [data.tech.borne.qty && data.tech.borne.qty + "×", data.tech.borne.type].filter(Boolean).join(" ") || "OUI" : tv(data.tech.borne.inclus)}</td></tr>
+          {data.tech.accessoires && <tr><th>Accessoires</th><td>{data.tech.accessoires}</td></tr>}
+          {data.tech.ems && data.tech.ems.inclus === "OUI" && <tr><th>EMS</th><td>{data.tech.ems.modele || "OUI"}</td></tr>}
+          {data.tech.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
+          {data.tech.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
+          <tr><th>Réseau</th><td>{tv(data.tech.reseau)}</td></tr>
+          <tr><th>Disjoncteur général</th><td>{data.tech.amperageDisj ? data.tech.amperageDisj + " A" : "—"}</td></tr>
+          <tr><th>Compteur réseau</th><td>{[data.tech.compteur.serie && "N° " + data.tech.compteur.serie, data.tech.compteur.ean && "EAN: " + data.tech.compteur.ean].filter(Boolean).join(" — ") || "—"}</td></tr>
+          <tr><th>Branchement onduleur</th><td>{tv(data.tech.branchementOnduleur)}</td></tr>
+          <tr><th>Distances</th><td>{[data.tech.distances.onduleurTGBT && `Ond→TGBT: ${data.tech.distances.onduleurTGBT}m`, data.tech.distances.onduleurTD && `Ond→TD: ${data.tech.distances.onduleurTD}m`, data.tech.distances.borneTGBT && `Borne→TGBT: ${data.tech.distances.borneTGBT}m`].filter(Boolean).join(" | ") || "—"}</td></tr>
+        </tbody></table>
+      </div>
+
+      {data.strings.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
+          <table className="preview-table">
+            <thead><tr>
+              {["String", "Onduleur", "Panneaux"].map(h => <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {data.strings.map((s, i) => <tr key={i}><td style={{ fontWeight: 600 }}>STR {i + 1}</td><td>Onduleur {s.onduleur}</td><td>{strLabel(s)}</td></tr>)}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 10, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
+            <strong style={{ color: TEXT }}>Résumé : </strong>
+            {Object.entries(groupedStrings).map(([key, rows]) => `${key} → ${rows.map(r => `STR${r.idx + 1}: ${strLabel(r)}`).join(", ")}`).join("   |   ")}
+          </div>
+        </div>
+      )}
+
+      {data.comments && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Commentaires</div>
+          <div style={{ padding: "10px 14px", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, whiteSpace: "pre-wrap" }}>{data.comments}</div>
+        </div>
+      )}
+
+      {PHOTO_CATS.some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Photos</div>
+          {PHOTO_CATS.filter(c => (data.photos[c.key] && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
+            <div key={c.key} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: TEXT }}>{c.label}</div>
+              {c.key === "td" && data.tdNote && <div style={{ fontSize: 12, color: MUTED, padding: "4px 8px", background: "#f9f9f7", borderRadius: 4, marginBottom: 6, border: `1px solid ${BORDER}` }}>{data.tdNote}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                {data.photos[c.key].map((item, i) => item.url
+                  ? <img key={i} src={item.url} alt={item.name} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                  : <div key={i} style={{ aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, color: MUTED }}>📄 PDF</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [mode, setMode] = useState("form");
+  const [bcLoading, setBcLoading] = useState(false);
+  const [bcDrag, setBcDrag] = useState(false);
+  const [bcMsg, setBcMsg] = useState("");
+  const [client, setClient] = useState({ nom: "", adresse: "", tel: "", email: "" });
+  const [weGreen, setWeGreen] = useState({ manager: "", tel: "", email: "" });
+  const [calepinage, setCalepinage] = useState({ image: null, loading: false, msg: "" });
+  const [tdNote, setTdNote] = useState("");
+  const [date, setDate] = useState("");
+  const [tech, setTech] = useState({
+    panneaux: { type: "", nbr: "", kWc: "" },
+    configStrings: "",
+    toiture: { main: null, sub: [], orientPlat: null, autreText: "" },
+    onduleurs: [{ type: "", kva: "" }],
+    energyMeter: null,
+    batterie: { inclus: null, qty: "1", kwh: "", type: "" },
+    borne: { inclus: null, qty: "1", type: "" },
+    ems: { inclus: null, modele: "" },
+    compteurVert: null,
+    greenbox: null,
+    accessoires: "",
+    reseau: null,
+    amperageDisj: "",
+    compteur: { serie: "", ean: "" },
+    branchementOnduleur: null,
+    distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
+  });
+  const [comments, setComments] = useState("");
+  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: null, nacelle: null, manitou: null, grue: null });
+  const [strings, setStrings] = useState([{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
+  const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
+
+  const data = { client, weGreen, date, tech, comments, logistique, strings, photos, calepinage, tdNote };
+
+  const setT = (path, val) => setTech(prev => {
+    const next = JSON.parse(JSON.stringify(prev));
+    const parts = path.split(".");
+    let o = next;
+    for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+    o[parts[parts.length - 1]] = val;
+    return next;
+  });
+
+  const parseBDC = async (file) => {
+    setBcLoading(true); setBcMsg("");
+    try {
+      if (!file.type.includes("pdf")) {
+        setBcMsg("Format PDF requis");
+        setBcLoading(false); return;
+      }
+      const pdfjsLib = window["pdfjs-dist/build/pdf"];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const ab = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+
+      // ── Extract items with coordinates from all pages ──────────────────────
+      var allItems = [];
+      var pageWidths = [];
+      for (var pg = 1; pg <= Math.min(pdf.numPages, 4); pg++) {
+        var page = await pdf.getPage(pg);
+        var vp = page.getViewport({ scale: 1 });
+        pageWidths.push(vp.width);
+        var tc = await page.getTextContent();
+        for (var ti = 0; ti < tc.items.length; ti++) {
+          var item = tc.items[ti];
+          if (item.str.trim()) {
+            allItems.push({ str: item.str.trim(), x: item.transform[4], y: vp.height - item.transform[5], page: pg, pw: vp.width });
+          }
+        }
+      }
+
+      // Sort: page asc, y asc, x asc
+      allItems.sort(function(a, b) {
+        if (a.page !== b.page) return a.page - b.page;
+        if (Math.abs(a.y - b.y) >= 6) return a.y - b.y;
+        return a.x - b.x;
+      });
+
+      // Group into lines (items within 5px vertically = same line)
+      var lineGroups = [];
+      for (var ii = 0; ii < allItems.length; ii++) {
+        var it = allItems[ii];
+        var last = lineGroups[lineGroups.length - 1];
+        if (last && it.page === last.page && Math.abs(it.y - last.y) < 5) {
+          last.items.push(it);
+        } else {
+          lineGroups.push({ y: it.y, page: it.page, pw: it.pw, items: [it] });
+        }
+      }
+
+      // Build line objects with text + min/max x
+      var lines = lineGroups.map(function(g) {
+        var sorted = g.items.sort(function(a,b){ return a.x - b.x; });
+        return {
+          text: sorted.map(function(i){ return i.str; }).join(" ").trim(),
+          minX: sorted[0].x,
+          maxX: sorted[sorted.length-1].x,
+          y: g.y,
+          page: g.page,
+          pw: g.pw,
+          items: sorted
+        };
+      }).filter(function(l){ return l.text; });
+
+      var r = {
+        nom: "", adresse: "", manager: "", commande_ref: "",
+        panneaux: [], onduleurs: [], batts: [], bornes: [], greenbox: false
+      };
+
+      // ── Commande ref ───────────────────────────────────────────────────────
+      for (var i = 0; i < lines.length; i++) {
+        var m = lines[i].text.match(/Commande\s*#\s*(S\d+)/i);
+        if (m) { r.commande_ref = m[1]; break; }
+      }
+
+      // ── Vendeur ────────────────────────────────────────────────────────────
+      for (var i = 0; i < lines.length; i++) {
+        if (/^Vendeur\s*:/i.test(lines[i].text)) {
+          var same = lines[i].text.replace(/^Vendeur\s*:\s*/i, "").trim();
+          var nxt = lines[i+1] ? lines[i+1].text.trim() : "";
+          var cand = same || nxt;
+          if (cand && !/^We Green/i.test(cand)) {
+            // Try exact match first, then partial match
+            if (PM_DATA[cand]) {
+              r.manager = cand;
+            } else {
+              // Try matching by first+last name fragments
+              var candLower = cand.toLowerCase();
+              var matched = Object.keys(PM_DATA).find(function(k) {
+                return k.toLowerCase() === candLower ||
+                       candLower.indexOf(k.toLowerCase()) >= 0 ||
+                       k.toLowerCase().indexOf(candLower) >= 0;
+              });
+              r.manager = matched || cand;
+            }
+          }
+          break;
+        }
+      }
+
+      // ── Client extraction ─────────────────────────────────────────────────
+      // Find index of "Commande #" line (header ends here)
+      var cmdLineIdx = -1;
+      for (var i = 0; i < lines.length; i++) {
+        if (/Commande\s*#/i.test(lines[i].text)) { cmdLineIdx = i; break; }
+      }
+      var headerLines = cmdLineIdx >= 0 ? lines.slice(0, cmdLineIdx) : lines.slice(0, 20);
+
+      var hasAddressBlock = headerLines.some(function(l){ return /Adresse de (facturation|livraison|exp)/i.test(l.text); });
+
+      if (hasAddressBlock) {
+        // Right column = items at x > 55% of page width → client contact
+        var pw = headerLines[0] ? headerLines[0].pw : 595;
+        var rightThreshold = pw * 0.52;
+        var rightBlock = [];
+        for (var i = 0; i < headerLines.length; i++) {
+          var ln = headerLines[i];
+          // Only count lines whose majority of text is in right column
+          if (ln.minX > rightThreshold && !/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE)/i.test(ln.text)) {
+            rightBlock.push(ln.text);
+          }
+        }
+        // Filter out TVA/phone lines
+        var filteredRight = rightBlock.filter(function(t){ return !/^(TVA|tel|fax|\+\d|BE\d{9})/i.test(t); });
+        if (filteredRight.length >= 1 && !/^We Green/i.test(filteredRight[0])) {
+          r.nom = filteredRight[0];
+          if (filteredRight.length >= 2) r.adresse = filteredRight.slice(1).filter(function(t){ return !/^(TVA|Belgi)/i.test(t); }).join(", ");
+        }
+
+        // If right block is WGE or empty, fall back to shipping address
+        if (!r.nom || /^We Green/i.test(r.nom)) {
+          var shipIdx = -1;
+          for (var i = 0; i < headerLines.length; i++) {
+            if (/Adresse.{1,12}exp.{1,12}dition/i.test(headerLines[i].text)) { shipIdx = i; break; }
+          }
+          if (shipIdx >= 0) {
+            var shipBlock = [];
+            for (var i = shipIdx + 1; i < headerLines.length; i++) {
+              var t = headerLines[i].text;
+              if (/^Belgique$|^France$|^Pays-Bas$/i.test(t)) break;
+              if (!/^(We Green|Ikaroslaan|Zaventem|Belgium|\+\d|n\.a\.)/i.test(t)) shipBlock.push(t);
+            }
+            if (shipBlock.length) {
+              // Remove "CompanyName, ProjectName" prefix if present (like "Inclusio, SINT-NIKKLAS")
+              var firstName = shipBlock[0].replace(/^[^,]+,\s*/, "").trim() || shipBlock[0];
+              r.nom = firstName;
+              if (shipBlock.length > 1) r.adresse = shipBlock.slice(1).join(", ");
+            }
+          }
+        }
+      } else {
+        // Simple BDC: client block is in the RIGHT column (high X) of the header
+        var pw2 = headerLines[0] ? headerLines[0].pw : 595;
+        var rightThresh2 = pw2 * 0.50;
+        var clientBlock = [];
+        for (var i = 0; i < headerLines.length; i++) {
+          var ln = headerLines[i];
+          // Only right-column items
+          if (ln.minX > rightThresh2) {
+            var t = ln.text;
+            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE|02 476|IBAN|Energy Solutions)/i.test(t)) continue;
+            clientBlock.push(t);
+          }
+        }
+        // Fallback: if nothing found in right column, try all non-WGE lines
+        if (clientBlock.length === 0) {
+          for (var i = 0; i < headerLines.length; i++) {
+            var t = headerLines[i].text;
+            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE|02 476|IBAN|Energy Solutions)/i.test(t)) continue;
+            clientBlock.push(t);
+          }
+        }
+        // Remove trailing Belgique/France
+        while (clientBlock.length && /^(Belgique|France|TVA)/i.test(clientBlock[clientBlock.length-1])) clientBlock.pop();
+        if (clientBlock.length >= 1) r.nom = clientBlock[0];
+        if (clientBlock.length >= 2) r.adresse = clientBlock.slice(1).join(", ");
+      }
+
+      // ── Scan product lines ─────────────────────────────────────────────────
+      // Helper: extract qty from line text (first integer >= 1 followed by ,00 or .00)
+      function extractQty(text) {
+        var m = text.match(/\b(\d+)[,.]0+\b/g);
+        if (!m) return 0;
+        for (var q = 0; q < m.length; q++) {
+          var n = parseInt(m[q]);
+          if (n >= 1 && n <= 9999) return n;
+        }
+        return 0;
+      }
+
+      // Helper: extract wattage from text
+      function extractWc(text) {
+        var m = text.match(/\b(\d{3,4})[Ww](?:c|att|p)?(?:\s|$|-|\/)/);
+        if (m) return m[1];
+        // From model like "A445", "54HL4M-BDV 515", "460W"
+        m = text.match(/\b(\d{3,4})[Ww]\b/);
+        if (m) return m[1];
+        // Model number like "-A445-" or " 515 "
+        m = text.match(/[-\s]A?(\d{3,4})[-\s]/);
+        if (m && parseInt(m[1]) >= 100 && parseInt(m[1]) <= 999) return m[1];
+        return "";
+      }
+
+      for (var li = 0; li < lines.length; li++) {
+        var t = lines[li].text;
+
+        // Panneaux
+        if (/^Panneaux\s*[-]\s*/i.test(t)) {
+          var qty = extractQty(t);
+          var nameMatch = t.match(/^Panneaux\s*[-]\s*(.+)/i);
+          if (nameMatch) {
+            var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").replace(/\s*[-]\s*(Full Black|Neostar\S*|Half[- ]Cell)\s*$/, "").trim();
+            var wc = extractWc(t);
+            r.panneaux.push({ name: name, qty: qty, wc: wc });
+          }
+        }
+
+        // Onduleurs (skip Optimiseur/Optimizer)
+        if (/Onduleur\s*[-]/i.test(t) && !/Optimis[e|eu]ur|Optimizer/i.test(t)) {
+          var qty = extractQty(t);
+          var nameMatch = t.match(/(?:\[[^\]]+\]\s*)?Onduleur\s*[-]\s*(.+)/i);
+          if (nameMatch && qty > 0) {
+            var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").replace(/\s*[-]\s*(Low Voltage|Three Phase|Hybrid|Mono\b|MONO\b|Single|TRI\b).*/i, "").trim();
+            r.onduleurs.push({ type: name, qty: qty });
+          }
+        }
+        // Onduleurs without "Onduleur -" prefix (like "Onduleur Deye SUN...")
+        if (/^Onduleur\s+(?!.*Optimis)/i.test(t) && !/-\s*/i.test(t.substring(0,15))) {
+          var qty = extractQty(t);
+          var nameMatch = t.match(/^Onduleur\s+(.+)/i);
+          if (nameMatch && qty > 0) {
+            var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").trim();
+            r.onduleurs.push({ type: name, qty: qty });
+          }
+        }
+
+        // Batteries
+        if (/^(?:\[[^\]]+\]\s*)?Batterie\s*[-]/i.test(t) && !/Chargeur|Power Module|recyclage/i.test(t)) {
+          var qty = extractQty(t);
+          var nameMatch = t.match(/Batterie\s*[-]\s*(.+)/i);
+          if (nameMatch) {
+            var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").trim();
+            var kwhM = t.match(/\b(\d+(?:[,.]\d+)?)\s*kWh/i) || nameMatch[1].match(/\b(\d+(?:[,.]\d+)?)\s*[kK][wW][hH]/i);
+            var kwh = kwhM ? kwhM[1].replace(",",".") : "";
+            r.batts.push({ name: name, qty: qty, kwh: kwh });
+          }
+        }
+
+        // Bornes
+        if (/^Borne\s/i.test(t)) {
+          var qty = extractQty(t);
+          if (qty > 0) {
+            var nameMatch = t.match(/^Borne\s+[-\s]?\s*(.+)/i);
+            var name = nameMatch ? nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").trim() : t;
+            r.bornes.push({ type: name, qty: qty });
+          }
+        }
+
+        // Greenbox
+        if (/^Greenbox\s*(?:\d+[,.]|$)/i.test(t)) {
+          r.greenbox = true;
+        }
+      }
+
+      // ── Apply to state ─────────────────────────────────────────────────────
+      if (r.nom || r.adresse) {
+        setClient(function(p){ return Object.assign({}, p, { nom: r.nom || p.nom, adresse: r.adresse || p.adresse }); });
+      }
+      if (r.manager) {
+        if (PM_DATA[r.manager]) {
+          setWeGreen(function(p){ return Object.assign({}, p, { manager: r.manager, tel: PM_DATA[r.manager].tel, email: PM_DATA[r.manager].email }); });
+        } else {
+          setWeGreen(function(p){ return Object.assign({}, p, { manager: r.manager }); });
+        }
+      }
+
+      setTech(function(prev) {
+        var next = JSON.parse(JSON.stringify(prev));
+
+        // Panneaux: use first with highest qty
+        var mainPan = null;
+        for (var i = 0; i < r.panneaux.length; i++) {
+          if (!mainPan || r.panneaux[i].qty > mainPan.qty) mainPan = r.panneaux[i];
+        }
+        if (mainPan) {
+          next.panneaux.type = mainPan.name;
+          next.panneaux.nbr = String(mainPan.qty || "");
+          if (mainPan.wc && mainPan.qty) next.panneaux.kWc = (parseFloat(mainPan.qty) * parseFloat(mainPan.wc) / 1000).toFixed(2);
+          else if (mainPan.wc === "" && mainPan.qty) {
+            // Try extracting wc from name
+            var wm = mainPan.name.match(/\b(\d{3,4})[Ww]/);
+            if (wm) next.panneaux.kWc = (parseFloat(mainPan.qty) * parseFloat(wm[1]) / 1000).toFixed(2);
+          }
+        }
+
+        // Onduleurs
+        if (r.onduleurs.length > 0) {
+          next.onduleurs = r.onduleurs.map(function(o){ return { type: o.type, kva: "" }; });
+        }
+
+        // Batterie
+        var hasRealBatt = r.batts.some(function(b){ return b.qty > 0; });
+        if (r.batts.length > 0) {
+          var mainBatt = r.batts[0];
+          // Find first with kWh info
+          for (var i = 0; i < r.batts.length; i++) {
+            if (r.batts[i].kwh) { mainBatt = r.batts[i]; break; }
+          }
+          if (hasRealBatt) {
+            next.batterie.inclus = "OUI";
+            if (mainBatt.kwh) next.batterie.kwh = mainBatt.kwh;
+            if (mainBatt.name) next.batterie.type = mainBatt.name;
+            // qty from first with qty > 0
+            for (var i = 0; i < r.batts.length; i++) {
+              if (r.batts[i].qty > 0) { next.batterie.qty = String(r.batts[i].qty); break; }
+            }
+          }
+        }
+
+        // Borne
+        if (r.bornes.length > 0) {
+          next.borne.inclus = "OUI";
+          next.borne.type = r.bornes[0].type;
+          next.borne.qty = String(r.bornes[0].qty);
+        }
+
+        // Greenbox
+        if (r.greenbox) next.greenbox = "OUI";
+
+        return next;
+      });
+
+      var found = [
+        r.nom && "client",
+        r.adresse && "adresse",
+        r.panneaux.some(function(p){ return p.qty > 0; }) && "panneaux (" + r.panneaux.reduce(function(s,p){ return s + p.qty; }, 0) + " pcs)",
+        r.onduleurs.length && "onduleurs",
+        r.batts.some(function(b){ return b.kwh; }) && "batterie",
+        r.bornes.length && "borne",
+        r.greenbox && "greenbox",
+        r.manager && "PM"
+      ].filter(Boolean);
+
+      setBcMsg(found.length > 0
+        ? "Extrait : " + found.join(" · ") + (r.commande_ref ? "  [" + r.commande_ref + "]" : "")
+        : "Aucune donnee reconnue");
+    } catch (e) {
+      setBcMsg("Erreur : " + e.message);
+    }
+    setBcLoading(false);
+  };
+
+
+    const extractCalepinage = async (file) => {
+    setCalepinage({ image: null, loading: true, msg: "" });
+    try {
+      if (file.type.startsWith("image/")) {
+        const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+        setCalepinage({ image: url, loading: false, msg: "✓ Image chargée" });
+        return;
+      }
+      const pdfjsLib = window["pdfjs-dist/build/pdf"];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let targetPage = pdf.numPages;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        const text = tc.items.map(item => item.str).join(" ").toLowerCase();
+        if (/illustration|detailed layout|calepinage|layout\d/.test(text)) { targetPage = i; break; }
+      }
+      const page = await pdf.getPage(targetPage);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      setCalepinage({ image: canvas.toDataURL("image/jpeg", 0.88), loading: false, msg: `✓ Page ${targetPage}/${pdf.numPages} extraite` });
+    } catch (e) {
+      setCalepinage({ image: null, loading: false, msg: "Erreur : " + e.message });
+    }
+  };
+
+  const addPhotos = (catKey, items) => setPhotos(prev => ({ ...prev, [catKey]: [...prev[catKey], ...items] }));
+  const deletePhoto = (catKey, idx) => setPhotos(prev => ({ ...prev, [catKey]: prev[catKey].filter((_, i) => i !== idx) }));
+  const reorderPhoto = (catKey, fromIdx, toIdx) => setPhotos(prev => {
+    const arr = [...prev[catKey]];
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+    return { ...prev, [catKey]: arr };
+  });
+  const addString = () => setStrings(p => [...p, { onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
+  const updString = (i, row) => setStrings(p => p.map((r, idx) => idx === i ? row : r));
+  const delString = i => setStrings(p => p.filter((_, idx) => idx !== i));
+
+
+    const btnSt = (active, extra = {}) => ({
+    padding: "7px 16px", borderRadius: 7,
+    background: active ? GREEN_LIGHT : WHITE,
+    color: active ? GREEN : MUTED,
+    border: `1px solid ${active ? GREEN_MID : BORDER}`,
+    fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", ...extra
+  });
+
+  return (
+    <div style={{ maxWidth: 880, margin: "0 auto", padding: "1.5rem 1rem", display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Header */}
+      <div id="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+            <button onClick={() => setMode("form")} style={{ ...btnSt(mode === "form"), borderRadius: 0, border: "none", borderRight: `1px solid ${BORDER}` }}>Formulaire</button>
+            <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
+          </div>
+          {mode === "preview" && <>
+            <button onClick={() => window.print()} style={btnSt(false)}>Exporter PDF</button>
+          </>}
+        </div>
+      </div>
+
+      {mode === "preview" ? <PreviewDoc data={data} /> : (
+        <>
+          {/* BDC drop zone */}
+          <div id="no-print"
+            onDragOver={e => { e.preventDefault(); setBcDrag(true); }}
+            onDragLeave={() => setBcDrag(false)}
+            onDrop={e => { e.preventDefault(); setBcDrag(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) parseBDC(f); }}
+            onClick={() => { const i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,image/*"; i.onchange = e => e.target.files && e.target.files[0] && parseBDC(e.target.files[0]); i.click(); }}
+            style={{ border: `1.5px dashed ${bcDrag ? GREEN : BORDER}`, background: bcDrag ? GREEN_LIGHT : BG, borderRadius: 10, padding: "1rem 1.25rem", textAlign: "center", cursor: "pointer" }}>
+            {bcLoading ? <div style={{ color: GREEN, fontSize: 14 }}>Extraction en cours…</div> : <>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Déposer le bon de commande client ici</div>
+              <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>PDF ou image — nom client, adresse et PM extraits automatiquement via IA</div>
+              {bcMsg && <div style={{ fontSize: 12, color: GREEN, marginTop: 6, fontWeight: 600 }}>{bcMsg}</div>}
+            </>}
+          </div>
+
+          {/* Client + WGE */}
+          <div style={G2}>
+            <div style={CARD}>
+              <div style={SH}>Client</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Field label="Nom du client" value={client.nom} onChange={v => setClient(p => ({ ...p, nom: v }))} placeholder="Société ou particulier" />
+                <Field label="Adresse de chantier" value={client.adresse} onChange={v => setClient(p => ({ ...p, adresse: v }))} placeholder="Rue, numéro, CP, ville" />
+                <div style={G2}>
+                  <Field label="Téléphone" value={client.tel} onChange={v => setClient(p => ({ ...p, tel: v }))} type="tel" />
+                  <Field label="Email" value={client.email} onChange={v => setClient(p => ({ ...p, email: v }))} type="email" />
+                </div>
+              </div>
+            </div>
+            <div style={CARD}>
+              <div style={SH}>We Green</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div><label style={LBL}>Project Manager</label>
+                  <select value={weGreen.manager} onChange={e => {
+                    const name = e.target.value;
+                    const pm = PM_DATA[name] || { tel: "", email: "" };
+                    setWeGreen({ manager: name, tel: pm.tel, email: pm.email });
+                  }} style={{ width: "100%" }}>
+                    <option value="">— Sélectionner —</option>
+                    {Object.keys(PM_DATA).map(m => <option key={m} value={m}>{m}</option>)}
+                    <option value="Autre">Autre</option>
+                  </select>
+                  {(weGreen.manager === "Autre" || (weGreen.manager && !PM_DATA[weGreen.manager] && weGreen.manager !== "Autre")) && (
+                    <input value={weGreen.manager} onChange={e => setWeGreen(p => ({ ...p, manager: e.target.value }))} placeholder="Nom du PM" style={{ width: "100%", marginTop: 6 }} />
+                  )}
+                </div>
+                <div style={G2}>
+                  <div>
+                    <label style={LBL}>Téléphone</label>
+                    <input value={weGreen.tel} onChange={e => setWeGreen(p => ({ ...p, tel: e.target.value }))} style={{ width: "100%" }} />
+                  </div>
+                  <div>
+                    <label style={LBL}>Email</label>
+                    <input value={weGreen.email} onChange={e => setWeGreen(p => ({ ...p, email: e.target.value }))} style={{ width: "100%" }} />
+                  </div>
+                </div>
+                <div><label style={LBL}>Date du chantier</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: "100%" }} /></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Technical info */}
+          <div style={CARD}>
+            <div style={SH}>Informations techniques</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div><div style={SUBH}>Panneaux</div>
+                <div style={G3}>
+                  <Field label="Type / Modèle" value={tech.panneaux.type} onChange={v => setT("panneaux.type", v)} placeholder="Ex: Trina Vertex S+" />
+                  <Field label="Nombre" value={tech.panneaux.nbr} onChange={v => setT("panneaux.nbr", v)} type="number" />
+                  <Field label="Puissance totale" value={tech.panneaux.kWc} onChange={v => setT("panneaux.kWc", v)} type="number" unit="kWc" />
+                </div>
+              </div>
+              <div><div style={SUBH}>Toiture</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {["Plat", "Incliné"].map(t => <Chip key={t} label={t} selected={tech.toiture.main === t} onClick={() => setT("toiture.main", tech.toiture.main === t ? null : t)} />)}
+                </div>
+                {tech.toiture.main === "Plat" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Orientation des panneaux</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {["Sud", "Est-Ouest"].map(o => <Chip key={o} label={o} selected={tech.toiture.orientPlat === o} onClick={() => setT("toiture.orientPlat", tech.toiture.orientPlat === o ? null : o)} />)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {tech.toiture.main === "Incliné" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {["Tuile", "Ardoise", "Panneaux sandwich", "Zinc", "Bac acier", "Autre"].map(t => <Chip key={t} label={t} selected={tech.toiture.sub.includes(t)} onClick={() => { const c = tech.toiture.sub; setT("toiture.sub", c.includes(t) ? c.filter(x => x !== t) : [...c, t]); }} />)}
+                    </div>
+                    {tech.toiture.sub.includes("Autre") && <input value={tech.toiture.autreText || ""} onChange={e => setT("toiture.autreText", e.target.value)} placeholder="Préciser..." style={{ width: "100%" }} />}
+                  </div>
+                )}
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={SUBH}>Onduleur(s)</div>
+                  <button onClick={() => setTech(p => ({ ...p, onduleurs: [...p.onduleurs, { type: "", kva: "" }] }))} style={{ fontSize: 12, color: GREEN, background: "none", border: "none", cursor: "pointer", marginBottom: 7 }}>+ Ajouter</button>
+                </div>
+                {tech.onduleurs.map((ond, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 24px", gap: 8, alignItems: "end", marginBottom: 8 }}>
+                    <Field label={`Onduleur ${i + 1} — Type / Modèle`} value={ond.type} onChange={v => setTech(p => ({ ...p, onduleurs: p.onduleurs.map((o, idx) => idx === i ? { ...o, type: v } : o) }))} placeholder="Ex: Deye SUN-8K" />
+                    <Field label="Puissance" value={ond.kva} onChange={v => setTech(p => ({ ...p, onduleurs: p.onduleurs.map((o, idx) => idx === i ? { ...o, kva: v } : o) }))} type="number" unit="kVA" />
+                    {tech.onduleurs.length > 1 && <button onClick={() => setTech(p => ({ ...p, onduleurs: p.onduleurs.filter((_, idx) => idx !== i) }))} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", paddingBottom: 4 }}>×</button>}
+                  </div>
+                ))}
+              </div>
+              <div style={G3}>
+                <div><div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Energy meter inclus</div><Toggle value={tech.energyMeter} onChange={v => setT("energyMeter", v)} /></div>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Batterie incluse</div>
+                  <Toggle value={tech.batterie.inclus} onChange={v => setT("batterie.inclus", v)} />
+                  {tech.batterie.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 1fr", gap: 6, marginTop: 8 }}>
+                    <Field label="Qté" value={tech.batterie.qty} onChange={v => setT("batterie.qty", v)} type="number" />
+                    <Field label="kWh" value={tech.batterie.kwh} onChange={v => setT("batterie.kwh", v)} type="number" unit="kWh" />
+                    <Field label="Modèle" value={tech.batterie.type} onChange={v => setT("batterie.type", v)} placeholder="Modèle" />
+                  </div>}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Borne de recharge</div>
+                  <Toggle value={tech.borne.inclus} onChange={v => setT("borne.inclus", v)} />
+                  {tech.borne.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr", gap: 6, marginTop: 8 }}>
+                    <Field label="Qté" value={tech.borne.qty} onChange={v => setT("borne.qty", v)} type="number" />
+                    <Field label="Modèle" value={tech.borne.type} onChange={v => setT("borne.type", v)} placeholder="Modèle" />
+                  </div>}
+                </div>
+              </div>
+
+              {/* EMS + Compteur vert + Greenbox */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>EMS (Energy Management System)</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <Toggle value={tech.ems.inclus} onChange={v => setT("ems.inclus", v)} />
+                    {tech.ems.inclus === "OUI" && (
+                      <select value={tech.ems.modele} onChange={e => setT("ems.modele", e.target.value)} style={{ flex: 1, minWidth: 200 }}>
+                        <option value="">— Choisir un EMS —</option>
+                        {["Nexxtlab Smart Master Home", "Nexxtlab Smart Master Pro", "Huawei EMMA", "Eniris Home", "Eniris PRO", "Solis"].map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13 }}>Compteur vert</span>
+                    <Toggle value={tech.compteurVert} onChange={v => setT("compteurVert", v)} />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13 }}>Greenbox</span>
+                    <Toggle value={tech.greenbox} onChange={v => setT("greenbox", v)} />
+                  </div>
+                </div>
+              </div>
+
+              <Field label="Autres accessoires" value={tech.accessoires} onChange={v => setT("accessoires", v)} placeholder="Notes libres..." />
+              <div><div style={SUBH}>Réseau électrique</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["Monophasé 230V", "Triphasé 3×230V", "Triphasé 3×400+N"].map(r => <Chip key={r} label={r} selected={tech.reseau === r} onClick={() => setT("reseau", tech.reseau === r ? null : r)} />)}
+                </div>
+              </div>
+              <div style={G2}>
+                <Field label="Ampérage disjoncteur général ⚠" value={tech.amperageDisj} onChange={v => setT("amperageDisj", v)} type="number" unit="A" placeholder="Ex: 40" />
+                <div />
+              </div>
+              <div style={G2}>
+                <Field label="Compteur réseau — N° de série (optionnel)" value={tech.compteur.serie} onChange={v => setT("compteur.serie", v)} />
+                <Field label="EAN (optionnel)" value={tech.compteur.ean} onChange={v => setT("compteur.ean", v)} placeholder="541400..." />
+              </div>
+              <div><div style={SUBH}>Branchement de l'onduleur</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["Sur le TGBT", "Sur un tableau divisionnaire"].map(b => <Chip key={b} label={b} selected={tech.branchementOnduleur === b} onClick={() => setT("branchementOnduleur", tech.branchementOnduleur === b ? null : b)} />)}
+                </div>
+              </div>
+              <div><div style={SUBH}>Distances</div>
+                <div style={G3}>
+                  <Field label="Onduleur → TGBT" value={tech.distances.onduleurTGBT} onChange={v => setT("distances.onduleurTGBT", v)} type="number" unit="m" />
+                  <Field label="Onduleur → Tableau div." value={tech.distances.onduleurTD} onChange={v => setT("distances.onduleurTD", v)} type="number" unit="m" />
+                  <Field label="Borne → TGBT" value={tech.distances.borneTGBT} onChange={v => setT("distances.borneTGBT", v)} type="number" unit="m" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Commentaires */}
+          <div style={CARD}>
+            <div style={SH}>Commentaires</div>
+            <textarea value={comments} onChange={e => setComments(e.target.value)} placeholder="Notes, observations particulières..." rows={3} style={{ width: "100%", resize: "vertical" }} />
+          </div>
+
+          {/* Logistique */}
+          <div style={CARD}>
+            <div style={SH}>Logistique</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={G2}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[["parking","Espace parking"],["tuileReserve","Tuiles / ardoises en réserve"]].map(([k,lbl]) => (
+                    <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13 }}>{lbl}</span>
+                      <Toggle value={logistique[k]} onChange={v => setLogistique(p => ({ ...p, [k]: v }))} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <Field label="Hauteur corniche" value={logistique.hauteurCorniche} onChange={v => setLogistique(p => ({ ...p, hauteurCorniche: v }))} type="number" unit="m" />
+                  <Field label="Hauteur toit plat" value={logistique.hauteurToitPlat} onChange={v => setLogistique(p => ({ ...p, hauteurToitPlat: v }))} type="number" unit="m" />
+                  <Field label="Inclinaison rue / allée" value={logistique.inclinaisonRue} onChange={v => setLogistique(p => ({ ...p, inclinaisonRue: v }))} placeholder="%" />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: MUTED, marginBottom: 7 }}>Accès à la toiture</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["Côté rue", "Côté jardin", "Autre"].map(a => <Chip key={a} label={a} selected={logistique.acces === a} onClick={() => setLogistique(p => ({ ...p, acces: p.acces === a ? null : a }))} />)}
+                </div>
+                {logistique.acces === "Autre" && <input value={logistique.autreAcces} onChange={e => setLogistique(p => ({ ...p, autreAcces: e.target.value }))} placeholder="Préciser..." style={{ marginTop: 8, width: "100%" }} />}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: MUTED, marginBottom: 7 }}>Équipements de levage / manutention</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(([k,lbl]) => (
+                    <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: logistique[k] === "OUI" ? GREEN_LIGHT : BG, borderRadius: 6, border: "1px solid " + (logistique[k] === "OUI" ? GREEN_MID : BORDER) }}>
+                      <span style={{ fontSize: 13, fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}</span>
+                      <Toggle value={logistique[k]} onChange={v => setLogistique(p => ({ ...p, [k]: v }))} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Strings */}
+          <div style={CARD}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={SH}>Configuration de strings</div>
+              <button onClick={addString} style={{ fontSize: 12, color: GREEN, background: "none", border: `1px dashed ${GREEN_MID}`, borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginBottom: 14 }}>+ Ajouter un string</button>
+            </div>
+            {strings.length === 0 && <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: "#aaa" }}>Aucun string — cliquez sur + Ajouter</div>}
+            {strings.map((row, i) => <StringRow key={i} idx={i} row={row} onChange={r => updString(i, r)} onRemove={() => delString(i)} maxOnd={Math.max(1, tech.onduleurs.length)} />)}
+            {strings.length > 0 && (
+              <div style={{ marginTop: 12, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
+                <strong style={{ color: TEXT }}>Résumé : </strong>
+                {Object.entries(strings.reduce((acc, s, i) => { const k = `Onduleur ${s.onduleur}`; if (!acc[k]) acc[k] = []; acc[k].push(`STR${i + 1}: ${s.count || "?"}×PV ${s.orient === "Libre" ? (s.orientLibre || "?") : s.orient || "?"}`); return acc; }, {})).map(([k, v]) => `${k} → ${v.join(", ")}`).join("   |   ")}
+              </div>
+            )}
+          </div>
+
+          {/* Calepinage */}
+          <div style={CARD}>
+            <div style={SH}>Calepinage (image de garde)</div>
+            <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>Déposer un rapport Archelios, Hélioscope, ou une capture d'écran du design PV en toiture — l'image sera utilisée en page de garde.</div>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div
+                onDragOver={e => { e.preventDefault(); }}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) extractCalepinage(f); }}
+                onClick={() => { const i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,image/*,.heic,.heif"; i.onchange = e => e.target.files && e.target.files[0] && extractCalepinage(e.target.files[0]); i.click(); }}
+                style={{ border: `1.5px dashed ${BORDER}`, background: BG, borderRadius: 8, padding: 12, minWidth: 180, minHeight: 120, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, flex: "0 0 auto" }}
+              >
+                {calepinage.loading
+                  ? <div style={{ fontSize: 13, color: GREEN }}>Extraction…</div>
+                  : <><div style={{ fontSize: 13, fontWeight: 500 }}>PDF ou image</div><div style={{ fontSize: 11, color: MUTED, textAlign: "center" }}>Archelios / Hélioscope<br/>ou capture d'écran</div></>
+                }
+                {calepinage.msg && <div style={{ fontSize: 11, color: GREEN, fontWeight: 600, marginTop: 4 }}>{calepinage.msg}</div>}
+              </div>
+              {calepinage.image && (
+                <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+                  <img src={calepinage.image} alt="calepinage" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                  <button onClick={() => setCalepinage({ image: null, loading: false, msg: "" })} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: WHITE, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>×</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Photos */}
+          <div style={CARD}>
+            <div style={SH}>Photos</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
+              {PHOTO_CATS.map(({ key, label, hasNote }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" ? tdNote : ""} onNoteChange={v => setTdNote(v)} />)}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
