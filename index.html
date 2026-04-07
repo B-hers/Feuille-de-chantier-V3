@@ -27,6 +27,21 @@ button { font-family: inherit; cursor: pointer; }
 .preview-table td, .preview-table th { padding: 6px 10px; border: 0.5px solid #ddd; }
 .preview-table th { background: #f0f7f2; font-weight: 500; text-align: left; width: 38%; color: #1B6B3A; }
 .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+/* ── Responsive grid helpers ── */
+.g2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.g3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  body { font-size: 15px; background: #f4f4f0; }
+  input, select, textarea { font-size: 16px !important; padding: 11px 12px; border-radius: 8px; width: 100%; }
+  select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+  button { min-height: 44px; padding: 10px 16px; }
+  .preview-table td, .preview-table th { padding: 5px 7px; font-size: 11px; }
+  /* Prevent bounce scrolling issues */
+  * { -webkit-tap-highlight-color: transparent; }
+}
 </style>
 </head>
 <body>
@@ -76,8 +91,8 @@ const CARD = { background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 1
 const SH = { fontSize: 11, fontWeight: 600, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", paddingBottom: 8, borderBottom: `1px solid ${GREEN_MID}`, marginBottom: 14 };
 const SUBH = { fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 };
 const LBL = { fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 4, display: "block" };
-const G2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
-const G3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 };
+const G2 = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 };
+const G3 = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
 
 const chipSt = sel => ({
   padding: "5px 11px", borderRadius: 6,
@@ -106,95 +121,154 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
   const [drag, setDrag] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
-  const ref = useRef();
+  const refFile = useRef();
+  const refCamera = useRef();
   const zoneRef = useRef();
 
-  const fileToDataURL = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  const handleFiles = async (files) => {
-    const arr = Array.from(files).filter(f => f.type.startsWith("image/") || f.type === "application/pdf");
-    const result = await Promise.all(arr.map(async f => ({ name: f.name, url: f.type.startsWith("image/") ? await fileToDataURL(f) : null, type: f.type })));
+  const compressImg = function(blob) { return new Promise(function(res) {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(blob);
+    img.onload = function() {
+      const MAX = 1000;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+      else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(objUrl);
+      res(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = function() { URL.revokeObjectURL(objUrl); res(null); };
+    img.src = objUrl;
+  }); };
+
+  const handleFiles = async function(files) {
+    const arr = Array.from(files).filter(function(f) { return f.type.startsWith("image/") || f.type === "application/pdf"; });
+    const result = [];
+    for (let i = 0; i < arr.length; i++) {
+      const f = arr[i];
+      const url = f.type.startsWith("image/") ? await compressImg(f) : null;
+      result.push({ name: f.name, url: url, type: f.type });
+    }
     onAdd(result);
   };
 
-  const handlePaste = async (e) => {
-    const items2 = Array.from(e.clipboardData.items || []);
-    const imageItems = items2.filter(i => i.type.startsWith("image/"));
+  const handlePaste = async function(e) {
+    const items2 = Array.from((e.clipboardData && e.clipboardData.items) || []);
+    const imageItems = items2.filter(function(i) { return i.type.startsWith("image/"); });
     if (imageItems.length === 0) return;
     e.preventDefault();
-    const result = await Promise.all(imageItems.map(async (item) => {
-      const blob = item.getAsFile();
-      const url = await fileToDataURL(blob);
-      return { name: "collé_" + Date.now() + ".png", url, type: blob.type };
-    }));
+    const result = [];
+    for (let i = 0; i < imageItems.length; i++) {
+      const blob = imageItems[i].getAsFile();
+      const url = await compressImg(blob);
+      result.push({ name: "colle_" + Date.now() + ".jpg", url: url, type: blob.type });
+    }
     onAdd(result);
   };
 
-  const handleItemDragStart = (i) => setDragIdx(i);
-  const handleItemDragOver = (e, i) => { e.preventDefault(); setOverIdx(i); };
-  const handleItemDrop = (e, i) => {
+  const handleDragStart = function(i) { setDragIdx(i); };
+  const handleDragOver = function(e, i) { e.preventDefault(); setOverIdx(i); };
+  const handleDrop = function(e, i) {
     e.preventDefault();
     if (dragIdx !== null && dragIdx !== i) onReorder(dragIdx, i);
     setDragIdx(null); setOverIdx(null);
   };
 
   return (
-    <div>
-      <div style={{ ...LBL, cursor: "pointer", userSelect: "none" }} onClick={() => zoneRef.current && zoneRef.current.focus()} title="Cliquer puis Ctrl+V pour coller">{label} {items.length > 0 && <span style={{ color: GREEN, fontWeight: 600 }}>({items.length})</span>} <span style={{ fontSize: 10, color: MUTED, fontWeight: 400 }}>↵ coller</span></div>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ ...LBL, cursor: "pointer", userSelect: "none", marginBottom: 6 }}
+        onClick={function() { zoneRef.current && zoneRef.current.focus(); }}
+        title="Cliquer puis Ctrl+V pour coller">
+        {label}
+        {items.length > 0 && <span style={{ color: GREEN, fontWeight: 600, marginLeft: 6 }}>({items.length})</span>}
+        <span style={{ fontSize: 10, color: MUTED, fontWeight: 400, marginLeft: 6 }}>↵ coller</span>
+      </div>
+
+      {/* Drop zone */}
       <div
         ref={zoneRef}
+        tabIndex={0}
         onPaste={handlePaste}
-        onDragOver={e => { if (!dragIdx && dragIdx !== 0) { e.preventDefault(); setDrag(true); } }}
-        onDragLeave={e => { if (!zoneRef.current.contains(e.relatedTarget)) setDrag(false); }}
-        onDrop={e => {
+        onDragOver={function(e) { if (dragIdx === null && dragIdx !== 0) { e.preventDefault(); setDrag(true); } }}
+        onDragLeave={function(e) { if (!zoneRef.current.contains(e.relatedTarget)) setDrag(false); }}
+        onDrop={function(e) {
           if (dragIdx !== null) return;
           e.preventDefault(); setDrag(false);
           if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
         }}
-        tabIndex={0}
-        style={{ border: `1.5px dashed ${drag ? GREEN : BORDER}`, background: drag ? GREEN_LIGHT : BG, borderRadius: 8, padding: 8, minHeight: 72, cursor: "default", outline: "none" }}
+        style={{ border: "1.5px dashed " + (drag ? GREEN : BORDER), background: drag ? GREEN_LIGHT : BG, borderRadius: 8, padding: 8, minHeight: 60, outline: "none" }}
       >
-        {items.length === 0 && (
-          <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <span onClick={() => ref.current && ref.current.click()} style={{ fontSize: 12, color: GREEN, cursor: "pointer", textDecoration: "underline" }}>Parcourir</span>
-            <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
-            <span style={{ fontSize: 12, color: "#aaa" }}>Drop ici</span>
-            <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
-            <span style={{ fontSize: 12, color: "#aaa" }}>Ctrl+V après focus</span>
+        {/* Mobile buttons row */}
+        {isMobile ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: items.length > 0 ? 8 : 0 }}>
+            <button
+              onClick={function() { refCamera.current && refCamera.current.click(); }}
+              style={{ flex: 1, minWidth: 120, background: GREEN, color: WHITE, border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              📷 Appareil photo
+            </button>
+            <button
+              onClick={function() { refFile.current && refFile.current.click(); }}
+              style={{ flex: 1, minWidth: 120, background: WHITE, color: GREEN, border: "1.5px solid " + GREEN, borderRadius: 8, padding: "10px 12px", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              🖼 Galerie
+            </button>
+          </div>
+        ) : (
+          items.length === 0 && (
+            <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <span onClick={function() { refFile.current && refFile.current.click(); }} style={{ fontSize: 12, color: GREEN, cursor: "pointer", textDecoration: "underline" }}>Parcourir</span>
+              <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
+              <span style={{ fontSize: 12, color: "#aaa" }}>Drop ici</span>
+              <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
+              <span style={{ fontSize: 12, color: "#aaa" }}>Ctrl+V après focus</span>
+            </div>
+          )
+        )}
+
+        {/* Thumbnails grid */}
+        {items.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {items.map(function(item, i) { return (
+              <div
+                key={i}
+                draggable={!isMobile}
+                onDragStart={function() { handleDragStart(i); }}
+                onDragOver={function(e) { handleDragOver(e, i); }}
+                onDrop={function(e) { handleDrop(e, i); }}
+                onDragEnd={function() { setDragIdx(null); setOverIdx(null); }}
+                style={{ position: "relative", opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? "2px solid " + GREEN : "none", borderRadius: 6, cursor: isMobile ? "default" : "grab" }}
+              >
+                {item.url
+                  ? <img src={item.url} alt={item.name} style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, objectFit: "cover", borderRadius: 6, border: "1px solid " + BORDER, display: "block" }} />
+                  : <div style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", borderRadius: 6, fontSize: 9, color: MUTED, border: "1px solid " + BORDER, textAlign: "center" }}>PDF</div>
+                }
+                <button
+                  onClick={function(e) { e.stopPropagation(); onDelete(i); }}
+                  style={{ position: "absolute", top: -6, right: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: "#e74c3c", color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 13 : 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                >×</button>
+              </div>
+            ); })}
+            <div
+              onClick={function() { refFile.current && refFile.current.click(); }}
+              style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px dashed " + BORDER, borderRadius: 6, cursor: "pointer", fontSize: 22, color: MUTED }}
+            >+</div>
           </div>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {items.map((item, i) => (
-            <div
-              key={i}
-              draggable
-              onDragStart={() => handleItemDragStart(i)}
-              onDragOver={e => handleItemDragOver(e, i)}
-              onDrop={e => handleItemDrop(e, i)}
-              onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
-              style={{ position: "relative", opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? `2px solid ${GREEN}` : "none", borderRadius: 4, cursor: "grab" }}
-            >
-              {item.url
-                ? <img src={item.url} alt={item.name} style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 4, border: `1px solid ${BORDER}`, display: "block" }} />
-                : <div style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", borderRadius: 4, fontSize: 9, color: MUTED, border: `1px solid ${BORDER}`, textAlign: "center", padding: 2 }}>PDF</div>
-              }
-              <button
-                onClick={e => { e.stopPropagation(); onDelete(i); }}
-                style={{ position: "absolute", top: -5, right: -5, width: 16, height: 16, borderRadius: "50%", background: "#e74c3c", color: WHITE, border: "none", cursor: "pointer", fontSize: 10, lineHeight: "16px", textAlign: "center", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >×</button>
-            </div>
-          ))}
-          {items.length > 0 && (
-            <div onClick={() => ref.current && ref.current.click()} style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", border: `1.5px dashed ${BORDER}`, borderRadius: 4, cursor: "pointer", fontSize: 20, color: MUTED }}>+</div>
-          )}
-        </div>
       </div>
-      {hasNote && <textarea value={note || ""} onChange={e => onNoteChange(e.target.value)} placeholder="Notes / précisions sur le TD..." rows={2} style={{ width: "100%", marginTop: 5, fontSize: 12, resize: "vertical", boxSizing: "border-box" }} />}
-      <input ref={ref} type="file" multiple accept="image/*,application/pdf,.heic,.heif" style={{ display: "none" }} onChange={e => e.target.files && e.target.files.length && handleFiles(e.target.files)} />
+
+      {hasNote && <textarea value={note || ""} onChange={function(e) { return onNoteChange(e.target.value); }} placeholder="Notes / précisions sur le TD..." rows={2} style={{ width: "100%", marginTop: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />}
+
+      {/* Hidden file inputs */}
+      <input ref={refCamera} type="file" multiple accept="image/*" capture="environment" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files.length) handleFiles(e.target.files); }} />
+      <input ref={refFile} type="file" multiple accept="image/*,application/pdf,.heic,.heif" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files.length) handleFiles(e.target.files); }} />
     </div>
   );
 }
-
 function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
@@ -234,7 +308,7 @@ function PreviewDoc({ data }) {
     groupedStrings[key].push({ ...s, idx: i });
   });
   return (
-    <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "2rem 1.5rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
+    <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "1rem 0.75rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
       {data.calepinage && data.calepinage.image && (
         <div style={{ marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${BORDER}` }}>
           <img src={data.calepinage.image} alt="Calepinage" style={{ width: "100%", maxHeight: 400, objectFit: "contain", display: "block" }} />
@@ -789,9 +863,9 @@ function App() {
   });
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto", padding: "1.5rem 1rem", display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ maxWidth: 880, margin: "0 auto", padding: "1rem 0.75rem", display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Header */}
-      <div id="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+      <div id="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV</div>
@@ -802,7 +876,7 @@ function App() {
             <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
           </div>
           {mode === "preview" && <>
-            <button onClick={() => window.print()} style={btnSt(false)}>Exporter PDF</button>
+            <button onClick={() => window.print()} style={btnSt(false)}>⬇ PDF</button>
           </>}
         </div>
       </div>
