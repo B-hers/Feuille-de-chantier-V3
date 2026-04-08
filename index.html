@@ -47,7 +47,7 @@ button { font-family: inherit; cursor: pointer; }
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef } = React;
+const { useState, useRef, useEffect, useCallback } = React;
 
 const PHOTO_CATS = [
   { key: "vue_generale", label: "1. Vue générale du chantier" },
@@ -78,6 +78,36 @@ const PM_DATA = {
   "Paul Bonnefont":          { tel: "", email: "" },
 };
 const ORIENTS = ["Nord","Sud","Est","Ouest"];
+
+const SUPA_URL = "https://brodjywccrirlzplovxg.supabase.co";
+const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
+
+async function supaLoad(ref) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) + "&select=data,updated_at", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var rows = await res.json();
+    if (rows && rows.length > 0) return rows[0];
+  } catch(e) {}
+  return null;
+}
+
+async function supaSave(ref, data) {
+  try {
+    await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+      method: "POST",
+      headers: {
+        "apikey": SUPA_KEY,
+        "Authorization": "Bearer " + SUPA_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+      },
+      body: JSON.stringify({ ref: ref, data: data, updated_at: new Date().toISOString() })
+    });
+    return true;
+  } catch(e) { return false; }
+}
 
 const GREEN = "#1B6B3A";
 const GREEN_LIGHT = "#f0f7f2";
@@ -450,6 +480,12 @@ function App() {
   const [strings, setStrings] = useState([{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
 
+  const [ref, setRef] = useState("");
+  const [saveStatus, setSaveStatus] = useState(""); // "", "saving", "saved", "error"
+  const [lastSaved, setLastSaved] = useState(null);
+  const saveTimer = useRef(null);
+  const isLoading = useRef(false);
+
   const data = { client, weGreen, date, tech, comments, logistique, strings, photos, calepinage, tdNote };
 
   const setT = (path, val) => setTech(prev => {
@@ -460,6 +496,59 @@ function App() {
     o[parts[parts.length - 1]] = val;
     return next;
   });
+
+  // ── Load from URL ?ref= on mount ──────────────────────────────────────────
+  useEffect(function() {
+    var params = new URLSearchParams(window.location.search);
+    var urlRef = params.get("ref");
+    if (!urlRef) return;
+    setRef(urlRef);
+    setSaveStatus("loading");
+    supaLoad(urlRef).then(function(row) {
+      if (!row || !row.data) { setSaveStatus(""); return; }
+      var d = row.data;
+      isLoading.current = true;
+      if (d.client) setClient(d.client);
+      if (d.weGreen) setWeGreen(d.weGreen);
+      if (d.date) setDate(d.date);
+      if (d.tech) setTech(d.tech);
+      if (d.comments !== undefined) setComments(d.comments);
+      if (d.logistique) setLogistique(d.logistique);
+      if (d.strings) setStrings(d.strings);
+      if (d.photos) setPhotos(d.photos);
+      if (d.tdNote !== undefined) setTdNote(d.tdNote);
+      if (d.calepinage) setCalepinage(d.calepinage);
+      setLastSaved(row.updated_at);
+      setSaveStatus("saved");
+      setTimeout(function() { isLoading.current = false; }, 100);
+    });
+  }, []);
+
+  // ── Auto-save on any data change ───────────────────────────────────────────
+  useEffect(function() {
+    if (!ref || isLoading.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveStatus("saving");
+    saveTimer.current = setTimeout(function() {
+      supaSave(ref, data).then(function(ok) {
+        if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
+        else setSaveStatus("error");
+      });
+    }, 1200);
+  }, [client, weGreen, date, tech, comments, logistique, strings, tdNote]);
+
+  // ── Photos auto-save (separate, debounced longer due to size) ──────────────
+  useEffect(function() {
+    if (!ref || isLoading.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveStatus("saving");
+    saveTimer.current = setTimeout(function() {
+      supaSave(ref, data).then(function(ok) {
+        if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
+        else setSaveStatus("error");
+      });
+    }, 2000);
+  }, [photos, calepinage]);
 
   const parseBDC = async (file) => {
     setBcLoading(true); setBcMsg("");
@@ -868,7 +957,14 @@ function App() {
       <div id="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV{ref ? <span style={{ fontSize: 14, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {ref}</span> : null}</div>
+          {!ref && <div style={{ fontSize: 11, color: "#e07b00", marginTop: 2 }}>⚠ Pas de référence — ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</div>}
+          {ref && <div style={{ fontSize: 11, marginTop: 2, color: saveStatus === "saving" ? "#e07b00" : saveStatus === "error" ? "#c0392b" : saveStatus === "loading" ? MUTED : GREEN }}>
+            {saveStatus === "saving" && "⏳ Sauvegarde en cours…"}
+            {saveStatus === "loading" && "⏳ Chargement…"}
+            {saveStatus === "error" && "⚠ Erreur de sauvegarde"}
+            {saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
+          </div>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
