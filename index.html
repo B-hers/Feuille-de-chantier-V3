@@ -33,6 +33,10 @@ button { font-family: inherit; cursor: pointer; }
 .g3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 
 /* ── Mobile ── */
+/* Prevent photos cut between pages */
+.photo-section { page-break-inside: avoid; break-inside: avoid; }
+.photo-section img { page-break-inside: avoid; break-inside: avoid; }
+
 @media (max-width: 640px) {
   body { font-size: 15px; background: #f4f4f0; }
   input, select, textarea { font-size: 16px !important; padding: 11px 12px; border-radius: 8px; width: 100%; }
@@ -50,14 +54,15 @@ button { font-family: inherit; cursor: pointer; }
 const { useState, useRef, useEffect, useCallback } = React;
 
 const PHOTO_CATS = [
-  { key: "vue_generale", label: "1. Vue générale du chantier" },
-  { key: "toiture", label: "2. État / photos de la toiture" },
-  { key: "cablage", label: "3. Câblage DC & AC" },
-  { key: "strings_design", label: "4. Design des strings" },
-  { key: "onduleur", label: "5. Emplacement de l'onduleur" },
-  { key: "compteur", label: "6. Compteur électrique & disjoncteur général" },
-  { key: "tgbt", label: "7. Tableau(x) TGBT" },
-  { key: "td", label: "8. TD", hasNote: true },
+  { key: "vue_generale",    label: "1. Vue générale du chantier" },
+  { key: "toiture",         label: "2. État / photos de la toiture" },
+  { key: "cablage",         label: "3. Câblage DC & AC" },
+  { key: "strings_design",  label: "4. Design des strings" },
+  { key: "onduleur",        label: "5. Emplacement de l'onduleur" },
+  { key: "compteur",        label: "6. Compteur électrique & disjoncteur général", hiRes: true },
+  { key: "tgbt",            label: "7. Tableau(x) TGBT", hiRes: true },
+  { key: "td",              label: "8. TD", hasNote: true, hiRes: true },
+  { key: "schema_elec",     label: "9. Schéma électrique client", hiRes: true, hasNote: true },
 ];
 
 const PM_DATA = {
@@ -147,7 +152,7 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
   </div>
 );
 
-function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, onNoteChange }) {
+function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, onNoteChange, hiRes }) {
   const [drag, setDrag] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
@@ -157,11 +162,14 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  const compressImg = function(blob) { return new Promise(function(res) {
+  // hiRes=true → 1800px max, qualité 0.88 (tableaux, schémas, disjoncteurs)
+  // hiRes=false → 1000px max, qualité 0.72 (photos générales)
+  const compressImg = function(blob, hiRes) { return new Promise(function(res) {
     const img = new Image();
     const objUrl = URL.createObjectURL(blob);
     img.onload = function() {
-      const MAX = 1000;
+      const MAX = hiRes ? 1800 : 1000;
+      const QUALITY = hiRes ? 0.88 : 0.72;
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
       else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
@@ -171,7 +179,7 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(objUrl);
-      res(canvas.toDataURL("image/jpeg", 0.72));
+      res(canvas.toDataURL("image/jpeg", QUALITY));
     };
     img.onerror = function() { URL.revokeObjectURL(objUrl); res(null); };
     img.src = objUrl;
@@ -182,7 +190,7 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
     const result = [];
     for (let i = 0; i < arr.length; i++) {
       const f = arr[i];
-      const url = f.type.startsWith("image/") ? await compressImg(f) : null;
+      const url = f.type.startsWith("image/") ? await compressImg(f, hiRes) : null;
       result.push({ name: f.name, url: url, type: f.type });
     }
     onAdd(result);
@@ -196,7 +204,7 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
     const result = [];
     for (let i = 0; i < imageItems.length; i++) {
       const blob = imageItems[i].getAsFile();
-      const url = await compressImg(blob);
+      const url = await compressImg(blob, hiRes);
       result.push({ name: "colle_" + Date.now() + ".jpg", url: url, type: blob.type });
     }
     onAdd(result);
@@ -435,12 +443,12 @@ function PreviewDoc({ data }) {
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Photos</div>
           {PHOTO_CATS.filter(c => (data.photos[c.key] && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
-            <div key={c.key} style={{ marginBottom: 14 }}>
+            <div key={c.key} style={{ marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: TEXT }}>{c.label}</div>
               {c.key === "td" && data.tdNote && <div style={{ fontSize: 12, color: MUTED, padding: "4px 8px", background: "#f9f9f7", borderRadius: 4, marginBottom: 6, border: `1px solid ${BORDER}` }}>{data.tdNote}</div>}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, pageBreakInside: "avoid", breakInside: "avoid" }}>
                 {data.photos[c.key].map((item, i) => item.url
-                  ? <img key={i} src={item.url} alt={item.name} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                  ? <img key={i} src={item.url} alt={item.name} style={{ width: "100%", aspectRatio: "4/3", pageBreakInside: "avoid", breakInside: "avoid", objectFit: "cover", borderRadius: 6, border: `1px solid ${BORDER}` }} />
                   : <div key={i} style={{ aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, color: MUTED }}>📄 PDF</div>
                 )}
               </div>
@@ -461,6 +469,7 @@ function App() {
   const [weGreen, setWeGreen] = useState({ manager: "", tel: "", email: "" });
   const [calepinage, setCalepinage] = useState({ image: null, loading: false, msg: "" });
   const [tdNote, setTdNote] = useState("");
+  const [schemaNote, setSchemaNote] = useState("");
   const [date, setDate] = useState("");
   const [tech, setTech] = useState({
     panneaux: { type: "", nbr: "", kWc: "" },
@@ -491,7 +500,7 @@ function App() {
   const saveTimer = useRef(null);
   const isLoading = useRef(false);
 
-  const data = { client, weGreen, date, tech, comments, logistique, strings, photos, calepinage, tdNote };
+  const data = { client, weGreen, date, tech, comments, logistique, strings, photos, calepinage, tdNote, schemaNote };
 
   const setT = (path, val) => setTech(prev => {
     const next = JSON.parse(JSON.stringify(prev));
@@ -522,6 +531,7 @@ function App() {
       if (d.strings) setStrings(d.strings);
       if (d.photos) setPhotos(d.photos);
       if (d.tdNote !== undefined) setTdNote(d.tdNote);
+      if (d.schemaNote !== undefined) setSchemaNote(d.schemaNote);
       if (d.calepinage) setCalepinage(d.calepinage);
       setLastSaved(row.updated_at);
       setSaveStatus("saved");
@@ -1258,7 +1268,7 @@ function App() {
           <div style={CARD}>
             <div style={SH}>Photos</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-              {PHOTO_CATS.map(({ key, label, hasNote }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" ? tdNote : ""} onNoteChange={v => setTdNote(v)} />)}
+              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
             </div>
           </div>
         </>
