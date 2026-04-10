@@ -1221,11 +1221,11 @@ function App() {
 
       // Render target page at high resolution
       const page = await pdf.getPage(targetPage);
-      const viewport = page.getViewport({ scale: 2.5 });
+      const viewport = page.getViewport({ scale: 4.0 });
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width; canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      const calUrl = canvas.toDataURL("image/jpeg", 0.90);
+      const calUrl = canvas.toDataURL("image/jpeg", 0.95);
       const type = isHelioScope ? "Hélioscope" : isArchelios ? "Archelios" : "PDF";
       applyCalepinage(calUrl, "✓ " + type + " — page " + targetPage + "/" + pdf.numPages);
 
