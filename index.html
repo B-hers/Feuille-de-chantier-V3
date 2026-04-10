@@ -153,17 +153,25 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
 );
 
 function AnnotationModal({ imageUrl, onSave, onClose }) {
-  const canvasRef = useRef();
-  const [tool, setTool] = useState("free");
-  const [color, setColor] = useState("#e74c3c");
-  const [thickness, setThickness] = useState(3);
-  const [history, setHistory] = useState([]);
-  const drawing = useRef(false);
-  const startPos = useRef({ x: 0, y: 0 });
-  const snapshot = useRef(null);
+  var canvasRef = useRef();
+  var containerRef = useRef();
+  var [tool, setTool] = useState("free");
+  var [color, setColor] = useState("#e74c3c");
+  var [thickness, setThickness] = useState(4);
+  var [history, setHistory] = useState([]);
+  var drawing = useRef(false);
+  var startPos = useRef({ x: 0, y: 0 });
+  var snapshot = useRef(null);
+  // Pinch-to-zoom state
+  var zoom = useRef(1);
+  var panOffset = useRef({ x: 0, y: 0 });
+  var lastPinchDist = useRef(null);
+  var lastPanPos = useRef(null);
+  var isPinching = useRef(false);
+  var [zoomLevel, setZoomLevel] = useState(1);
 
-  const COLORS = ["#e74c3c","#27ae60","#2980b9","#f39c12","#ffffff","#1a1a1a"];
-  const TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["eraser","🧹 Gomme"]];
+  var COLORS = ["#e74c3c","#27ae60","#2980b9","#f39c12","#ffffff","#1a1a1a"];
+  var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["eraser","🧹 Gomme"]];
 
   useEffect(function() {
     var canvas = canvasRef.current;
@@ -171,12 +179,10 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     var img = new Image();
     img.onload = function() {
       var maxW = window.innerWidth * 0.92;
-      var maxH = window.innerHeight * 0.75;
+      var maxH = window.innerHeight * 0.65;
       var scale = Math.min(maxW / img.width, maxH / img.height, 1);
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      canvas.style.width = canvas.width + "px";
-      canvas.style.height = canvas.height + "px";
       var ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       setHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
@@ -187,8 +193,9 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   function getPos(e) {
     var canvas = canvasRef.current;
     var rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
+    // Account for zoom/pan transform applied to container
+    var scaleX = canvas.width / (rect.width);
+    var scaleY = canvas.height / (rect.height);
     var clientX = e.touches ? e.touches[0].clientX : e.clientX;
     var clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
@@ -196,6 +203,8 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
 
   function onStart(e) {
     e.preventDefault();
+    if (e.touches && e.touches.length === 2) { isPinching.current = true; return; }
+    if (isPinching.current) return;
     var canvas = canvasRef.current;
     var ctx = canvas.getContext("2d");
     var pos = getPos(e);
@@ -208,25 +217,46 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
 
   function onMove(e) {
     e.preventDefault();
+    // Handle pinch zoom
+    if (e.touches && e.touches.length === 2) {
+      isPinching.current = true;
+      drawing.current = false;
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      if (lastPinchDist.current !== null) {
+        var delta = dist / lastPinchDist.current;
+        zoom.current = Math.min(Math.max(zoom.current * delta, 1), 4);
+        setZoomLevel(Math.round(zoom.current * 100));
+        if (containerRef.current) {
+          containerRef.current.style.transform = "scale(" + zoom.current + ")";
+          containerRef.current.style.transformOrigin = "center center";
+        }
+      }
+      lastPinchDist.current = dist;
+      return;
+    }
+    lastPinchDist.current = null;
     if (!drawing.current) return;
     var canvas = canvasRef.current;
     var ctx = canvas.getContext("2d");
     var pos = getPos(e);
-    ctx.lineWidth = tool === "eraser" ? thickness * 5 : thickness;
+    ctx.lineWidth = tool === "eraser" ? thickness * 6 : thickness;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = tool === "eraser" ? null : color;
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, thickness * 3, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, thickness * 4, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = "source-over";
     } else if (tool === "free") {
+      ctx.strokeStyle = color;
       ctx.globalCompositeOperation = "source-over";
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     } else if (tool === "line") {
+      ctx.strokeStyle = color;
       ctx.putImageData(snapshot.current, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.beginPath();
@@ -237,6 +267,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   }
 
   function onEnd(e) {
+    if (e.touches && e.touches.length < 2) { isPinching.current = false; lastPinchDist.current = null; }
     if (!drawing.current) return;
     drawing.current = false;
     var canvas = canvasRef.current;
@@ -253,9 +284,14 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     ctx.putImageData(newHist[newHist.length - 1], 0, 0);
   }
 
+  function resetZoom() {
+    zoom.current = 1;
+    setZoomLevel(100);
+    if (containerRef.current) { containerRef.current.style.transform = "scale(1)"; }
+  }
+
   function save() {
     var canvas = canvasRef.current;
-    // Merge annotation onto white background then save
     var out = document.createElement("canvas");
     out.width = canvas.width; out.height = canvas.height;
     var ctx2 = out.getContext("2d");
@@ -266,44 +302,51 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden", touchAction: "none" }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center", padding: "8px 12px", background: "#1a1a1a", borderRadius: 10, marginBottom: 10, maxWidth: "96vw" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "center", padding: "8px 10px", background: "#1a1a1a", width: "100%", boxSizing: "border-box" }}>
         {TOOLS.map(function(t) { return (
           <button key={t[0]} onClick={function() { setTool(t[0]); }}
-            style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: tool === t[0] ? GREEN : "#333", color: WHITE, fontSize: 13, cursor: "pointer", fontWeight: tool === t[0] ? 700 : 400 }}>
+            style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: tool === t[0] ? GREEN : "#333", color: "#fff", fontSize: 13, cursor: "pointer", fontWeight: tool === t[0] ? 700 : 400 }}>
             {t[1]}
           </button>
         ); })}
-        <div style={{ width: 1, height: 24, background: "#444" }} />
+        <div style={{ width: 1, height: 28, background: "#444" }} />
         {COLORS.map(function(col) { return (
           <div key={col} onClick={function() { setColor(col); setTool("free"); }}
-            style={{ width: 22, height: 22, borderRadius: "50%", background: col, border: color === col && tool !== "eraser" ? "3px solid #fff" : "2px solid #555", cursor: "pointer", flexShrink: 0 }} />
+            style={{ width: 26, height: 26, borderRadius: "50%", background: col, border: color === col && tool !== "eraser" ? "3px solid #fff" : "2px solid #555", cursor: "pointer", flexShrink: 0 }} />
         ); })}
-        <div style={{ width: 1, height: 24, background: "#444" }} />
+        <div style={{ width: 1, height: 28, background: "#444" }} />
         {[2,4,8].map(function(t) { return (
           <div key={t} onClick={function() { setThickness(t); }}
-            style={{ width: t * 3 + 8, height: t * 3 + 8, borderRadius: "50%", background: thickness === t ? "#fff" : "#666", cursor: "pointer", flexShrink: 0 }} />
+            style={{ width: t * 3 + 10, height: t * 3 + 10, minWidth: 12, minHeight: 12, borderRadius: "50%", background: thickness === t ? "#fff" : "#555", cursor: "pointer", flexShrink: 0 }} />
         ); })}
-        <div style={{ width: 1, height: 24, background: "#444" }} />
-        <button onClick={undo} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#333", color: WHITE, fontSize: 13, cursor: "pointer" }}>↩ Annuler</button>
-        <button onClick={save} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: GREEN, color: WHITE, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauvegarder</button>
-        <button onClick={onClose} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#555", color: WHITE, fontSize: 13, cursor: "pointer" }}>✕</button>
+        <div style={{ width: 1, height: 28, background: "#444" }} />
+        <button onClick={undo} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>↩</button>
+        {zoomLevel > 100 && <button onClick={resetZoom} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#555", color: "#fff", fontSize: 12, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
+        <button onClick={save} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: GREEN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauver</button>
+        <button onClick={onClose} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#555", color: "#fff", fontSize: 13, cursor: "pointer" }}>✕</button>
       </div>
-      <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "5px 14px", background: "#111", borderRadius: 8, marginBottom: 8, fontSize: 12, color: "#ccc", flexWrap: "wrap", justifyContent: "center" }}>
-        <span style={{ color: "#888", fontWeight: 600, marginRight: 4 }}>Légende :</span>
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, alignItems: "center", padding: "5px 10px", background: "#111", fontSize: 12, color: "#ccc", flexWrap: "wrap", justifyContent: "center", width: "100%", boxSizing: "border-box" }}>
+        <span style={{ color: "#888", fontWeight: 600 }}>Légende :</span>
         {[["#e74c3c","Câble DC"],["#27ae60","Câble AC"],["#2980b9","Onduleur"],["#f39c12","Borne"]].map(function(item) { return (
-          <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 12, height: 12, borderRadius: "50%", background: item[0], display: "inline-block", flexShrink: 0 }} />
-            <span>{item[1]}</span>
+          <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 11, height: 11, borderRadius: "50%", background: item[0], display: "inline-block" }} />
+            {item[1]}
           </span>
         ); })}
+        <span style={{ color: "#666", fontSize: 11 }}>Pincer pour zoomer</span>
       </div>
-      {/* Canvas */}
-      <canvas ref={canvasRef}
-        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
-        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
-        style={{ cursor: tool === "eraser" ? "cell" : "crosshair", borderRadius: 6, touchAction: "none", maxWidth: "92vw", maxHeight: "75vh", display: "block" }} />
+      {/* Canvas container with zoom */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", position: "relative" }}>
+        <div ref={containerRef} style={{ transition: "transform 0.05s", transformOrigin: "center center" }}>
+          <canvas ref={canvasRef}
+            onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+            onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+            style={{ cursor: tool === "eraser" ? "cell" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", maxWidth: "92vw" }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -313,6 +356,7 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
   const [annotating, setAnnotating] = useState(null); // index of photo being annotated
+  const [preview, setPreview] = useState(null); // url of photo to preview full-screen
   const refFile = useRef();
   const refCamera = useRef();
   const zoneRef = useRef();
@@ -436,35 +480,45 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
                 onDragOver={function(e) { handleDragOver(e, i); }}
                 onDrop={function(e) { handleDrop(e, i); }}
                 onDragEnd={function() { setDragIdx(null); setOverIdx(null); }}
-                style={{ position: "relative", opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? "2px solid " + GREEN : "none", borderRadius: 6, cursor: isMobile ? "default" : "grab" }}
+                style={{ opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? "2px solid " + GREEN : "none", borderRadius: 8, background: WHITE, border: "1px solid " + BORDER, overflow: "hidden", width: isMobile ? 110 : 90 }}
               >
+                {/* Photo */}
                 {item.url
-                  ? <img src={item.url} alt={item.name} style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, objectFit: "cover", borderRadius: 6, border: "1px solid " + BORDER, display: "block" }} />
-                  : <div style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", borderRadius: 6, fontSize: 9, color: MUTED, border: "1px solid " + BORDER, textAlign: "center" }}>PDF</div>
+                  ? <img src={item.url} alt={item.name} style={{ width: "100%", height: isMobile ? 90 : 75, objectFit: "cover", display: "block", cursor: "pointer" }} onClick={function(e) { e.stopPropagation(); setPreview(item.url); }} />
+                  : <div style={{ width: "100%", height: isMobile ? 90 : 75, display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontSize: 11, color: MUTED }}>PDF</div>
                 }
-                {item.url && <button
-                  onClick={function(e) { e.stopPropagation(); setAnnotating(i); }}
-                  style={{ position: "absolute", bottom: -6, right: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: "#2980b9", color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 10 : 8, lineHeight: (isMobile ? 22 : 16) + "px", textAlign: "center", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>}
-                <button
-                  onClick={function(e) { e.stopPropagation(); onDelete(i); }}
-                  style={{ position: "absolute", top: -6, right: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: "#e74c3c", color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 13 : 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                >×</button>
-                {item.url && <a
-                  href={item.url}
-                  download={item.name || "photo.jpg"}
-                  onClick={function(e) { e.stopPropagation(); }}
-                  style={{ position: "absolute", top: -6, left: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: GREEN, color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 10 : 8, lineHeight: (isMobile ? 22 : 16) + "px", textAlign: "center", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>⬇</a>}
+                {/* Action bar below */}
+                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", padding: "4px 2px", background: "#f8f8f6", borderTop: "1px solid " + BORDER }}>
+                  {item.url && <button title="Agrandir" onClick={function(e) { e.stopPropagation(); setPreview(item.url); }}
+                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#555" }}>🔍</button>}
+                  {item.url && <button title="Annoter" onClick={function(e) { e.stopPropagation(); setAnnotating(i); }}
+                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#2980b9" }}>✏️</button>}
+                  {item.url && <a title="Télécharger" href={item.url} download={item.name || "photo.jpg"} onClick={function(e) { e.stopPropagation(); }}
+                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#27ae60", textAlign: "center", textDecoration: "none" }}>⬇️</a>}
+                  <button title="Supprimer" onClick={function(e) { e.stopPropagation(); onDelete(i); }}
+                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#e74c3c" }}>×</button>
+                </div>
               </div>
             ); })}
             <div
               onClick={function() { refFile.current && refFile.current.click(); }}
-              style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px dashed " + BORDER, borderRadius: 6, cursor: "pointer", fontSize: 22, color: MUTED }}
+              style={{ width: isMobile ? 110 : 90, height: isMobile ? 118 : 100, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px dashed " + BORDER, borderRadius: 8, cursor: "pointer", fontSize: 24, color: MUTED }}
             >+</div>
           </div>
         )}
       </div>
 
       {hasNote && <textarea value={note || ""} onChange={function(e) { return onNoteChange(e.target.value); }} placeholder="Notes / précisions sur le TD..." rows={2} style={{ width: "100%", marginTop: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />}
+
+      {/* Lightbox preview */}
+      {preview && (
+        <div onClick={function() { setPreview(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          <img src={preview} alt="" style={{ maxWidth: "95vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 6 }} />
+          <button onClick={function() { setPreview(null); }}
+            style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: "50%", background: "#333", color: WHITE, border: "none", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+      )}
 
       {/* Annotation modal */}
       {annotating !== null && items[annotating] && items[annotating].url && (
@@ -525,8 +579,8 @@ function PreviewDoc({ data }) {
   return (
     <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "1rem 0.75rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
       {data.calepinage && data.calepinage.image && (
-        <div style={{ marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${BORDER}` }}>
-          <img src={data.calepinage.image} alt="Calepinage" style={{ width: "100%", maxHeight: 400, objectFit: "contain", display: "block" }} />
+        <div style={{ marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fafaf8" }}>
+          <img src={data.calepinage.image} alt="Calepinage" style={{ width: "100%", maxHeight: "420px", objectFit: "contain", display: "block", padding: "8px" }} />
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, paddingBottom: 16, borderBottom: `2px solid ${GREEN}` }}>
@@ -692,27 +746,36 @@ function App() {
     setSaveStatus("loading");
     supaLoad(urlRef).then(function(row) {
       if (!row || !row.data) { setSaveStatus(""); return; }
-      var d = row.data;
-      isLoading.current = true;
-      if (d.client) setClient(d.client);
-      if (d.weGreen) setWeGreen(d.weGreen);
-      if (d.date) setDate(d.date);
-      if (d.tech) setTech(d.tech);
-      if (d.comments !== undefined) setComments(d.comments);
-      if (d.logistique) setLogistique(d.logistique);
-      if (d.strings) setStrings(d.strings);
-      if (d.photos) {
-        // Ensure all current PHOTO_CATS keys exist (handles schema updates)
-        var loadedPhotos = d.photos;
-        var merged = Object.fromEntries(PHOTO_CATS.map(function(cat) { return [cat.key, loadedPhotos[cat.key] || []]; }));
-        setPhotos(merged);
+      try {
+        var d = row.data;
+        isLoading.current = true;
+        // Each field validated before applying - crash-safe
+        if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
+        if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+        if (typeof d.date === "string") setDate(d.date);
+        if (d.tech && typeof d.tech === "object") setTech(function(p){ return Object.assign({}, JSON.parse(JSON.stringify(p)), d.tech); });
+        if (typeof d.comments === "string") setComments(d.comments);
+        if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (Array.isArray(d.strings) && d.strings.length > 0) setStrings(d.strings);
+        if (d.photos && typeof d.photos === "object") {
+          var loadedPhotos = d.photos;
+          var merged = Object.fromEntries(PHOTO_CATS.map(function(cat) {
+            var arr = loadedPhotos[cat.key];
+            return [cat.key, Array.isArray(arr) ? arr : []];
+          }));
+          setPhotos(merged);
+        }
+        if (typeof d.tdNote === "string") setTdNote(d.tdNote);
+        if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
+        if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
+        setLastSaved(row.updated_at);
+        setSaveStatus("saved");
+        setTimeout(function() { isLoading.current = false; }, 100);
+      } catch(loadErr) {
+        console.error("Erreur chargement Supabase:", loadErr);
+        isLoading.current = false;
+        setSaveStatus("");
       }
-      if (d.tdNote !== undefined) setTdNote(d.tdNote);
-      if (d.schemaNote !== undefined) setSchemaNote(d.schemaNote);
-      if (d.calepinage) setCalepinage(d.calepinage);
-      setLastSaved(row.updated_at);
-      setSaveStatus("saved");
-      setTimeout(function() { isLoading.current = false; }, 100);
     });
   }, []);
 
@@ -1092,31 +1155,80 @@ function App() {
   };
 
 
-    const extractCalepinage = async (file) => {
+        const extractCalepinage = async (file) => {
     setCalepinage({ image: null, loading: true, msg: "" });
     try {
+      // Helper: save url as calepinage + auto-add to strings_design
+      const applyCalepinage = (url, msg) => {
+        setCalepinage({ image: url, loading: false, msg: msg });
+        setPhotos(prev => {
+          var existing = prev.strings_design || [];
+          // Remove old auto-calepinage then prepend new one
+          var filtered = existing.filter(function(p) { return p.name !== "__calepinage__"; });
+          return Object.assign({}, prev, { strings_design: [{ name: "__calepinage__", url: url, type: "image/jpeg" }].concat(filtered) });
+        });
+      };
+
       if (file.type.startsWith("image/")) {
         const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
-        setCalepinage({ image: url, loading: false, msg: "✓ Image chargée" });
+        applyCalepinage(url, "✓ Image chargée");
         return;
       }
+
       const pdfjsLib = window["pdfjs-dist/build/pdf"];
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let targetPage = pdf.numPages;
+
+      // Read all pages text first
+      const pageTexts = [];
       for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const tc = await page.getTextContent();
-        const text = tc.items.map(item => item.str).join(" ").toLowerCase();
-        if (/illustration|detailed layout|calepinage|layout\d/.test(text)) { targetPage = i; break; }
+        const pg = await pdf.getPage(i);
+        const tc = await pg.getTextContent();
+        pageTexts.push(tc.items.map(function(it){ return it.str; }).join(" ").toLowerCase());
       }
+      const allText = pageTexts.join(" ");
+
+      // Detect report type
+      const isHelioScope = /helioscope|aurora solar|detailed layout/i.test(allText);
+      const isArchelios = /archelios|illustrations du projet/i.test(allText);
+
+      let targetPage = pdf.numPages; // default: last page
+
+      if (isHelioScope) {
+        // Hélioscope: find "Detailed Layout" page
+        for (let i = 1; i <= pdf.numPages; i++) {
+          if (/detailed layout/i.test(pageTexts[i-1])) { targetPage = i; break; }
+        }
+      } else if (isArchelios) {
+        // Archelios: find "Illustrations du projet" page
+        for (let i = 1; i <= pdf.numPages; i++) {
+          if (/illustrations du projet/i.test(pageTexts[i-1])) { targetPage = i; break; }
+        }
+      } else {
+        // Generic: score pages, prefer layout/illustration pages, skip map pages
+        let bestScore = -999; let bestPage = pdf.numPages;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const txt = pageTexts[i-1];
+          let score = 0;
+          if (/illustration|detailed layout|calepinage|layout plan/.test(txt)) score += 15;
+          if (/toiture|roof|panneaux|string|mppt/.test(txt)) score += 5;
+          if (/google|maps?|satellite|localisation|location|météo|meteo|irradiation/.test(txt)) score -= 20;
+          if (score >= bestScore) { bestScore = score; bestPage = i; }
+        }
+        targetPage = bestPage;
+      }
+
+      // Render target page at high resolution
       const page = await pdf.getPage(targetPage);
-      const viewport = page.getViewport({ scale: 2.0 });
+      const viewport = page.getViewport({ scale: 2.5 });
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width; canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      setCalepinage({ image: canvas.toDataURL("image/jpeg", 0.88), loading: false, msg: `✓ Page ${targetPage}/${pdf.numPages} extraite` });
+      const calUrl = canvas.toDataURL("image/jpeg", 0.90);
+      const type = isHelioScope ? "Hélioscope" : isArchelios ? "Archelios" : "PDF";
+      applyCalepinage(calUrl, "✓ " + type + " — page " + targetPage + "/" + pdf.numPages);
+
     } catch (e) {
       setCalepinage({ image: null, loading: false, msg: "Erreur : " + e.message });
     }
@@ -1438,7 +1550,7 @@ function App() {
               </div>
               {calepinage.image && (
                 <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-                  <img src={calepinage.image} alt="calepinage" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                  <img src={calepinage.image} alt="calepinage" style={{ width: "100%", borderRadius: 6, display: "block" }} />
                   <button onClick={() => setCalepinage({ image: null, loading: false, msg: "" })} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.5)", color: WHITE, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>×</button>
                 </div>
               )}
