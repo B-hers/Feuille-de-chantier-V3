@@ -614,7 +614,7 @@ function PreviewDoc({ data }) {
       {PHOTO_CATS.some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Photos</div>
-          {PHOTO_CATS.filter(c => (data.photos[c.key] && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
+          {PHOTO_CATS.filter(c => (data.photos[c.key] && Array.isArray(data.photos[c.key]) && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
             <div key={c.key} style={{ marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: TEXT }}>{c.label}</div>
               {c.key === "td" && data.tdNote && <div style={{ fontSize: 12, color: MUTED, padding: "4px 8px", background: "#f9f9f7", borderRadius: 4, marginBottom: 6, border: `1px solid ${BORDER}` }}>{data.tdNote}</div>}
@@ -701,7 +701,12 @@ function App() {
       if (d.comments !== undefined) setComments(d.comments);
       if (d.logistique) setLogistique(d.logistique);
       if (d.strings) setStrings(d.strings);
-      if (d.photos) setPhotos(d.photos);
+      if (d.photos) {
+        // Ensure all current PHOTO_CATS keys exist (handles schema updates)
+        var loadedPhotos = d.photos;
+        var merged = Object.fromEntries(PHOTO_CATS.map(function(cat) { return [cat.key, loadedPhotos[cat.key] || []]; }));
+        setPhotos(merged);
+      }
       if (d.tdNote !== undefined) setTdNote(d.tdNote);
       if (d.schemaNote !== undefined) setSchemaNote(d.schemaNote);
       if (d.calepinage) setCalepinage(d.calepinage);
@@ -1444,7 +1449,7 @@ function App() {
           <div style={CARD}>
             <div style={SH}>Photos</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onUpdate={(idx, url) => updatePhoto(key, idx, url)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
+              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onUpdate={(idx, url) => updatePhoto(key, idx, url)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
             </div>
           </div>
         </>
