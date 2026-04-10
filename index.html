@@ -152,10 +152,167 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
   </div>
 );
 
-function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, onNoteChange, hiRes }) {
+function AnnotationModal({ imageUrl, onSave, onClose }) {
+  const canvasRef = useRef();
+  const [tool, setTool] = useState("free");
+  const [color, setColor] = useState("#e74c3c");
+  const [thickness, setThickness] = useState(3);
+  const [history, setHistory] = useState([]);
+  const drawing = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const snapshot = useRef(null);
+
+  const COLORS = ["#e74c3c","#27ae60","#2980b9","#f39c12","#ffffff","#1a1a1a"];
+  const TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["eraser","🧹 Gomme"]];
+
+  useEffect(function() {
+    var canvas = canvasRef.current;
+    if (!canvas) return;
+    var img = new Image();
+    img.onload = function() {
+      var maxW = window.innerWidth * 0.92;
+      var maxH = window.innerHeight * 0.75;
+      var scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.style.width = canvas.width + "px";
+      canvas.style.height = canvas.height + "px";
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      setHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+    };
+    img.src = imageUrl;
+  }, []);
+
+  function getPos(e) {
+    var canvas = canvasRef.current;
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  }
+
+  function onStart(e) {
+    e.preventDefault();
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext("2d");
+    var pos = getPos(e);
+    drawing.current = true;
+    startPos.current = pos;
+    snapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+
+  function onMove(e) {
+    e.preventDefault();
+    if (!drawing.current) return;
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext("2d");
+    var pos = getPos(e);
+    ctx.lineWidth = tool === "eraser" ? thickness * 5 : thickness;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = tool === "eraser" ? null : color;
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, thickness * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+    } else if (tool === "free") {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    } else if (tool === "line") {
+      ctx.putImageData(snapshot.current, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.beginPath();
+      ctx.moveTo(startPos.current.x, startPos.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+  }
+
+  function onEnd(e) {
+    if (!drawing.current) return;
+    drawing.current = false;
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext("2d");
+    setHistory(function(prev) { return prev.concat([ctx.getImageData(0, 0, canvas.width, canvas.height)]); });
+  }
+
+  function undo() {
+    if (history.length <= 1) return;
+    var newHist = history.slice(0, -1);
+    setHistory(newHist);
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext("2d");
+    ctx.putImageData(newHist[newHist.length - 1], 0, 0);
+  }
+
+  function save() {
+    var canvas = canvasRef.current;
+    // Merge annotation onto white background then save
+    var out = document.createElement("canvas");
+    out.width = canvas.width; out.height = canvas.height;
+    var ctx2 = out.getContext("2d");
+    ctx2.fillStyle = "#fff";
+    ctx2.fillRect(0, 0, out.width, out.height);
+    ctx2.drawImage(canvas, 0, 0);
+    onSave(out.toDataURL("image/jpeg", 0.92));
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center", padding: "8px 12px", background: "#1a1a1a", borderRadius: 10, marginBottom: 10, maxWidth: "96vw" }}>
+        {TOOLS.map(function(t) { return (
+          <button key={t[0]} onClick={function() { setTool(t[0]); }}
+            style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: tool === t[0] ? GREEN : "#333", color: WHITE, fontSize: 13, cursor: "pointer", fontWeight: tool === t[0] ? 700 : 400 }}>
+            {t[1]}
+          </button>
+        ); })}
+        <div style={{ width: 1, height: 24, background: "#444" }} />
+        {COLORS.map(function(col) { return (
+          <div key={col} onClick={function() { setColor(col); setTool("free"); }}
+            style={{ width: 22, height: 22, borderRadius: "50%", background: col, border: color === col && tool !== "eraser" ? "3px solid #fff" : "2px solid #555", cursor: "pointer", flexShrink: 0 }} />
+        ); })}
+        <div style={{ width: 1, height: 24, background: "#444" }} />
+        {[2,4,8].map(function(t) { return (
+          <div key={t} onClick={function() { setThickness(t); }}
+            style={{ width: t * 3 + 8, height: t * 3 + 8, borderRadius: "50%", background: thickness === t ? "#fff" : "#666", cursor: "pointer", flexShrink: 0 }} />
+        ); })}
+        <div style={{ width: 1, height: 24, background: "#444" }} />
+        <button onClick={undo} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#333", color: WHITE, fontSize: 13, cursor: "pointer" }}>↩ Annuler</button>
+        <button onClick={save} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: GREEN, color: WHITE, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauvegarder</button>
+        <button onClick={onClose} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#555", color: WHITE, fontSize: 13, cursor: "pointer" }}>✕</button>
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "5px 14px", background: "#111", borderRadius: 8, marginBottom: 8, fontSize: 12, color: "#ccc", flexWrap: "wrap", justifyContent: "center" }}>
+        <span style={{ color: "#888", fontWeight: 600, marginRight: 4 }}>Légende :</span>
+        {[["#e74c3c","Câble DC"],["#27ae60","Câble AC"],["#2980b9","Onduleur"],["#f39c12","Borne"]].map(function(item) { return (
+          <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 12, height: 12, borderRadius: "50%", background: item[0], display: "inline-block", flexShrink: 0 }} />
+            <span>{item[1]}</span>
+          </span>
+        ); })}
+      </div>
+      {/* Canvas */}
+      <canvas ref={canvasRef}
+        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+        style={{ cursor: tool === "eraser" ? "cell" : "crosshair", borderRadius: 6, touchAction: "none", maxWidth: "92vw", maxHeight: "75vh", display: "block" }} />
+    </div>
+  );
+}
+
+function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote, note, onNoteChange, hiRes }) {
   const [drag, setDrag] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+  const [annotating, setAnnotating] = useState(null); // index of photo being annotated
   const refFile = useRef();
   const refCamera = useRef();
   const zoneRef = useRef();
@@ -285,6 +442,9 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
                   ? <img src={item.url} alt={item.name} style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, objectFit: "cover", borderRadius: 6, border: "1px solid " + BORDER, display: "block" }} />
                   : <div style={{ width: isMobile ? 72 : 56, height: isMobile ? 72 : 56, display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", borderRadius: 6, fontSize: 9, color: MUTED, border: "1px solid " + BORDER, textAlign: "center" }}>PDF</div>
                 }
+                {item.url && <button
+                  onClick={function(e) { e.stopPropagation(); setAnnotating(i); }}
+                  style={{ position: "absolute", bottom: -6, right: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: "#2980b9", color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 10 : 8, lineHeight: (isMobile ? 22 : 16) + "px", textAlign: "center", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>}
                 <button
                   onClick={function(e) { e.stopPropagation(); onDelete(i); }}
                   style={{ position: "absolute", top: -6, right: -6, width: isMobile ? 22 : 16, height: isMobile ? 22 : 16, borderRadius: "50%", background: "#e74c3c", color: WHITE, border: "none", cursor: "pointer", fontSize: isMobile ? 13 : 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
@@ -305,6 +465,18 @@ function PhotoZone({ label, items, onAdd, onDelete, onReorder, hasNote, note, on
       </div>
 
       {hasNote && <textarea value={note || ""} onChange={function(e) { return onNoteChange(e.target.value); }} placeholder="Notes / précisions sur le TD..." rows={2} style={{ width: "100%", marginTop: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />}
+
+      {/* Annotation modal */}
+      {annotating !== null && items[annotating] && items[annotating].url && (
+        <AnnotationModal
+          imageUrl={items[annotating].url}
+          onSave={function(newUrl) {
+            onUpdate(annotating, newUrl);
+            setAnnotating(null);
+          }}
+          onClose={function() { setAnnotating(null); }}
+        />
+      )}
 
       {/* Hidden file inputs */}
       <input ref={refCamera} type="file" multiple accept="image/*" capture="environment" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files.length) handleFiles(e.target.files); }} />
@@ -953,6 +1125,10 @@ function App() {
     arr.splice(toIdx, 0, moved);
     return { ...prev, [catKey]: arr };
   });
+  const updatePhoto = (catKey, idx, newUrl) => setPhotos(prev => ({
+    ...prev,
+    [catKey]: prev[catKey].map((item, i) => i === idx ? Object.assign({}, item, { url: newUrl }) : item)
+  }));
   const addString = () => setStrings(p => [...p, { onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
   const updString = (i, row) => setStrings(p => p.map((r, idx) => idx === i ? row : r));
   const delString = i => setStrings(p => p.filter((_, idx) => idx !== i));
@@ -1268,7 +1444,7 @@ function App() {
           <div style={CARD}>
             <div style={SH}>Photos</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
+              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key]} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onUpdate={(idx, url) => updatePhoto(key, idx, url)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
             </div>
           </div>
         </>
