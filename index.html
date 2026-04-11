@@ -569,13 +569,7 @@ function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
 
 function PreviewDoc({ data }) {
   const tv = v => v || "—";
-  const strLabel = s => `${s.count || "?"} × PV ${s.orient === "Libre" ? (s.orientLibre || "?") : s.orient || "?"}`;
-  const groupedStrings = {};
-  data.strings.forEach((s, i) => {
-    const key = `Onduleur ${s.onduleur}`;
-    if (!groupedStrings[key]) groupedStrings[key] = [];
-    groupedStrings[key].push({ ...s, idx: i });
-  });
+  const strLabel = s => (s.count || "?") + " × PV " + (s.orient === "Libre" ? (s.orientLibre || "?") : (s.orient || "?"));
   return (
     <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "1rem 0.75rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
       {data.calepinage && data.calepinage.image && (
@@ -619,51 +613,45 @@ function PreviewDoc({ data }) {
         </div>
       </div>
 
-      <div style={{ marginBottom: 18, pageBreakBefore: "always" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
-        <table className="preview-table"><tbody>
-          <tr><th>Panneaux</th><td>{[data.tech.panneaux.type, data.tech.panneaux.nbr && data.tech.panneaux.nbr + " pcs", data.tech.panneaux.kWc && data.tech.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
-          <tr><th>Toiture</th><td>{[data.tech.toiture.main, data.tech.toiture.main === "Plat" && data.tech.toiture.orientPlat, ...data.tech.toiture.sub, data.tech.toiture.sub.includes("Autre") && data.tech.toiture.autreText].filter(Boolean).join(" / ") || "—"}</td></tr>
-          {data.tech.onduleurs.map((o, i) => <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>)}
-          <tr><th>Energy meter</th><td>{tv(data.tech.energyMeter)}</td></tr>
-          <tr><th>Batterie</th><td>{data.tech.batterie.inclus === "OUI" ? [data.tech.batterie.qty && data.tech.batterie.qty + "×", data.tech.batterie.kwh && data.tech.batterie.kwh + " kWh", data.tech.batterie.type].filter(Boolean).join(" ") || "OUI" : tv(data.tech.batterie.inclus)}</td></tr>
-          <tr><th>Borne recharge</th><td>{data.tech.borne.inclus === "OUI" ? [data.tech.borne.qty && data.tech.borne.qty + "×", data.tech.borne.type].filter(Boolean).join(" ") || "OUI" : tv(data.tech.borne.inclus)}</td></tr>
-          {data.tech.accessoires && <tr><th>Accessoires</th><td>{data.tech.accessoires}</td></tr>}
-          {data.tech.ems && data.tech.ems.inclus === "OUI" && <tr><th>EMS</th><td>{data.tech.ems.modele || "OUI"}</td></tr>}
-          {data.tech.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
-          {data.tech.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
-          <tr><th>Réseau</th><td>{tv(data.tech.reseau)}</td></tr>
-          <tr><th>Disjoncteur général</th><td>{data.tech.amperageDisj ? data.tech.amperageDisj + " A" : "—"}</td></tr>
-          <tr><th>Compteur réseau</th><td>{[data.tech.compteur.serie && "N° " + data.tech.compteur.serie, data.tech.compteur.ean && "EAN: " + data.tech.compteur.ean].filter(Boolean).join(" — ") || "—"}</td></tr>
-          <tr><th>Branchement onduleur</th><td>{tv(data.tech.branchementOnduleur)}</td></tr>
-          <tr><th>Distances</th><td>{[data.tech.distances.onduleurTGBT && `Ond→TGBT: ${data.tech.distances.onduleurTGBT}m`, data.tech.distances.onduleurTD && `Ond→TD: ${data.tech.distances.onduleurTD}m`, data.tech.distances.borneTGBT && `Borne→TGBT: ${data.tech.distances.borneTGBT}m`].filter(Boolean).join(" | ") || "—"}</td></tr>
-        </tbody></table>
-      </div>
+      {data.installations.map(function(inst, instIdx) { return (
+        <div key={instIdx} style={{ marginBottom: 18, pageBreakBefore: instIdx === 0 ? "always" : "avoid", breakBefore: instIdx === 0 ? "always" : "avoid" }}>
+          {data.installations.length > 1 && (
+            <div style={{ background: GREEN, color: "#fff", borderRadius: 6, padding: "3px 14px", fontWeight: 700, fontSize: 13, marginBottom: 10, display: "inline-block" }}>Installation {instIdx + 1}</div>
+          )}
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
+          <table className="preview-table"><tbody>
+            <tr><th>Panneaux</th><td>{[inst.tech.panneaux.type, inst.tech.panneaux.nbr && inst.tech.panneaux.nbr + " pcs", inst.tech.panneaux.kWc && inst.tech.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
+            <tr><th>Toiture</th><td>{[inst.tech.toiture.main, inst.tech.toiture.main === "Plat" && inst.tech.toiture.orientPlat, inst.tech.toiture.main === "Incliné" && inst.tech.toiture.sub.join(", ")].filter(Boolean).join(" — ") || "—"}</td></tr>
+            {inst.tech.onduleurs.map(function(o, i) { return <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>; })}
+            <tr><th>Energy meter</th><td>{tv(inst.tech.energyMeter)}</td></tr>
+            <tr><th>Batterie</th><td>{inst.tech.batterie.inclus === "OUI" ? [inst.tech.batterie.qty && inst.tech.batterie.qty + "×", inst.tech.batterie.kwh && inst.tech.batterie.kwh + " kWh", inst.tech.batterie.type].filter(Boolean).join(" ") || "OUI" : tv(inst.tech.batterie.inclus)}</td></tr>
+            <tr><th>Borne recharge</th><td>{inst.tech.borne.inclus === "OUI" ? [inst.tech.borne.qty && inst.tech.borne.qty + "×", inst.tech.borne.type].filter(Boolean).join(" ") || "OUI" : tv(inst.tech.borne.inclus)}</td></tr>
+            {inst.tech.accessoires && <tr><th>Accessoires</th><td>{inst.tech.accessoires}</td></tr>}
+            {inst.tech.ems && inst.tech.ems.inclus === "OUI" && <tr><th>EMS</th><td>{inst.tech.ems.modele || "OUI"}</td></tr>}
+            {inst.tech.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
+            {inst.tech.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
+            <tr><th>Réseau</th><td>{tv(inst.tech.reseau)}</td></tr>
+            <tr><th>Disjoncteur général</th><td>{inst.tech.amperageDisj ? inst.tech.amperageDisj + " A" : "—"}</td></tr>
+            <tr><th>Compteur réseau</th><td>{[inst.tech.compteur.serie && "N° " + inst.tech.compteur.serie, inst.tech.compteur.ean && "EAN: " + inst.tech.compteur.ean].filter(Boolean).join(" — ") || "—"}</td></tr>
+            <tr><th>Branchement onduleur</th><td>{tv(inst.tech.branchementOnduleur)}</td></tr>
+            <tr><th>Distances</th><td>{[inst.tech.distances.onduleurTGBT && "Ond→TGBT: " + inst.tech.distances.onduleurTGBT + "m", inst.tech.distances.onduleurTD && "Ond→TD: " + inst.tech.distances.onduleurTD + "m", inst.tech.distances.borneTGBT && "Borne→TGBT: " + inst.tech.distances.borneTGBT + "m"].filter(Boolean).join(" | ") || "—"}</td></tr>
+          </tbody></table>
 
-      {data.strings.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
-          <table className="preview-table">
-            <thead><tr>
-              {["String", "Onduleur", "Panneaux"].map(h => <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {data.strings.map((s, i) => <tr key={i}><td style={{ fontWeight: 600 }}>STR {i + 1}</td><td>Onduleur {s.onduleur}</td><td>{strLabel(s)}</td></tr>)}
-            </tbody>
-          </table>
-          <div style={{ marginTop: 10, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
-            <strong style={{ color: TEXT }}>Résumé : </strong>
-            {Object.entries(groupedStrings).map(([key, rows]) => `${key} → ${rows.map(r => `STR${r.idx + 1}: ${strLabel(r)}`).join(", ")}`).join("   |   ")}
-          </div>
+          {inst.strings.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
+              <table className="preview-table">
+                <thead><tr>
+                  {["String", "Onduleur", "Panneaux", "Orientation"].map(function(h) { return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}
+                </tr></thead>
+                <tbody>
+                  {inst.strings.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>STR {i + 1}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
-
-      {data.comments && (
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Commentaires</div>
-          <div style={{ padding: "10px 14px", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, whiteSpace: "pre-wrap" }}>{data.comments}</div>
-        </div>
-      )}
+      ); })}
 
       {PHOTO_CATS.some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
         <div style={{ marginBottom: 18 }}>
@@ -697,28 +685,31 @@ function App() {
   const [tdNote, setTdNote] = useState("");
   const [schemaNote, setSchemaNote] = useState("");
   const [date, setDate] = useState("");
-  const [tech, setTech] = useState({
-    panneaux: { type: "", nbr: "", kWc: "" },
-    configStrings: "",
-    toiture: { main: null, sub: [], orientPlat: null, autreText: "" },
-    onduleurs: [{ type: "", kva: "" }],
-    energyMeter: null,
-    batterie: { inclus: null, qty: "1", kwh: "", type: "" },
-    borne: { inclus: null, qty: "1", type: "" },
-    ems: { inclus: null, modele: "" },
-    compteurVert: null,
-    greenbox: null,
-    accessoires: "",
-    reseau: null,
-    amperageDisj: "",
-    compteur: { serie: "", ean: "" },
-    branchementOnduleur: null,
-    distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
-  });
+  const EMPTY_INST = function() { return {
+    tech: {
+      panneaux: { type: "", nbr: "", kWc: "" },
+      configStrings: "",
+      toiture: { main: null, sub: [], orientPlat: null, autreText: "" },
+      onduleurs: [{ type: "", kva: "" }],
+      energyMeter: null,
+      batterie: { inclus: null, qty: "1", kwh: "", type: "" },
+      borne: { inclus: null, qty: "1", type: "" },
+      ems: { inclus: null, modele: "" },
+      compteurVert: null,
+      greenbox: null,
+      accessoires: "",
+      reseau: null,
+      amperageDisj: "",
+      compteur: { serie: "", ean: "" },
+      branchementOnduleur: null,
+      distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
+    },
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]
+  }; };
+  const [installations, setInstallations] = useState([EMPTY_INST()]);
   const [comments, setComments] = useState("");
   const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: null, nacelle: null, manitou: null, grue: null });
-  const [strings, setStrings] = useState([{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
-  const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
+    const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
 
   const [ref, setRef] = useState("");
   const [saveStatus, setSaveStatus] = useState(""); // "", "saving", "saved", "error"
@@ -726,15 +717,22 @@ function App() {
   const saveTimer = useRef(null);
   const isLoading = useRef(false);
 
-  const data = { client, weGreen, date, tech, comments, logistique, strings, photos, calepinage, tdNote, schemaNote };
+  const data = { client, weGreen, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote };
 
-  const setT = (path, val) => setTech(prev => {
-    const next = JSON.parse(JSON.stringify(prev));
+  // setT(instIdx, path, val) - update tech field for a given installation
+  const setT = (instIdx, path, val) => setInstallations(prev => {
+    var arr = JSON.parse(JSON.stringify(prev));
+    var next = arr[instIdx].tech;
     const parts = path.split(".");
     let o = next;
     for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
     o[parts[parts.length - 1]] = val;
-    return next;
+    return arr;
+  });
+  const setInstTech = (instIdx, updater) => setInstallations(prev => {
+    var arr = JSON.parse(JSON.stringify(prev));
+    arr[instIdx].tech = typeof updater === "function" ? updater(arr[instIdx].tech) : Object.assign({}, arr[instIdx].tech, updater);
+    return arr;
   });
 
   // ── Load from URL ?ref= on mount ──────────────────────────────────────────
@@ -753,10 +751,18 @@ function App() {
         if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
         if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
         if (typeof d.date === "string") setDate(d.date);
-        if (d.tech && typeof d.tech === "object") setTech(function(p){ return Object.assign({}, JSON.parse(JSON.stringify(p)), d.tech); });
+        // Support both old format (tech+strings) and new format (installations[])
+        if (Array.isArray(d.installations) && d.installations.length > 0) {
+          setInstallations(d.installations);
+        } else if (d.tech && typeof d.tech === "object") {
+          // Migrate old format: wrap tech+strings into installations[0]
+          var migratedInst = EMPTY_INST();
+          migratedInst.tech = Object.assign({}, migratedInst.tech, d.tech);
+          if (Array.isArray(d.strings) && d.strings.length > 0) migratedInst.strings = d.strings;
+          setInstallations([migratedInst]);
+        }
         if (typeof d.comments === "string") setComments(d.comments);
         if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
-        if (Array.isArray(d.strings) && d.strings.length > 0) setStrings(d.strings);
         if (d.photos && typeof d.photos === "object") {
           var loadedPhotos = d.photos;
           var merged = Object.fromEntries(PHOTO_CATS.map(function(cat) {
@@ -790,7 +796,7 @@ function App() {
         else setSaveStatus("error");
       });
     }, 1200);
-  }, [client, weGreen, date, tech, comments, logistique, strings, tdNote]);
+  }, [client, weGreen, date, installations, comments, logistique, tdNote]);
 
   // ── Photos auto-save (separate, debounced longer due to size) ──────────────
   useEffect(function() {
@@ -1078,8 +1084,9 @@ function App() {
         }
       }
 
-      setTech(function(prev) {
-        var next = JSON.parse(JSON.stringify(prev));
+      setInstallations(function(prev) {
+        var arr = JSON.parse(JSON.stringify(prev));
+        var next = arr[0].tech;
 
         // Panneaux: use first with highest qty
         var mainPan = null;
@@ -1131,7 +1138,8 @@ function App() {
         // Greenbox
         if (r.greenbox) next.greenbox = "OUI";
 
-        return next;
+        arr[0].tech = next;
+        return arr;
       });
 
       var found = [
@@ -1246,9 +1254,23 @@ function App() {
     ...prev,
     [catKey]: prev[catKey].map((item, i) => i === idx ? Object.assign({}, item, { url: newUrl }) : item)
   }));
-  const addString = () => setStrings(p => [...p, { onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]);
-  const updString = (i, row) => setStrings(p => p.map((r, idx) => idx === i ? row : r));
-  const delString = i => setStrings(p => p.filter((_, idx) => idx !== i));
+  const addString = (instIdx) => setInstallations(prev => {
+    var arr = JSON.parse(JSON.stringify(prev));
+    arr[instIdx].strings.push({ onduleur: "1", count: "", orient: "Sud", orientLibre: "" });
+    return arr;
+  });
+  const updString = (instIdx, i, row) => setInstallations(prev => {
+    var arr = JSON.parse(JSON.stringify(prev));
+    arr[instIdx].strings = arr[instIdx].strings.map(function(r, idx) { return idx === i ? row : r; });
+    return arr;
+  });
+  const delString = (instIdx, i) => setInstallations(prev => {
+    var arr = JSON.parse(JSON.stringify(prev));
+    arr[instIdx].strings = arr[instIdx].strings.filter(function(_, idx) { return idx !== i; });
+    return arr;
+  });
+  const addInstallation = () => setInstallations(prev => [...prev, EMPTY_INST()]);
+  const removeInstallation = (instIdx) => setInstallations(prev => prev.length > 1 ? prev.filter(function(_, i) { return i !== instIdx; }) : prev);
 
 
     const btnSt = (active, extra = {}) => ({
@@ -1347,69 +1369,81 @@ function App() {
           </div>
 
           {/* Technical info */}
-          <div style={CARD}>
-            <div style={SH}>Informations techniques</div>
+          {/* Installations */}
+          {installations.map(function(inst, instIdx) { return (
+            <div key={instIdx}>
+              {/* Banner */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: instIdx > 0 ? 8 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ background: GREEN, color: "#fff", borderRadius: 8, padding: "4px 16px", fontWeight: 700, fontSize: 14, letterSpacing: "0.04em" }}>
+                    Installation {instIdx + 1}
+                  </div>
+                  {installations.length > 1 && <button onClick={function() { removeInstallation(instIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Supprimer</button>}
+                </div>
+              </div>
+<div style={CARD}>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               <div><div style={SUBH}>Panneaux</div>
                 <div style={G3}>
-                  <Field label="Type / Modèle" value={tech.panneaux.type} onChange={v => setT("panneaux.type", v)} placeholder="Ex: Trina Vertex S+" />
-                  <Field label="Nombre" value={tech.panneaux.nbr} onChange={v => setT("panneaux.nbr", v)} type="number" />
-                  <Field label="Puissance totale" value={tech.panneaux.kWc} onChange={v => setT("panneaux.kWc", v)} type="number" unit="kWc" />
+                  <Field label="Type / Modèle" value={inst.tech.panneaux.type} onChange={v => setT(instIdx, "panneaux.type", v)} placeholder="Ex: Trina Vertex S+" />
+                  <Field label="Nombre" value={inst.tech.panneaux.nbr} onChange={v => setT(instIdx, "panneaux.nbr", v)} type="number" />
+                  <Field label="Puissance totale" value={inst.tech.panneaux.kWc} onChange={v => setT(instIdx, "panneaux.kWc", v)} type="number" unit="kWc" />
                 </div>
               </div>
               <div><div style={SUBH}>Toiture</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                  {["Plat", "Incliné"].map(t => <Chip key={t} label={t} selected={tech.toiture.main === t} onClick={() => setT("toiture.main", tech.toiture.main === t ? null : t)} />)}
+                  {["Plat", "Incliné"].map(t => <Chip key={t} label={t} selected={inst.tech.toiture.main === t} onClick={() => setT(instIdx, "toiture.main", inst.tech.toiture.main === t ? null : t)} />)}
                 </div>
-                {tech.toiture.main === "Plat" && (
+                {inst.tech.toiture.main === "Plat" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div>
                       <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Orientation des panneaux</div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {["Sud", "Est-Ouest"].map(o => <Chip key={o} label={o} selected={tech.toiture.orientPlat === o} onClick={() => setT("toiture.orientPlat", tech.toiture.orientPlat === o ? null : o)} />)}
+                        {["Sud", "Est-Ouest"].map(o => <Chip key={o} label={o} selected={inst.tech.toiture.orientPlat === o} onClick={() => setT(instIdx, "toiture.orientPlat", inst.tech.toiture.orientPlat === o ? null : o)} />)}
                       </div>
                     </div>
                   </div>
                 )}
-                {tech.toiture.main === "Incliné" && (
+                {inst.tech.toiture.main === "Incliné" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      {["Tuile", "Ardoise", "Panneaux sandwich", "Zinc", "Bac acier", "Autre"].map(t => <Chip key={t} label={t} selected={tech.toiture.sub.includes(t)} onClick={() => { const c = tech.toiture.sub; setT("toiture.sub", c.includes(t) ? c.filter(x => x !== t) : [...c, t]); }} />)}
+                      {["Tuile", "Ardoise", "Panneaux sandwich", "Zinc", "Bac acier", "Autre"].map(t => <Chip key={t} label={t} selected={inst.tech.toiture.sub.includes(t)} onClick={() => { const c = inst.tech.toiture.sub; setT(instIdx, "toiture.sub", c.includes(t) ? c.filter(x => x !== t) : [...c, t]); }} />)}
                     </div>
-                    {tech.toiture.sub.includes("Autre") && <input value={tech.toiture.autreText || ""} onChange={e => setT("toiture.autreText", e.target.value)} placeholder="Préciser..." style={{ width: "100%" }} />}
+                    {inst.tech.toiture.sub.includes("Autre") && <input value={inst.tech.toiture.autreText || ""} onChange={e => setT(instIdx, "toiture.autreText", e.target.value)} placeholder="Préciser..." style={{ width: "100%" }} />}
                   </div>
                 )}
               </div>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={SUBH}>Onduleur(s)</div>
-                  <button onClick={() => setTech(p => ({ ...p, onduleurs: [...p.onduleurs, { type: "", kva: "" }] }))} style={{ fontSize: 12, color: GREEN, background: "none", border: "none", cursor: "pointer", marginBottom: 7 }}>+ Ajouter</button>
+                  <button onClick={() => setInstTech(instIdx, function(p){ return Object.assign({}, p, { onduleurs: p.onduleurs.concat([{ type: "", kva: "" }]) }); })} style={{ fontSize: 12, color: GREEN, background: "none", border: "none", cursor: "pointer", marginBottom: 7 }}>+ Ajouter</button>
                 </div>
-                {tech.onduleurs.map((ond, i) => (
+                {inst.tech.onduleurs.map((ond, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 24px", gap: 8, alignItems: "end", marginBottom: 8 }}>
-                    <Field label={`Onduleur ${i + 1} — Type / Modèle`} value={ond.type} onChange={v => setTech(p => ({ ...p, onduleurs: p.onduleurs.map((o, idx) => idx === i ? { ...o, type: v } : o) }))} placeholder="Ex: Deye SUN-8K" />
-                    <Field label="Puissance" value={ond.kva} onChange={v => setTech(p => ({ ...p, onduleurs: p.onduleurs.map((o, idx) => idx === i ? { ...o, kva: v } : o) }))} type="number" unit="kVA" />
-                    {tech.onduleurs.length > 1 && <button onClick={() => setTech(p => ({ ...p, onduleurs: p.onduleurs.filter((_, idx) => idx !== i) }))} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", paddingBottom: 4 }}>×</button>}
+                    <Field label={`Onduleur ${i + 1} — Type / Modèle`} value={ond.type} onChange={v => setInstTech(instIdx, function(p){ return Object.assign({}, p, { onduleurs: p.onduleurs.map(function(o, idx){ return idx === i ? Object.assign({}, o, { type: v }) : o; }) }); })} placeholder="Ex: Deye SUN-8K" />
+                    <Field label="Puissance" value={ond.kva} onChange={v => setInstTech(instIdx, function(p){ return Object.assign({}, p, { onduleurs: p.onduleurs.map(function(o, idx){ return idx === i ? Object.assign({}, o, { kva: v }) : o; }) }); })} type="number" unit="kVA" />
+                    {inst.tech.onduleurs.length > 1 && <button onClick={() => setInstTech(instIdx, function(p){ return Object.assign({}, p, { onduleurs: p.onduleurs.filter(function(_, idx){ return idx !== i; }) }); })} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", paddingBottom: 4 }}>×</button>}
                   </div>
                 ))}
               </div>
               <div style={G3}>
-                <div><div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Energy meter inclus</div><Toggle value={tech.energyMeter} onChange={v => setT("energyMeter", v)} /></div>
+                <div><div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Energy meter inclus</div><Toggle value={inst.tech.energyMeter} onChange={v => setT(instIdx, "energyMeter", v)} /></div>
                 <div>
                   <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Batterie incluse</div>
-                  <Toggle value={tech.batterie.inclus} onChange={v => setT("batterie.inclus", v)} />
-                  {tech.batterie.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 1fr", gap: 6, marginTop: 8 }}>
-                    <Field label="Qté" value={tech.batterie.qty} onChange={v => setT("batterie.qty", v)} type="number" />
-                    <Field label="kWh" value={tech.batterie.kwh} onChange={v => setT("batterie.kwh", v)} type="number" unit="kWh" />
-                    <Field label="Modèle" value={tech.batterie.type} onChange={v => setT("batterie.type", v)} placeholder="Modèle" />
+                  <Toggle value={inst.tech.batterie.inclus} onChange={v => setT(instIdx, "batterie.inclus", v)} />
+                  {inst.tech.batterie.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 1fr", gap: 6, marginTop: 8 }}>
+                    <Field label="Qté" value={inst.tech.batterie.qty} onChange={v => setT(instIdx, "batterie.qty", v)} type="number" />
+                    <Field label="kWh" value={inst.tech.batterie.kwh} onChange={v => setT(instIdx, "batterie.kwh", v)} type="number" unit="kWh" />
+                    <Field label="Modèle" value={inst.tech.batterie.type} onChange={v => setT(instIdx, "batterie.type", v)} placeholder="Modèle" />
                   </div>}
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Borne de recharge</div>
-                  <Toggle value={tech.borne.inclus} onChange={v => setT("borne.inclus", v)} />
-                  {tech.borne.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr", gap: 6, marginTop: 8 }}>
-                    <Field label="Qté" value={tech.borne.qty} onChange={v => setT("borne.qty", v)} type="number" />
-                    <Field label="Modèle" value={tech.borne.type} onChange={v => setT("borne.type", v)} placeholder="Modèle" />
+                  <Toggle value={inst.tech.borne.inclus} onChange={v => setT(instIdx, "borne.inclus", v)} />
+                  {inst.tech.borne.inclus === "OUI" && <div style={{ display: "grid", gridTemplateColumns: "50px 1fr", gap: 6, marginTop: 8 }}>
+                    <Field label="Qté" value={inst.tech.borne.qty} onChange={v => setT(instIdx, "borne.qty", v)} type="number" />
+                    <Field label="Modèle" value={inst.tech.borne.type} onChange={v => setT(instIdx, "borne.type", v)} placeholder="Modèle" />
                   </div>}
                 </div>
               </div>
@@ -1419,9 +1453,9 @@ function App() {
                 <div>
                   <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>EMS (Energy Management System)</div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <Toggle value={tech.ems.inclus} onChange={v => setT("ems.inclus", v)} />
-                    {tech.ems.inclus === "OUI" && (
-                      <select value={tech.ems.modele} onChange={e => setT("ems.modele", e.target.value)} style={{ flex: 1, minWidth: 200 }}>
+                    <Toggle value={inst.tech.ems.inclus} onChange={v => setT(instIdx, "ems.inclus", v)} />
+                    {inst.tech.ems.inclus === "OUI" && (
+                      <select value={inst.tech.ems.modele} onChange={e => setT(instIdx, "ems.modele", e.target.value)} style={{ flex: 1, minWidth: 200 }}>
                         <option value="">— Choisir un EMS —</option>
                         {["Nexxtlab Smart Master Home", "Nexxtlab Smart Master Pro", "Huawei EMMA", "Eniris Home", "Eniris PRO", "Solis"].map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
@@ -1431,42 +1465,49 @@ function App() {
                 <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontSize: 13 }}>Compteur vert</span>
-                    <Toggle value={tech.compteurVert} onChange={v => setT("compteurVert", v)} />
+                    <Toggle value={inst.inst.tech.compteurVert} onChange={v => setT(instIdx, "compteurVert", v)} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontSize: 13 }}>Greenbox</span>
-                    <Toggle value={tech.greenbox} onChange={v => setT("greenbox", v)} />
+                    <Toggle value={inst.tech.greenbox} onChange={v => setT(instIdx, "greenbox", v)} />
                   </div>
                 </div>
               </div>
 
-              <Field label="Autres accessoires" value={tech.accessoires} onChange={v => setT("accessoires", v)} placeholder="Notes libres..." />
+              <Field label="Autres accessoires" value={inst.tech.accessoires} onChange={v => setT(instIdx, "accessoires", v)} placeholder="Notes libres..." />
               <div><div style={SUBH}>Réseau électrique</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["Monophasé 230V", "Triphasé 3×230V", "Triphasé 3×400+N"].map(r => <Chip key={r} label={r} selected={tech.reseau === r} onClick={() => setT("reseau", tech.reseau === r ? null : r)} />)}
+                  {["Monophasé 230V", "Triphasé 3×230V", "Triphasé 3×400+N"].map(r => <Chip key={r} label={r} selected={inst.tech.reseau === r} onClick={() => setT(instIdx, "reseau", inst.tech.reseau === r ? null : r)} />)}
                 </div>
               </div>
               <div style={G2}>
-                <Field label="Ampérage disjoncteur général ⚠" value={tech.amperageDisj} onChange={v => setT("amperageDisj", v)} type="number" unit="A" placeholder="Ex: 40" />
+                <Field label="Ampérage disjoncteur général ⚠" value={inst.tech.amperageDisj} onChange={v => setT(instIdx, "amperageDisj", v)} type="number" unit="A" placeholder="Ex: 40" />
                 <div />
               </div>
               <div style={G2}>
-                <Field label="Compteur réseau — N° de série (optionnel)" value={tech.compteur.serie} onChange={v => setT("compteur.serie", v)} />
-                <Field label="EAN (optionnel)" value={tech.compteur.ean} onChange={v => setT("compteur.ean", v)} placeholder="541400..." />
+                <Field label="Compteur réseau — N° de série (optionnel)" value={inst.tech.compteur.serie} onChange={v => setT(instIdx, "compteur.serie", v)} />
+                <Field label="EAN (optionnel)" value={inst.tech.compteur.ean} onChange={v => setT(instIdx, "compteur.ean", v)} placeholder="541400..." />
               </div>
               <div><div style={SUBH}>Branchement de l'onduleur</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["Sur le TGBT", "Sur un tableau divisionnaire"].map(b => <Chip key={b} label={b} selected={tech.branchementOnduleur === b} onClick={() => setT("branchementOnduleur", tech.branchementOnduleur === b ? null : b)} />)}
+                  {["Sur le TGBT", "Sur un tableau divisionnaire"].map(b => <Chip key={b} label={b} selected={inst.tech.branchementOnduleur === b} onClick={() => setT(instIdx, "branchementOnduleur", inst.tech.branchementOnduleur === b ? null : b)} />)}
                 </div>
               </div>
               <div><div style={SUBH}>Distances</div>
                 <div style={G3}>
-                  <Field label="Onduleur → TGBT" value={tech.distances.onduleurTGBT} onChange={v => setT("distances.onduleurTGBT", v)} type="number" unit="m" />
-                  <Field label="Onduleur → Tableau div." value={tech.distances.onduleurTD} onChange={v => setT("distances.onduleurTD", v)} type="number" unit="m" />
-                  <Field label="Borne → TGBT" value={tech.distances.borneTGBT} onChange={v => setT("distances.borneTGBT", v)} type="number" unit="m" />
+                  <Field label="Onduleur → TGBT" value={inst.tech.distances.onduleurTGBT} onChange={v => setT(instIdx, "distances.onduleurTGBT", v)} type="number" unit="m" />
+                  <Field label="Onduleur → Tableau div." value={inst.tech.distances.onduleurTD} onChange={v => setT(instIdx, "distances.onduleurTD", v)} type="number" unit="m" />
+                  <Field label="Borne → TGBT" value={inst.tech.distances.borneTGBT} onChange={v => setT(instIdx, "distances.borneTGBT", v)} type="number" unit="m" />
                 </div>
               </div>
             </div>
+          </div>
+            </div>
+          ); })}
+
+          {/* Add installation button */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 4, marginBottom: 4 }}>
+            <button onClick={addInstallation} style={{ background: GREEN_LIGHT, color: GREEN, border: "1.5px dashed " + GREEN_MID, borderRadius: 8, padding: "8px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>+ Ajouter une installation</button>
           </div>
 
           {/* Commentaires */}
