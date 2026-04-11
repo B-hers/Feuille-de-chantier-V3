@@ -1145,44 +1145,67 @@ function App() {
       var hasAddressBlock = headerLines.some(function(l){ return /Adresse de (facturation|livraison|exp)/i.test(l.text); });
 
       if (hasAddressBlock) {
-        // Right column = items at x > 55% of page width → client contact
         var pw = headerLines[0] ? headerLines[0].pw : 595;
         var rightThreshold = pw * 0.52;
+
+        // nom = top-right contact block (client name)
         var rightBlock = [];
         for (var i = 0; i < headerLines.length; i++) {
           var ln = headerLines[i];
-          // Only count lines whose majority of text is in right column
           if (ln.minX > rightThreshold && !/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE)/i.test(ln.text)) {
             rightBlock.push(ln.text);
           }
         }
-        // Filter out TVA/phone lines
-        var filteredRight = rightBlock.filter(function(t){ return !/^(TVA|tel|fax|\+\d|BE\d{9})/i.test(t); });
+        var filteredRight = rightBlock.filter(function(tx){ return !/^(TVA|tel|fax|\+\d|BE\d{9})/i.test(tx); });
         if (filteredRight.length >= 1 && !/^We Green/i.test(filteredRight[0])) {
           r.nom = filteredRight[0];
-          if (filteredRight.length >= 2) r.adresse = filteredRight.slice(1).filter(function(t){ return !/^(TVA|Belgi)/i.test(t); }).join(", ");
         }
 
-        // If right block is WGE or empty, fall back to shipping address
-        if (!r.nom || /^We Green/i.test(r.nom)) {
-          var shipIdx = -1;
+        // adresse chantier = shipping address block (left column only)
+        // Find "Adresse d'expedition" OR combined "Adresse de facturation et d'expedition" label
+        var shipLabelIdx = -1;
+        for (var i = 0; i < headerLines.length; i++) {
+          var lt = headerLines[i].text;
+          if (/Adresse.{1,5}exp.{1,10}dition/i.test(lt)) { shipLabelIdx = i; break; }
+        }
+        // Fallback: combined or billing-only label
+        if (shipLabelIdx < 0) {
           for (var i = 0; i < headerLines.length; i++) {
-            if (/Adresse.{1,12}exp.{1,12}dition/i.test(headerLines[i].text)) { shipIdx = i; break; }
+            if (/Adresse de facturation/i.test(headerLines[i].text)) { shipLabelIdx = i; break; }
           }
-          if (shipIdx >= 0) {
-            var shipBlock = [];
-            for (var i = shipIdx + 1; i < headerLines.length; i++) {
-              var t = headerLines[i].text;
-              if (/^Belgique$|^France$|^Pays-Bas$/i.test(t)) break;
-              if (!/^(We Green|Ikaroslaan|Zaventem|Belgium|\+\d|n\.a\.)/i.test(t)) shipBlock.push(t);
-            }
-            if (shipBlock.length) {
-              // Remove "CompanyName, ProjectName" prefix if present (like "Inclusio, SINT-NIKKLAS")
-              var firstName = shipBlock[0].replace(/^[^,]+,\s*/, "").trim() || shipBlock[0];
-              r.nom = firstName;
-              if (shipBlock.length > 1) r.adresse = shipBlock.slice(1).join(", ");
-            }
+        }
+
+        if (shipLabelIdx >= 0) {
+          var shipLines = [];
+          for (var i = shipLabelIdx + 1; i < headerLines.length; i++) {
+            var ln2 = headerLines[i];
+            if (ln2.minX > rightThreshold) continue;
+            var t2 = ln2.text;
+            if (/^(Belgique|France|Pays-Bas)$/i.test(t2)) break;
+            if (/^Adresse\s+de/i.test(t2)) break;
+            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|\+\d)/i.test(t2)) continue;
+            shipLines.push(t2);
           }
+          if (shipLines.length) {
+            // Skip first line if it looks like a company/project name rather than a street address
+            var addrLines = shipLines;
+            if (addrLines.length > 1 && !/^\d|^Rue|^Avenue|^Av\.|^Chauss|^Bd\b|^Boulevard|^Place|^Sq\b|^Drev|^All.e|^Impasse/i.test(addrLines[0])) {
+              addrLines = addrLines.slice(1);
+            }
+            r.adresse = addrLines.filter(function(t3){ return !/^(TVA|Belgi)/i.test(t3); }).join(", ");
+          }
+        }
+
+        // Fallback: if no nom found, use first shipping line
+        if (!r.nom) {
+          var fbLines = [];
+          for (var i = shipLabelIdx >= 0 ? shipLabelIdx + 1 : 0; i < headerLines.length; i++) {
+            var ft = headerLines[i].text;
+            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE)/i.test(ft)) continue;
+            fbLines.push(ft);
+            if (fbLines.length === 1) break;
+          }
+          if (fbLines.length) r.nom = fbLines[0];
         }
       } else {
         // Simple BDC: client block is in the RIGHT column (high X) of the header
@@ -1240,10 +1263,10 @@ function App() {
       for (var li = 0; li < lines.length; li++) {
         var t = lines[li].text;
 
-        // Panneaux
-        if (/^Panneaux\s*[-]\s*/i.test(t)) {
+        // Panneaux (also match lines starting with a SKU like [ODA450-24V-MHDBRz] Panneaux -)
+        if (/^(?:\[[^\]]+\]\s*)?Panneaux\s*[-]\s*/i.test(t)) {
           var qty = extractQty(t);
-          var nameMatch = t.match(/^Panneaux\s*[-]\s*(.+)/i);
+          var nameMatch = t.match(/^(?:\[[^\]]+\]\s*)?Panneaux\s*[-]\s*(.+)/i);
           if (nameMatch) {
             var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").replace(/\s*[-]\s*(Full Black|Neostar\S*|Half[- ]Cell)\s*$/, "").trim();
             var wc = extractWc(t);
@@ -1313,7 +1336,6 @@ function App() {
       setInstallations(function(prev) {
         var arr = JSON.parse(JSON.stringify(prev));
         var next = arr[0].tech;
-        var next = JSON.parse(JSON.stringify(prev));
 
         // Panneaux: use first with highest qty
         var mainPan = null;
