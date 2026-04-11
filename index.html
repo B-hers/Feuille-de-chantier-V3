@@ -607,7 +607,7 @@ function PreviewDoc({ data }) {
             <tr><th>Haut. corniche</th><td>{data.logistique.hauteurCorniche ? data.logistique.hauteurCorniche + " m" : "—"}</td></tr>
             <tr><th>Haut. toit plat</th><td>{data.logistique.hauteurToitPlat ? data.logistique.hauteurToitPlat + " m" : "—"}</td></tr>
             <tr><th>Accès toiture</th><td>{data.logistique.acces === "Autre" ? (data.logistique.autreAcces || "Autre") : tv(data.logistique.acces)}</td></tr>
-            {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(([k]) => data.logistique[k] === "OUI").length > 0 && <tr><th>Engins</th><td>{[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(function(p){ return data.logistique[p[0]] === "OUI"; }).map(function(p){ return p[1]; }).join(", ")}</td></tr>}
+            {(function(){ var engins = [["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(function(p){ return data.logistique[p[0]] === "OUI"; }); return engins.length > 0 ? <tr><th>Engins</th><td>{engins.map(function(p){ return p[1]; }).join(", ")}</td></tr> : null; })()}
             <tr><th>Tuiles réserve</th><td>{tv(data.logistique.tuileReserve)}</td></tr>
           </tbody></table>
         </div>
@@ -1522,12 +1522,13 @@ function App() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={G2}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {[["parking","Espace parking"],["tuileReserve","Tuiles / ardoises en réserve"]].map(([k,lbl]) => (
+                  {[["parking","Espace parking"],["tuileReserve","Tuiles / ardoises en réserve"]].map(function(pair) {
+                    var k = pair[0]; var lbl = pair[1]; return (
                     <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span style={{ fontSize: 13 }}>{lbl}</span>
                       <Toggle value={logistique[k]} onChange={v => setLogistique(p => ({ ...p, [k]: v }))} />
                     </div>
-                  ))}
+                  ); })}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <Field label="Hauteur corniche" value={logistique.hauteurCorniche} onChange={v => setLogistique(p => ({ ...p, hauteurCorniche: v }))} type="number" unit="m" />
@@ -1545,12 +1546,12 @@ function App() {
               <div>
                 <div style={{ fontSize: 12, fontWeight: 500, color: MUTED, marginBottom: 7 }}>Équipements de levage / manutention</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(([k,lbl]) => (
+                  {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(function(pair){ var k=pair[0],lbl=pair[1]; return  (
                     <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: logistique[k] === "OUI" ? GREEN_LIGHT : BG, borderRadius: 6, border: "1px solid " + (logistique[k] === "OUI" ? GREEN_MID : BORDER) }}>
                       <span style={{ fontSize: 13, fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}</span>
                       <Toggle value={logistique[k]} onChange={v => setLogistique(p => ({ ...p, [k]: v }))} />
                     </div>
-                  ))}
+                  ); })}
                 </div>
               </div>
             </div>
@@ -1560,14 +1561,14 @@ function App() {
           <div style={CARD}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={SH}>Configuration de strings</div>
-              <button onClick={addString} style={{ fontSize: 12, color: GREEN, background: "none", border: `1px dashed ${GREEN_MID}`, borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginBottom: 14 }}>+ Ajouter un string</button>
+              <button onClick={function() { addString(instIdx); }} style={{ fontSize: 12, color: GREEN, background: "none", border: `1px dashed ${GREEN_MID}`, borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginBottom: 14 }}>+ Ajouter un string</button>
             </div>
-            {strings.length === 0 && <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: "#aaa" }}>Aucun string — cliquez sur + Ajouter</div>}
-            {strings.map((row, i) => <StringRow key={i} idx={i} row={row} onChange={r => updString(i, r)} onRemove={() => delString(i)} maxOnd={Math.max(1, tech.onduleurs.length)} />)}
-            {strings.length > 0 && (
+            {inst.strings.length === 0 && <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: "#aaa" }}>Aucun string — cliquez sur + Ajouter</div>}
+            {inst.strings.map(function(row, i) { return <StringRow key={i} idx={i} row={row} onChange={function(r) { updString(instIdx, i, r); }} onRemove={function() { delString(instIdx, i); }} maxOnd={Math.max(1, inst.tech.onduleurs.length)} />; })}
+            {inst.strings.length > 0 && (
               <div style={{ marginTop: 12, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
                 <strong style={{ color: TEXT }}>Résumé : </strong>
-                {Object.entries(strings.reduce((acc, s, i) => { const k = `Onduleur ${s.onduleur}`; if (!acc[k]) acc[k] = []; acc[k].push(`STR${i + 1}: ${s.count || "?"}×PV ${s.orient === "Libre" ? (s.orientLibre || "?") : s.orient || "?"}`); return acc; }, {})).map(([k, v]) => `${k} → ${v.join(", ")}`).join("   |   ")}
+                {Object.entries(inst.strings.reduce(function(acc, s, i) { var k = "Onduleur " + s.onduleur; if (!acc[k]) acc[k] = []; acc[k].push({ s: s, idx: i }); return acc; }, {})).map(function(entry) { return entry[0] + " → " + entry[1].map(function(e) { return "STR" + (e.idx+1) + ": " + (e.s.count||"?") + "×PV " + (e.s.orient === "Libre" ? (e.s.orientLibre||"?") : (e.s.orient||"?")); }).join(", "); }).join("   |   ")}
               </div>
             )}
           </div>
