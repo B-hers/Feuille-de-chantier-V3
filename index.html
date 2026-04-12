@@ -57,12 +57,14 @@ const PHOTO_CATS = [
   { key: "vue_generale",    label: "1. Vue générale du chantier" },
   { key: "toiture",         label: "2. État / photos de la toiture" },
   { key: "cablage",         label: "3. Câblage DC & AC" },
-  { key: "strings_design",  label: "4. Design des strings" },
+  { key: "strings_design",  label: "4. Design des strings", hiRes: true },
   { key: "onduleur",        label: "5. Emplacement de l'onduleur" },
   { key: "compteur",        label: "6. Compteur électrique & disjoncteur général", hiRes: true },
   { key: "tgbt",            label: "7. Tableau(x) TGBT", hiRes: true },
   { key: "td",              label: "8. TD", hasNote: true, hiRes: true },
   { key: "schema_elec",     label: "9. Schéma électrique client", hiRes: true, hasNote: true },
+  { key: "dc_extra",        label: "10. Photos DC supplémentaires / à reclasser" },
+  { key: "ac_extra",        label: "11. Photos AC supplémentaires / à reclasser", hiRes: true },
 ];
 
 const PM_DATA = {
@@ -355,16 +357,20 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
   const [drag, setDrag] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
-  const [annotating, setAnnotating] = useState(null); // index of photo being annotated
-  const [preview, setPreview] = useState(null); // url of photo to preview full-screen
+  const [annotating, setAnnotating] = useState(null);
+  const [preview, setPreview] = useState(null);
+  // Touch drag state
+  const [touchDragIdx, setTouchDragIdx] = useState(null);
+  const [touchOverIdx, setTouchOverIdx] = useState(null);
+  const tdxRef = useRef(null);
+  const toxRef = useRef(null);
   const refFile = useRef();
   const refCamera = useRef();
   const zoneRef = useRef();
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  // hiRes=true → 1800px max, qualité 0.88 (tableaux, schémas, disjoncteurs)
-  // hiRes=false → 1000px max, qualité 0.72 (photos générales)
+  // DC sections: 1000px / 0.72 — AC + strings + schemas: 1800px / 0.88
   const compressImg = function(blob, hiRes) { return new Promise(function(res) {
     const img = new Image();
     const objUrl = URL.createObjectURL(blob);
@@ -411,6 +417,7 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
     onAdd(result);
   };
 
+  // ── Desktop drag-to-reorder ──
   const handleDragStart = function(i) { setDragIdx(i); };
   const handleDragOver = function(e, i) { e.preventDefault(); setOverIdx(i); };
   const handleDrop = function(e, i) {
@@ -419,12 +426,40 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
     setDragIdx(null); setOverIdx(null);
   };
 
+  // ── Touch drag-to-reorder ──
+  function handleTouchDragStart(i) {
+    tdxRef.current = i; toxRef.current = null;
+    setTouchDragIdx(i); setTouchOverIdx(null);
+  }
+  function handleTouchDragMove(e) {
+    if (tdxRef.current === null) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!el) return;
+    const container = el.closest("[data-photo-idx]");
+    if (!container) return;
+    const idx = parseInt(container.getAttribute("data-photo-idx"));
+    if (!isNaN(idx) && idx !== tdxRef.current) {
+      toxRef.current = idx;
+      setTouchOverIdx(idx);
+    }
+  }
+  function handleTouchDragEnd() {
+    const from = tdxRef.current;
+    const to = toxRef.current;
+    tdxRef.current = null; toxRef.current = null;
+    setTouchDragIdx(null); setTouchOverIdx(null);
+    if (from !== null && to !== null && from !== to) onReorder(from, to);
+  }
+
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ ...LBL, cursor: "pointer", userSelect: "none", marginBottom: 6 }}
         onClick={function() { zoneRef.current && zoneRef.current.focus(); }}
         title="Cliquer puis Ctrl+V pour coller">
         {label}
+        {hiRes && <span title="Haute résolution — chiffres lisibles" style={{ fontSize: 10, color: GREEN, fontWeight: 700, marginLeft: 5, background: GREEN_LIGHT, padding: "1px 5px", borderRadius: 4 }}>HD</span>}
         {items.length > 0 && <span style={{ color: GREEN, fontWeight: 600, marginLeft: 6 }}>({items.length})</span>}
         <span style={{ fontSize: 10, color: MUTED, fontWeight: 400, marginLeft: 6 }}>↵ coller</span>
       </div>
@@ -475,13 +510,33 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
             {items.map(function(item, i) { return (
               <div
                 key={i}
-                draggable={!isMobile}
+                data-photo-idx={i}
+                draggable={true}
                 onDragStart={function() { handleDragStart(i); }}
                 onDragOver={function(e) { handleDragOver(e, i); }}
                 onDrop={function(e) { handleDrop(e, i); }}
                 onDragEnd={function() { setDragIdx(null); setOverIdx(null); }}
-                style={{ opacity: dragIdx === i ? 0.4 : 1, outline: overIdx === i ? "2px solid " + GREEN : "none", borderRadius: 8, background: WHITE, border: "1px solid " + BORDER, overflow: "hidden", width: isMobile ? 110 : 90 }}
+                style={{
+                  opacity: (dragIdx === i || touchDragIdx === i) ? 0.35 : 1,
+                  outline: (overIdx === i || touchOverIdx === i) ? "2px solid " + GREEN : "none",
+                  borderRadius: 8, background: WHITE, border: "1px solid " + BORDER,
+                  overflow: "hidden", width: isMobile ? 110 : 90,
+                  boxShadow: (touchDragIdx === i) ? "0 4px 14px rgba(0,0,0,0.18)" : "none"
+                }}
               >
+                {/* Drag handle */}
+                <div
+                  title="Maintenir pour déplacer"
+                  onTouchStart={function(e) { handleTouchDragStart(i); }}
+                  onTouchMove={function(e) { handleTouchDragMove(e); }}
+                  onTouchEnd={function(e) { handleTouchDragEnd(); }}
+                  style={{
+                    cursor: "grab", textAlign: "center", padding: "3px 0",
+                    background: "#f0f0ec", borderBottom: "1px solid " + BORDER,
+                    color: "#bbb", fontSize: 13, userSelect: "none", touchAction: "none",
+                    letterSpacing: 2
+                  }}
+                >⠿</div>
                 {/* Photo */}
                 {item.url
                   ? <img src={item.url} alt={item.name} style={{ width: "100%", height: isMobile ? 90 : 75, objectFit: "cover", display: "block", cursor: "pointer" }} onClick={function(e) { e.stopPropagation(); setPreview(item.url); }} />
@@ -1145,67 +1200,44 @@ function App() {
       var hasAddressBlock = headerLines.some(function(l){ return /Adresse de (facturation|livraison|exp)/i.test(l.text); });
 
       if (hasAddressBlock) {
+        // Right column = items at x > 55% of page width → client contact
         var pw = headerLines[0] ? headerLines[0].pw : 595;
         var rightThreshold = pw * 0.52;
-
-        // nom = top-right contact block (client name)
         var rightBlock = [];
         for (var i = 0; i < headerLines.length; i++) {
           var ln = headerLines[i];
+          // Only count lines whose majority of text is in right column
           if (ln.minX > rightThreshold && !/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE)/i.test(ln.text)) {
             rightBlock.push(ln.text);
           }
         }
-        var filteredRight = rightBlock.filter(function(tx){ return !/^(TVA|tel|fax|\+\d|BE\d{9})/i.test(tx); });
+        // Filter out TVA/phone lines
+        var filteredRight = rightBlock.filter(function(t){ return !/^(TVA|tel|fax|\+\d|BE\d{9})/i.test(t); });
         if (filteredRight.length >= 1 && !/^We Green/i.test(filteredRight[0])) {
           r.nom = filteredRight[0];
+          if (filteredRight.length >= 2) r.adresse = filteredRight.slice(1).filter(function(t){ return !/^(TVA|Belgi)/i.test(t); }).join(", ");
         }
 
-        // adresse chantier = shipping address block (left column only)
-        // Find "Adresse d'expedition" OR combined "Adresse de facturation et d'expedition" label
-        var shipLabelIdx = -1;
-        for (var i = 0; i < headerLines.length; i++) {
-          var lt = headerLines[i].text;
-          if (/Adresse.{1,5}exp.{1,10}dition/i.test(lt)) { shipLabelIdx = i; break; }
-        }
-        // Fallback: combined or billing-only label
-        if (shipLabelIdx < 0) {
+        // If right block is WGE or empty, fall back to shipping address
+        if (!r.nom || /^We Green/i.test(r.nom)) {
+          var shipIdx = -1;
           for (var i = 0; i < headerLines.length; i++) {
-            if (/Adresse de facturation/i.test(headerLines[i].text)) { shipLabelIdx = i; break; }
+            if (/Adresse.{1,12}exp.{1,12}dition/i.test(headerLines[i].text)) { shipIdx = i; break; }
           }
-        }
-
-        if (shipLabelIdx >= 0) {
-          var shipLines = [];
-          for (var i = shipLabelIdx + 1; i < headerLines.length; i++) {
-            var ln2 = headerLines[i];
-            if (ln2.minX > rightThreshold) continue;
-            var t2 = ln2.text;
-            if (/^(Belgique|France|Pays-Bas)$/i.test(t2)) break;
-            if (/^Adresse\s+de/i.test(t2)) break;
-            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|\+\d)/i.test(t2)) continue;
-            shipLines.push(t2);
-          }
-          if (shipLines.length) {
-            // Skip first line if it looks like a company/project name rather than a street address
-            var addrLines = shipLines;
-            if (addrLines.length > 1 && !/^\d|^Rue|^Avenue|^Av\.|^Chauss|^Bd\b|^Boulevard|^Place|^Sq\b|^Drev|^All.e|^Impasse/i.test(addrLines[0])) {
-              addrLines = addrLines.slice(1);
+          if (shipIdx >= 0) {
+            var shipBlock = [];
+            for (var i = shipIdx + 1; i < headerLines.length; i++) {
+              var t = headerLines[i].text;
+              if (/^Belgique$|^France$|^Pays-Bas$/i.test(t)) break;
+              if (!/^(We Green|Ikaroslaan|Zaventem|Belgium|\+\d|n\.a\.)/i.test(t)) shipBlock.push(t);
             }
-            r.adresse = addrLines.filter(function(t3){ return !/^(TVA|Belgi)/i.test(t3); }).join(", ");
+            if (shipBlock.length) {
+              // Remove "CompanyName, ProjectName" prefix if present (like "Inclusio, SINT-NIKKLAS")
+              var firstName = shipBlock[0].replace(/^[^,]+,\s*/, "").trim() || shipBlock[0];
+              r.nom = firstName;
+              if (shipBlock.length > 1) r.adresse = shipBlock.slice(1).join(", ");
+            }
           }
-        }
-
-        // Fallback: if no nom found, use first shipping line
-        if (!r.nom) {
-          var fbLines = [];
-          for (var i = shipLabelIdx >= 0 ? shipLabelIdx + 1 : 0; i < headerLines.length; i++) {
-            var ft = headerLines[i].text;
-            if (/^(We Green|Ikaroslaan|Zaventem|Belgium|TVA BE)/i.test(ft)) continue;
-            fbLines.push(ft);
-            if (fbLines.length === 1) break;
-          }
-          if (fbLines.length) r.nom = fbLines[0];
         }
       } else {
         // Simple BDC: client block is in the RIGHT column (high X) of the header
@@ -1263,10 +1295,10 @@ function App() {
       for (var li = 0; li < lines.length; li++) {
         var t = lines[li].text;
 
-        // Panneaux (also match lines starting with a SKU like [ODA450-24V-MHDBRz] Panneaux -)
-        if (/^(?:\[[^\]]+\]\s*)?Panneaux\s*[-]\s*/i.test(t)) {
+        // Panneaux
+        if (/^Panneaux\s*[-]\s*/i.test(t)) {
           var qty = extractQty(t);
-          var nameMatch = t.match(/^(?:\[[^\]]+\]\s*)?Panneaux\s*[-]\s*(.+)/i);
+          var nameMatch = t.match(/^Panneaux\s*[-]\s*(.+)/i);
           if (nameMatch) {
             var name = nameMatch[1].replace(/\s+\d+[,.]0+.*$/, "").replace(/\s*[-]\s*(Full Black|Neostar\S*|Half[- ]Cell)\s*$/, "").trim();
             var wc = extractWc(t);
@@ -1536,6 +1568,49 @@ function App() {
 
 
 
+  // ── Export local backup ───────────────────────────────────────────────────
+  const exportData = function() {
+    try {
+      var exportObj = { ref: ref, exported_at: new Date().toISOString(), version: 4, data: data };
+      var blob = new Blob([JSON.stringify(exportObj)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "fdc_" + (ref || "export") + "_" + new Date().toISOString().slice(0,10) + ".json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch(e) { alert("Erreur export : " + e.message); }
+  };
+
+  const importData = function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var obj = JSON.parse(e.target.result);
+        var d = obj.data || obj;
+        if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
+        if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+        if (typeof d.date === "string") setDate(d.date);
+        if (Array.isArray(d.installations) && d.installations.length > 0) setInstallations(d.installations);
+        if (typeof d.comments === "string") setComments(d.comments);
+        if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (d.photos && typeof d.photos === "object") {
+          var merged = Object.fromEntries(PHOTO_CATS.map(function(cat) {
+            var arr = d.photos[cat.key];
+            return [cat.key, Array.isArray(arr) ? arr : []];
+          }));
+          setPhotos(merged);
+        }
+        if (typeof d.tdNote === "string") setTdNote(d.tdNote);
+        if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
+        if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
+        if (obj.ref && !ref) setRef(obj.ref);
+        alert("✓ Import réussi" + (obj.ref ? " — réf. " + obj.ref : ""));
+      } catch(err) { alert("Erreur d'import : " + err.message); }
+    };
+    reader.readAsText(file);
+  };
+
     const btnSt = (active, extra = {}) => ({
     padding: "7px 16px", borderRadius: 7,
     background: active ? GREEN_LIGHT : WHITE,
@@ -1567,6 +1642,17 @@ function App() {
           {mode === "preview" && <>
             <button onClick={() => window.print()} style={btnSt(false)}>⬇ PDF</button>
           </>}
+          {/* Backup buttons — always visible */}
+          <button
+            onClick={exportData}
+            title="Télécharger une sauvegarde locale de toutes les données (JSON)"
+            style={{ ...btnSt(false), background: "#fffbe6", borderColor: "#e0c800", color: "#7a6000", fontSize: 12 }}>
+            💾 Export
+          </button>
+          <label title="Restaurer depuis une sauvegarde locale (JSON)" style={{ ...btnSt(false), background: "#f0f7f2", borderColor: GREEN_MID, color: GREEN, fontSize: 12, cursor: "pointer", margin: 0 }}>
+            📂 Import
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files[0]) { importData(e.target.files[0]); e.target.value = ""; } }} />
+          </label>
         </div>
       </div>
 
@@ -1684,8 +1770,29 @@ function App() {
           {/* Photos */}
           <div style={CARD}>
             <div style={SH}>Photos</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-              {PHOTO_CATS.map(({ key, label, hasNote, hiRes }) => <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={items => addPhotos(key, items)} onDelete={idx => deletePhoto(key, idx)} onUpdate={(idx, url) => updatePhoto(key, idx, url)} onReorder={(from, to) => reorderPhoto(key, from, to)} hasNote={hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={v => key === "td" ? setTdNote(v) : setSchemaNote(v)} hiRes={!!hiRes} />)}
+
+            {/* ── DC section ── */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#2980b9", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: 6, borderBottom: "1.5px solid #d0e8f8", marginBottom: 10 }}>
+                ⚡ DC — qualité standard
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
+                {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur","dc_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} hasNote={!!hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                })}
+              </div>
+            </div>
+
+            {/* ── AC section ── */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#c0392b", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: 6, borderBottom: "1.5px solid #f9d4d0", marginBottom: 10 }}>
+                ⚡ AC — haute résolution (chiffres lisibles)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
+                {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec","ac_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} hasNote={!!hasNote} note={key === "td" || key === "schema_elec" ? (key === "td" ? tdNote : schemaNote) : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                })}
+              </div>
             </div>
           </div>
         </>
