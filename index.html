@@ -170,23 +170,23 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
 function AnnotationModal({ imageUrl, onSave, onClose }) {
   var canvasRef = useRef();
   var containerRef = useRef();
+  var textInputRef = useRef();
   var [tool, setTool] = useState("free");
   var [color, setColor] = useState("#e74c3c");
   var [thickness, setThickness] = useState(4);
+  var [fontSize, setFontSize] = useState(24);
   var [history, setHistory] = useState([]);
+  var [textInput, setTextInput] = useState(null); // {x,y,screenX,screenY}
   var drawing = useRef(false);
   var startPos = useRef({ x: 0, y: 0 });
   var snapshot = useRef(null);
-  // Pinch-to-zoom state
   var zoom = useRef(1);
-  var panOffset = useRef({ x: 0, y: 0 });
   var lastPinchDist = useRef(null);
-  var lastPanPos = useRef(null);
   var isPinching = useRef(false);
   var [zoomLevel, setZoomLevel] = useState(1);
 
-  var COLORS = ["#e74c3c","#27ae60","#2980b9","#f39c12","#ffffff","#1a1a1a"];
-  var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["eraser","🧹 Gomme"]];
+  var COLORS = ["#e74c3c","#f39c12","#27ae60","#2980b9","#9b59b6","#ffffff","#1a1a1a"];
+  var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["text","🔤 Texte"],["eraser","🧹 Gomme"]];
 
   useEffect(function() {
     var canvas = canvasRef.current;
@@ -194,7 +194,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     var img = new Image();
     img.onload = function() {
       var maxW = window.innerWidth * 0.92;
-      var maxH = window.innerHeight * 0.65;
+      var maxH = window.innerHeight * 0.62;
       var scale = Math.min(maxW / img.width, maxH / img.height, 1);
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
@@ -205,21 +205,45 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     img.src = imageUrl;
   }, []);
 
+  // Focus text input when it appears
+  useEffect(function() {
+    if (textInput && textInputRef.current) textInputRef.current.focus();
+  }, [textInput]);
+
   function getPos(e) {
     var canvas = canvasRef.current;
     var rect = canvas.getBoundingClientRect();
-    // Account for zoom/pan transform applied to container
-    var scaleX = canvas.width / (rect.width);
-    var scaleY = canvas.height / (rect.height);
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
     var clientX = e.touches ? e.touches[0].clientX : e.clientX;
     var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY, screenX: clientX - rect.left, screenY: clientY - rect.top };
+  }
+
+  function commitText(txt) {
+    if (!txt || !txt.trim() || !textInput) { setTextInput(null); return; }
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext("2d");
+    var scaledFontSize = fontSize * (canvas.width / canvas.getBoundingClientRect().width);
+    ctx.font = "bold " + scaledFontSize + "px Arial, sans-serif";
+    ctx.fillStyle = color;
+    ctx.strokeStyle = (color === "#ffffff" || color === "#f39c12") ? "#333" : "rgba(0,0,0,0.4)";
+    ctx.lineWidth = scaledFontSize / 14;
+    ctx.strokeText(txt.trim(), textInput.x, textInput.y);
+    ctx.fillText(txt.trim(), textInput.x, textInput.y);
+    setHistory(function(prev) { return prev.concat([ctx.getImageData(0, 0, canvas.width, canvas.height)]); });
+    setTextInput(null);
   }
 
   function onStart(e) {
     e.preventDefault();
     if (e.touches && e.touches.length === 2) { isPinching.current = true; return; }
     if (isPinching.current) return;
+    if (tool === "text") {
+      var pos = getPos(e);
+      setTextInput({ x: pos.x, y: pos.y, screenX: pos.screenX, screenY: pos.screenY - fontSize });
+      return;
+    }
     var canvas = canvasRef.current;
     var ctx = canvas.getContext("2d");
     var pos = getPos(e);
@@ -232,10 +256,8 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
 
   function onMove(e) {
     e.preventDefault();
-    // Handle pinch zoom
     if (e.touches && e.touches.length === 2) {
-      isPinching.current = true;
-      drawing.current = false;
+      isPinching.current = true; drawing.current = false;
       var dx = e.touches[0].clientX - e.touches[1].clientX;
       var dy = e.touches[0].clientY - e.touches[1].clientY;
       var dist = Math.sqrt(dx*dx + dy*dy);
@@ -243,41 +265,26 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
         var delta = dist / lastPinchDist.current;
         zoom.current = Math.min(Math.max(zoom.current * delta, 1), 4);
         setZoomLevel(Math.round(zoom.current * 100));
-        if (containerRef.current) {
-          containerRef.current.style.transform = "scale(" + zoom.current + ")";
-          containerRef.current.style.transformOrigin = "center center";
-        }
+        if (containerRef.current) { containerRef.current.style.transform = "scale(" + zoom.current + ")"; containerRef.current.style.transformOrigin = "center center"; }
       }
-      lastPinchDist.current = dist;
-      return;
+      lastPinchDist.current = dist; return;
     }
     lastPinchDist.current = null;
     if (!drawing.current) return;
-    var canvas = canvasRef.current;
-    var ctx = canvas.getContext("2d");
-    var pos = getPos(e);
+    var canvas = canvasRef.current; var ctx = canvas.getContext("2d"); var pos = getPos(e);
     ctx.lineWidth = tool === "eraser" ? thickness * 6 : thickness;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, thickness * 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, thickness * 4, 0, Math.PI * 2); ctx.fill();
       ctx.globalCompositeOperation = "source-over";
     } else if (tool === "free") {
-      ctx.strokeStyle = color;
-      ctx.globalCompositeOperation = "source-over";
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      ctx.strokeStyle = color; ctx.globalCompositeOperation = "source-over";
+      ctx.lineTo(pos.x, pos.y); ctx.stroke();
     } else if (tool === "line") {
-      ctx.strokeStyle = color;
-      ctx.putImageData(snapshot.current, 0, 0);
+      ctx.strokeStyle = color; ctx.putImageData(snapshot.current, 0, 0);
       ctx.globalCompositeOperation = "source-over";
-      ctx.beginPath();
-      ctx.moveTo(startPos.current.x, startPos.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(startPos.current.x, startPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
     }
   }
 
@@ -285,93 +292,107 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     if (e.touches && e.touches.length < 2) { isPinching.current = false; lastPinchDist.current = null; }
     if (!drawing.current) return;
     drawing.current = false;
-    var canvas = canvasRef.current;
-    var ctx = canvas.getContext("2d");
+    var canvas = canvasRef.current; var ctx = canvas.getContext("2d");
     setHistory(function(prev) { return prev.concat([ctx.getImageData(0, 0, canvas.width, canvas.height)]); });
   }
 
   function undo() {
     if (history.length <= 1) return;
-    var newHist = history.slice(0, -1);
-    setHistory(newHist);
-    var canvas = canvasRef.current;
-    var ctx = canvas.getContext("2d");
+    var newHist = history.slice(0, -1); setHistory(newHist);
+    var canvas = canvasRef.current; var ctx = canvas.getContext("2d");
     ctx.putImageData(newHist[newHist.length - 1], 0, 0);
-  }
-
-  function resetZoom() {
-    zoom.current = 1;
-    setZoomLevel(100);
-    if (containerRef.current) { containerRef.current.style.transform = "scale(1)"; }
   }
 
   function save() {
     var canvas = canvasRef.current;
-    var out = document.createElement("canvas");
-    out.width = canvas.width; out.height = canvas.height;
-    var ctx2 = out.getContext("2d");
-    ctx2.fillStyle = "#fff";
-    ctx2.fillRect(0, 0, out.width, out.height);
-    ctx2.drawImage(canvas, 0, 0);
+    var out = document.createElement("canvas"); out.width = canvas.width; out.height = canvas.height;
+    var ctx2 = out.getContext("2d"); ctx2.fillStyle = "#fff"; ctx2.fillRect(0, 0, out.width, out.height); ctx2.drawImage(canvas, 0, 0);
     onSave(out.toDataURL("image/jpeg", 0.92));
   }
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden", touchAction: "none" }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "center", padding: "8px 10px", background: "#1a1a1a", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap", justifyContent: "center", padding: "8px 10px", background: "#1a1a1a", width: "100%", boxSizing: "border-box" }}>
         {TOOLS.map(function(t) { return (
-          <button key={t[0]} onClick={function() { setTool(t[0]); }}
-            style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: tool === t[0] ? GREEN : "#333", color: "#fff", fontSize: 13, cursor: "pointer", fontWeight: tool === t[0] ? 700 : 400 }}>
+          <button key={t[0]} onClick={function() { setTool(t[0]); setTextInput(null); }}
+            style={{ padding: "6px 11px", borderRadius: 7, border: "none", background: tool === t[0] ? GREEN : "#333", color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: tool === t[0] ? 700 : 400 }}>
             {t[1]}
           </button>
         ); })}
-        <div style={{ width: 1, height: 28, background: "#444" }} />
+        <div style={{ width: 1, height: 26, background: "#444" }} />
+        {/* Colors */}
         {COLORS.map(function(col) { return (
-          <div key={col} onClick={function() { setColor(col); setTool("free"); }}
-            style={{ width: 26, height: 26, borderRadius: "50%", background: col, border: color === col && tool !== "eraser" ? "3px solid #fff" : "2px solid #555", cursor: "pointer", flexShrink: 0 }} />
+          <div key={col} onClick={function() { setColor(col); if (tool === "eraser") setTool("free"); }}
+            style={{ width: 24, height: 24, borderRadius: "50%", background: col, border: color === col && tool !== "eraser" ? "3px solid #fff" : "2px solid #555", cursor: "pointer", flexShrink: 0 }} />
         ); })}
-        <div style={{ width: 1, height: 28, background: "#444" }} />
+        <div style={{ width: 1, height: 26, background: "#444" }} />
+        {/* Thickness dots */}
         {[2,4,8].map(function(t) { return (
           <div key={t} onClick={function() { setThickness(t); }}
-            style={{ width: t * 3 + 10, height: t * 3 + 10, minWidth: 12, minHeight: 12, borderRadius: "50%", background: thickness === t ? "#fff" : "#555", cursor: "pointer", flexShrink: 0 }} />
+            style={{ width: t*3+8, height: t*3+8, minWidth: 10, minHeight: 10, borderRadius: "50%", background: thickness === t ? "#fff" : "#555", cursor: "pointer", flexShrink: 0 }} />
         ); })}
-        <div style={{ width: 1, height: 28, background: "#444" }} />
-        <button onClick={undo} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>↩</button>
-        {zoomLevel > 100 && <button onClick={resetZoom} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#555", color: "#fff", fontSize: 12, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
-        <button onClick={save} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: GREEN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauver</button>
-        <button onClick={onClose} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#555", color: "#fff", fontSize: 13, cursor: "pointer" }}>✕</button>
+        {/* Font size (text tool) */}
+        {tool === "text" && <>
+          <div style={{ width: 1, height: 26, background: "#444" }} />
+          <span style={{ color: "#aaa", fontSize: 11 }}>Taille :</span>
+          {[12,18,24,32,44].map(function(s) { return (
+            <button key={s} onClick={function() { setFontSize(s); }}
+              style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: fontSize === s ? GREEN : "#333", color: "#fff", fontSize: 11, cursor: "pointer", fontWeight: fontSize === s ? 700 : 400 }}>
+              {s}
+            </button>
+          ); })}
+        </>}
+        <div style={{ width: 1, height: 26, background: "#444" }} />
+        <button onClick={undo} style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>↩</button>
+        <button onClick={save} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: GREEN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauver</button>
+        <button onClick={onClose} style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#555", color: "#fff", fontSize: 13, cursor: "pointer" }}>✕</button>
       </div>
       {/* Legend */}
-      <div style={{ display: "flex", gap: 14, alignItems: "center", padding: "5px 10px", background: "#111", fontSize: 12, color: "#ccc", flexWrap: "wrap", justifyContent: "center", width: "100%", boxSizing: "border-box" }}>
-        <span style={{ color: "#888", fontWeight: 600 }}>Légende :</span>
-        {[["#e74c3c","Câble DC"],["#27ae60","Câble AC"],["#2980b9","Onduleur"],["#f39c12","Borne"]].map(function(item) { return (
-          <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 11, height: 11, borderRadius: "50%", background: item[0], display: "inline-block" }} />
-            {item[1]}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "4px 10px", background: "#111", fontSize: 11, color: "#aaa", flexWrap: "wrap", justifyContent: "center", width: "100%", boxSizing: "border-box" }}>
+        {[["#e74c3c","DC"],["#27ae60","AC"],["#2980b9","Onduleur"],["#f39c12","Borne"]].map(function(item) { return (
+          <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: item[0], display: "inline-block" }} />{item[1]}
           </span>
         ); })}
-        <span style={{ color: "#666", fontSize: 11 }}>Pincer pour zoomer</span>
+        <span style={{ color: "#666" }}>· Pincer pour zoomer</span>
+        {zoomLevel > 100 && <button onClick={function(){ zoom.current=1; setZoomLevel(100); if(containerRef.current) containerRef.current.style.transform="scale(1)"; }} style={{ padding: "2px 8px", borderRadius: 5, border: "none", background: "#555", color: "#fff", fontSize: 11, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
       </div>
-      {/* Canvas container with zoom */}
+      {/* Canvas area */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", position: "relative" }}>
-        <div ref={containerRef} style={{ transition: "transform 0.05s", transformOrigin: "center center" }}>
+        <div ref={containerRef} style={{ transition: "transform 0.05s", transformOrigin: "center center", position: "relative" }}>
           <canvas ref={canvasRef}
             onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
             onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
-            style={{ cursor: tool === "eraser" ? "cell" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", maxWidth: "92vw" }} />
+            style={{ cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", maxWidth: "92vw" }} />
+          {/* Text input overlay */}
+          {textInput && (
+            <input ref={textInputRef} type="text" placeholder="Tapez le texte…"
+              onKeyDown={function(e){ if (e.key === "Enter") commitText(e.target.value); if (e.key === "Escape") setTextInput(null); }}
+              onBlur={function(e){ commitText(e.target.value); }}
+              style={{
+                position: "absolute", left: textInput.screenX, top: Math.max(0, textInput.screenY),
+                minWidth: 140, background: "rgba(0,0,0,0.75)", color: color,
+                border: "1.5px solid " + color, borderRadius: 4, padding: "3px 7px",
+                fontSize: fontSize + "px", fontWeight: "bold", fontFamily: "Arial, sans-serif",
+                outline: "none", zIndex: 10
+              }} />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote, note, onNoteChange, hiRes }) {
+var _crossDrag = null; // cross-zone native drag tracker
+function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder, onReceiveCross, onMoveTo, allSections, hasNote, note, onNoteChange, hiRes }) {
   const [drag, setDrag] = React.useState(false);
   const [dragIdx, setDragIdx] = React.useState(null);
   const [overIdx, setOverIdx] = React.useState(null);
+  const [crossOver, setCrossOver] = React.useState(false);
   const [annotating, setAnnotating] = React.useState(null);
-  const [preview, setPreview] = React.useState(null);
+  const [previewIdx, setPreviewIdx] = React.useState(null);
+  const [previewZoomed, setPreviewZoomed] = React.useState(false);
   const [touchDragIdx, setTouchDragIdx] = React.useState(null);
   const [touchOverIdx, setTouchOverIdx] = React.useState(null);
   const tdxRef = React.useRef(null);
@@ -381,23 +402,18 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
   const zoneRef = React.useRef();
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  // DC: 1000px/0.72 — AC + strings + schémas: 1800px/0.88
+  // Compression: DC 1000px/0.72 — AC + strings + schémas 1800px/0.88
   const compressImg = function(blob, isHiRes) { return new Promise(function(res) {
-    const img = new Image();
-    const objUrl = URL.createObjectURL(blob);
+    const img = new Image(); const objUrl = URL.createObjectURL(blob);
     img.onload = function() {
-      const MAX = isHiRes ? 1800 : 1000;
-      const QUALITY = isHiRes ? 0.88 : 0.72;
+      const MAX = isHiRes ? 1800 : 1000; const QUALITY = isHiRes ? 0.88 : 0.72;
       let w = img.width, h = img.height;
-      if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
-      else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
+      if (w > h) { if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; } }
+      else { if (h > MAX) { w = Math.round(w*MAX/h); h = MAX; } }
+      const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(objUrl);
-      res(canvas.toDataURL("image/jpeg", QUALITY));
+      ctx.fillStyle = "#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(objUrl); res(canvas.toDataURL("image/jpeg", QUALITY));
     };
     img.onerror = function() { URL.revokeObjectURL(objUrl); res(null); };
     img.src = objUrl;
@@ -406,163 +422,234 @@ function PhotoZone({ label, items, onAdd, onDelete, onUpdate, onReorder, hasNote
   const handleFiles = async function(files) {
     const arr = Array.from(files).filter(function(f) { return f.type.startsWith("image/") || f.type === "application/pdf"; });
     const result = [];
-    for (let i = 0; i < arr.length; i++) {
+    for (let i=0; i<arr.length; i++) {
       const f = arr[i];
       const url = f.type.startsWith("image/") ? await compressImg(f, hiRes) : null;
-      result.push({ name: f.name, url: url, type: f.type });
+      result.push({ name: f.name, url, type: f.type });
     }
     onAdd(result);
   };
 
   const handlePaste = async function(e) {
-    const items2 = Array.from((e.clipboardData && e.clipboardData.items) || []);
-    const imageItems = items2.filter(function(i) { return i.type.startsWith("image/"); });
-    if (imageItems.length === 0) return;
-    e.preventDefault();
+    const imgs = Array.from((e.clipboardData && e.clipboardData.items)||[]).filter(function(i){ return i.type.startsWith("image/"); });
+    if (!imgs.length) return; e.preventDefault();
     const result = [];
-    for (let i = 0; i < imageItems.length; i++) {
-      const blob = imageItems[i].getAsFile();
-      const url = await compressImg(blob, hiRes);
-      result.push({ name: "colle_" + Date.now() + ".jpg", url: url, type: blob.type });
-    }
+    for (let i=0; i<imgs.length; i++) { const blob = imgs[i].getAsFile(); result.push({ name: "colle_"+Date.now()+".jpg", url: await compressImg(blob, hiRes), type: blob.type }); }
     onAdd(result);
   };
 
-  // Desktop drag-to-reorder
-  const handleDragStart = function(i) { setDragIdx(i); };
-  const handleDragOver = function(e, i) { e.preventDefault(); setOverIdx(i); };
-  const handleDrop = function(e, i) {
+  // ── Desktop drag within zone ──────────────────────────────────────────
+  function hdStart(i) { _crossDrag = { fromKey: catKey, fromIdx: i }; setDragIdx(i); }
+  function hdOver(e, i) { e.preventDefault(); setOverIdx(i); }
+  function hdDrop(e, i) {
     e.preventDefault();
-    if (dragIdx !== null && dragIdx !== i) onReorder(dragIdx, i);
-    setDragIdx(null); setOverIdx(null);
-  };
+    if (_crossDrag && _crossDrag.fromKey !== catKey) { onReceiveCross(_crossDrag.fromKey, _crossDrag.fromIdx); }
+    else if (dragIdx !== null && dragIdx !== i) { onReorder(dragIdx, i); }
+    setDragIdx(null); setOverIdx(null); _crossDrag = null;
+  }
+  function hdEnd() { setDragIdx(null); setOverIdx(null); _crossDrag = null; }
 
-  // Touch drag-to-reorder
-  function handleTouchDragStart(i) { tdxRef.current = i; toxRef.current = null; setTouchDragIdx(i); setTouchOverIdx(null); }
-  function handleTouchDragMove(e) {
-    if (tdxRef.current === null) return;
+  // ── Zone-level drag (cross-section receive) ───────────────────────────
+  function zoneOver(e) {
     e.preventDefault();
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!el) return;
-    const container = el.closest("[data-photo-idx]");
-    if (!container) return;
-    const idx = parseInt(container.getAttribute("data-photo-idx"));
-    if (!isNaN(idx) && idx !== tdxRef.current) { toxRef.current = idx; setTouchOverIdx(idx); }
+    if (_crossDrag && _crossDrag.fromKey !== catKey) { setCrossOver(true); return; }
+    if (!_crossDrag) setDrag(true);
   }
-  function handleTouchDragEnd() {
-    const from = tdxRef.current; const to = toxRef.current;
-    tdxRef.current = null; toxRef.current = null;
-    setTouchDragIdx(null); setTouchOverIdx(null);
-    if (from !== null && to !== null && from !== to) onReorder(from, to);
+  function zoneLeave(e) {
+    if (!zoneRef.current.contains(e.relatedTarget)) { setDrag(false); setCrossOver(false); }
   }
+  function zoneDrop(e) {
+    e.preventDefault(); setDrag(false); setCrossOver(false);
+    if (_crossDrag && _crossDrag.fromKey !== catKey) { onReceiveCross(_crossDrag.fromKey, _crossDrag.fromIdx); _crossDrag = null; return; }
+    _crossDrag = null;
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  }
+
+  // ── Touch drag within zone ────────────────────────────────────────────
+  function htStart(i) { tdxRef.current=i; toxRef.current=null; setTouchDragIdx(i); setTouchOverIdx(null); }
+  function htMove(e) {
+    if (tdxRef.current===null) return; e.preventDefault();
+    const t=e.touches[0]; const el=document.elementFromPoint(t.clientX,t.clientY); if(!el) return;
+    const c2=el.closest("[data-photo-idx]"); if(!c2) return;
+    const idx=parseInt(c2.getAttribute("data-photo-idx"));
+    if (!isNaN(idx) && idx!==tdxRef.current) { toxRef.current=idx; setTouchOverIdx(idx); }
+  }
+  function htEnd() {
+    const from=tdxRef.current; const to=toxRef.current;
+    tdxRef.current=null; toxRef.current=null; setTouchDragIdx(null); setTouchOverIdx(null);
+    if (from!==null && to!==null && from!==to) onReorder(from,to);
+  }
+
+  // ── Lightbox helpers ──────────────────────────────────────────────────
+  function openPrev() { setPreviewIdx(function(i){ return i>0?i-1:i; }); setPreviewZoomed(false); }
+  function openNext() { setPreviewIdx(function(i){ return i<items.length-1?i+1:i; }); setPreviewZoomed(false); }
+  function closePreview() { setPreviewIdx(null); setPreviewZoomed(false); }
+
+  React.useEffect(function() {
+    if (previewIdx===null) return;
+    function onKey(e) {
+      if (e.key==="ArrowLeft") openPrev();
+      if (e.key==="ArrowRight") openNext();
+      if (e.key==="Escape") closePreview();
+    }
+    window.addEventListener("keydown", onKey);
+    return function() { window.removeEventListener("keydown", onKey); };
+  }, [previewIdx, items.length]);
+
+  var borderStyle = crossOver ? "2px dashed #2980b9" : drag ? "1.5px dashed "+GREEN : "1.5px dashed "+BORDER;
+  var bgStyle = crossOver ? "#e8f4fd" : drag ? GREEN_LIGHT : BG;
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ ...LBL, cursor: "pointer", userSelect: "none", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}
-        onClick={function() { zoneRef.current && zoneRef.current.focus(); }}
-        title="Cliquer puis Ctrl+V pour coller">
+      {/* Label */}
+      <div style={{ ...LBL, cursor:"pointer", userSelect:"none", marginBottom:6, display:"flex", alignItems:"center", gap:4 }}
+        onClick={function(){ zoneRef.current && zoneRef.current.focus(); }} title="Cliquer puis Ctrl+V pour coller">
         <span>{label}</span>
-        {hiRes && <span title="Haute résolution — chiffres lisibles" style={{ fontSize: 9, color: "#c0392b", fontWeight: 700, background: "#fdecea", padding: "1px 5px", borderRadius: 3, letterSpacing: "0.04em" }}>HD</span>}
-        {items.length > 0 && <span style={{ color: GREEN, fontWeight: 700, marginLeft: 2 }}>({items.length})</span>}
-        <span style={{ fontSize: 10, color: MUTED, fontWeight: 400, marginLeft: 4 }}>↵ coller</span>
+        {hiRes && <span style={{ fontSize:9, color:"#c0392b", fontWeight:700, background:"#fdecea", padding:"1px 5px", borderRadius:3 }}>HD</span>}
+        {items.length>0 && <span style={{ color:GREEN, fontWeight:700, marginLeft:2 }}>({items.length})</span>}
+        <span style={{ fontSize:10, color:MUTED, fontWeight:400, marginLeft:4 }}>↵ coller</span>
+        {crossOver && <span style={{ fontSize:10, color:"#2980b9", fontWeight:700, marginLeft:4 }}>↓ Déposer ici</span>}
       </div>
 
+      {/* Drop zone */}
       <div ref={zoneRef} tabIndex={0} onPaste={handlePaste}
-        onDragOver={function(e) { if (dragIdx === null && dragIdx !== 0) { e.preventDefault(); setDrag(true); } }}
-        onDragLeave={function(e) { if (!zoneRef.current.contains(e.relatedTarget)) setDrag(false); }}
-        onDrop={function(e) {
-          if (dragIdx !== null) return;
-          e.preventDefault(); setDrag(false);
-          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
-        }}
-        style={{ border: "1.5px dashed " + (drag ? GREEN : BORDER), background: drag ? GREEN_LIGHT : BG, borderRadius: 8, padding: 8, minHeight: 60, outline: "none" }}>
+        onDragOver={zoneOver} onDragLeave={zoneLeave} onDrop={zoneDrop}
+        style={{ border: borderStyle, background: bgStyle, borderRadius:8, padding:8, minHeight:60, outline:"none", transition:"border-color 0.12s, background 0.12s" }}>
 
+        {/* Mobile capture buttons */}
         {isMobile ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: items.length > 0 ? 8 : 0 }}>
-            <button onClick={function() { refCamera.current && refCamera.current.click(); }}
-              style={{ flex: 1, minWidth: 120, background: GREEN, color: WHITE, border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              📷 Appareil photo
-            </button>
-            <button onClick={function() { refFile.current && refFile.current.click(); }}
-              style={{ flex: 1, minWidth: 120, background: WHITE, color: GREEN, border: "1.5px solid " + GREEN, borderRadius: 8, padding: "10px 12px", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              🖼 Galerie
-            </button>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:items.length>0?8:0 }}>
+            <button onClick={function(){ refCamera.current && refCamera.current.click(); }}
+              style={{ flex:1, minWidth:120, background:GREEN, color:WHITE, border:"none", borderRadius:8, padding:"10px 12px", fontSize:14, fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>📷 Photo</button>
+            <button onClick={function(){ refFile.current && refFile.current.click(); }}
+              style={{ flex:1, minWidth:100, background:WHITE, color:GREEN, border:"1.5px solid "+GREEN, borderRadius:8, padding:"10px 12px", fontSize:14, fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🖼 Galerie</button>
           </div>
         ) : (
-          items.length === 0 && (
-            <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <span onClick={function() { refFile.current && refFile.current.click(); }} style={{ fontSize: 12, color: GREEN, cursor: "pointer", textDecoration: "underline" }}>Parcourir</span>
-              <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
-              <span style={{ fontSize: 12, color: "#aaa" }}>Drop ici</span>
-              <span style={{ fontSize: 12, color: "#ccc" }}>|</span>
-              <span style={{ fontSize: 12, color: "#aaa" }}>Ctrl+V après focus</span>
+          items.length===0 && (
+            <div style={{ height:44, display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+              <span onClick={function(){ refFile.current && refFile.current.click(); }} style={{ fontSize:12, color:GREEN, cursor:"pointer", textDecoration:"underline" }}>Parcourir</span>
+              <span style={{ fontSize:12, color:"#ccc" }}>|</span>
+              <span style={{ fontSize:12, color:"#aaa" }}>Drop ici</span>
+              <span style={{ fontSize:12, color:"#ccc" }}>|</span>
+              <span style={{ fontSize:12, color:"#aaa" }}>Ctrl+V</span>
             </div>
           )
         )}
 
-        {items.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {items.map(function(item, i) { return (
+        {/* Thumbnails */}
+        {items.length>0 && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {items.map(function(item,i) { return (
               <div key={i} data-photo-idx={i} draggable={true}
-                onDragStart={function() { handleDragStart(i); }}
-                onDragOver={function(e) { handleDragOver(e, i); }}
-                onDrop={function(e) { handleDrop(e, i); }}
-                onDragEnd={function() { setDragIdx(null); setOverIdx(null); }}
-                style={{ opacity: (dragIdx === i || touchDragIdx === i) ? 0.35 : 1,
-                  outline: (overIdx === i || touchOverIdx === i) ? "2px solid " + GREEN : "none",
-                  borderRadius: 8, background: WHITE, border: "1px solid " + BORDER, overflow: "hidden",
-                  width: isMobile ? 110 : 90,
-                  boxShadow: touchDragIdx === i ? "0 4px 14px rgba(0,0,0,0.18)" : "none" }}>
+                onDragStart={function(){ hdStart(i); }}
+                onDragOver={function(e){ hdOver(e,i); }}
+                onDrop={function(e){ hdDrop(e,i); }}
+                onDragEnd={hdEnd}
+                style={{ opacity:(dragIdx===i||touchDragIdx===i)?0.35:1,
+                  outline:(overIdx===i||touchOverIdx===i)?"2px solid "+GREEN:"none",
+                  borderRadius:8, background:WHITE, border:"1px solid "+BORDER, overflow:"hidden",
+                  width:isMobile?120:104, boxShadow:touchDragIdx===i?"0 4px 14px rgba(0,0,0,0.18)":"none" }}>
                 {/* Drag handle */}
-                <div title="Maintenir pour déplacer"
-                  onTouchStart={function() { handleTouchDragStart(i); }}
-                  onTouchMove={function(e) { handleTouchDragMove(e); }}
-                  onTouchEnd={function() { handleTouchDragEnd(); }}
-                  style={{ cursor: "grab", textAlign: "center", padding: "3px 0", background: "#f0f0ec",
-                    borderBottom: "1px solid " + BORDER, color: "#bbb", fontSize: 13,
-                    userSelect: "none", touchAction: "none", letterSpacing: 2 }}>⠿</div>
+                <div title="Glisser pour réordonner ou déplacer vers une autre section"
+                  onTouchStart={function(){ htStart(i); }} onTouchMove={htMove} onTouchEnd={htEnd}
+                  style={{ cursor:"grab", textAlign:"center", padding:"3px 0", background:"#f0f0ec", borderBottom:"1px solid "+BORDER, color:"#bbb", fontSize:13, userSelect:"none", touchAction:"none", letterSpacing:2 }}>⠿</div>
+                {/* Image */}
                 {item.url
-                  ? <img src={item.url} alt={item.name} style={{ width: "100%", height: isMobile ? 90 : 75, objectFit: "cover", display: "block", cursor: "pointer" }} onClick={function(e) { e.stopPropagation(); setPreview(item.url); }} />
-                  : <div style={{ width: "100%", height: isMobile ? 90 : 75, display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontSize: 11, color: MUTED }}>PDF</div>
-                }
-                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", padding: "4px 2px", background: "#f8f8f6", borderTop: "1px solid " + BORDER }}>
-                  {item.url && <button title="Agrandir" onClick={function(e) { e.stopPropagation(); setPreview(item.url); }}
-                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#555" }}>🔍</button>}
-                  {item.url && <button title="Annoter" onClick={function(e) { e.stopPropagation(); setAnnotating(i); }}
-                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#2980b9" }}>✏️</button>}
-                  {item.url && <a title="Télécharger" href={item.url} download={item.name || "photo.jpg"} onClick={function(e) { e.stopPropagation(); }}
-                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#27ae60", textAlign: "center", textDecoration: "none" }}>⬇️</a>}
-                  <button title="Supprimer" onClick={function(e) { e.stopPropagation(); onDelete(i); }}
-                    style={{ flex: 1, background: "none", border: "none", cursor: "pointer", fontSize: isMobile ? 16 : 13, padding: "2px 0", color: "#e74c3c" }}>×</button>
+                  ? <img src={item.url} alt={item.name} style={{ width:"100%", height:isMobile?90:75, objectFit:"cover", display:"block", cursor:"pointer" }} onClick={function(e){ e.stopPropagation(); setPreviewIdx(i); setPreviewZoomed(false); }} />
+                  : <div style={{ width:"100%", height:isMobile?90:75, display:"flex", alignItems:"center", justifyContent:"center", background:BG, fontSize:11, color:MUTED }}>PDF</div>}
+                {/* Action bar — row 1: 4 main actions */}
+                <div style={{ display:"flex", borderTop:"1px solid "+BORDER }}>
+                  {item.url && <button title="Agrandir" onClick={function(e){ e.stopPropagation(); setPreviewIdx(i); setPreviewZoomed(false); }}
+                    style={{ flex:1, background:"none", border:"none", borderRight:"1px solid "+BORDER, cursor:"pointer", fontSize:isMobile?18:15, padding:"6px 0", color:"#555" }}>🔍</button>}
+                  {item.url && <button title="Annoter / dessiner / écrire" onClick={function(e){ e.stopPropagation(); setAnnotating(i); }}
+                    style={{ flex:1, background:"none", border:"none", borderRight:"1px solid "+BORDER, cursor:"pointer", fontSize:isMobile?18:15, padding:"6px 0", color:"#2980b9" }}>✏️</button>}
+                  {item.url && <a title="Télécharger" href={item.url} download={item.name||"photo.jpg"} onClick={function(e){ e.stopPropagation(); }}
+                    style={{ flex:1, background:"none", border:"none", borderRight:"1px solid "+BORDER, cursor:"pointer", fontSize:isMobile?18:15, padding:"6px 0", color:"#27ae60", textAlign:"center", textDecoration:"none", display:"block" }}>⬇️</a>}
+                  <button title="Supprimer cette photo" onClick={function(e){ e.stopPropagation(); if(window.confirm("Supprimer cette photo ?\nCette action est irréversible.")) onDelete(i); }}
+                    style={{ flex:1, background:"#fdecea", border:"none", cursor:"pointer", fontSize:isMobile?15:13, padding:"6px 0", color:"#c0392b", fontWeight:700 }}>×</button>
+                </div>
+                {/* Action bar — row 2: move to another section */}
+                <div style={{ borderTop:"1px solid "+BORDER }}>
+                  <select key={"mv-"+i+"-"+items.length} title="Déplacer vers une autre section"
+                    onChange={function(e){ e.stopPropagation(); var tk=e.target.value; if(tk&&tk!=="0") onMoveTo(i,tk); }}
+                    onClick={function(e){ e.stopPropagation(); }}
+                    style={{ width:"100%", border:"none", background:"#fafaf8", fontSize:11, color:MUTED, cursor:"pointer", outline:"none", padding:"4px 6px", fontFamily:"inherit" }}>
+                    <option value="0">↗ Déplacer vers…</option>
+                    {allSections.map(function(s){ return <option key={s.key} value={s.key}>{s.label.replace(/^\d+\.\s*/,"")}</option>; })}
+                  </select>
                 </div>
               </div>
             ); })}
-            <div onClick={function() { refFile.current && refFile.current.click(); }}
-              style={{ width: isMobile ? 110 : 90, height: isMobile ? 118 : 100, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px dashed " + BORDER, borderRadius: 8, cursor: "pointer", fontSize: 24, color: MUTED }}>+</div>
+            <div onClick={function(){ refFile.current && refFile.current.click(); }}
+              style={{ width:isMobile?120:104, height:isMobile?128:108, display:"flex", alignItems:"center", justifyContent:"center", border:"1.5px dashed "+BORDER, borderRadius:8, cursor:"pointer", fontSize:24, color:MUTED }}>+</div>
           </div>
         )}
       </div>
 
-      {hasNote && <textarea value={note || ""} onChange={function(e) { return onNoteChange(e.target.value); }} placeholder="Notes / précisions..." rows={2} style={{ width: "100%", marginTop: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />}
+      {hasNote && <textarea value={note||""} onChange={function(e){ onNoteChange(e.target.value); }} placeholder="Notes…" rows={2} style={{ width:"100%", marginTop:6, fontSize:13, resize:"vertical", boxSizing:"border-box" }} />}
 
-      {preview && (
-        <div onClick={function() { setPreview(null); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
-          <img src={preview} alt="" style={{ maxWidth: "95vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 6 }} />
-          <button onClick={function() { setPreview(null); }}
-            style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: "50%", background: "#333", color: WHITE, border: "none", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+      {/* ── Lightbox ────────────────────────────────────────────────────── */}
+      {previewIdx!==null && items[previewIdx] && items[previewIdx].url && (
+        <div onClick={function(e){ if(e.target===e.currentTarget && !previewZoomed) closePreview(); }}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.93)", zIndex:9998, display:"flex", flexDirection:"column" }}>
+
+          {/* Top bar */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:"rgba(0,0,0,0.65)", flexShrink:0, flexWrap:"wrap" }}>
+            <span style={{ color:"rgba(255,255,255,0.75)", fontSize:13, flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              <strong style={{ color:"#fff" }}>{label}</strong>
+              {items.length>1 && <span style={{ color:"rgba(255,255,255,0.5)", marginLeft:8 }}>{previewIdx+1} / {items.length}</span>}
+            </span>
+            <a href={items[previewIdx].url} download={items[previewIdx].name||"photo.jpg"} onClick={function(e){ e.stopPropagation(); }}
+              style={{ padding:"6px 12px", borderRadius:6, background:"#27ae60", color:"#fff", fontSize:13, textDecoration:"none", fontWeight:600, whiteSpace:"nowrap" }}>⬇ Télécharger</a>
+            <button onClick={function(e){ e.stopPropagation(); var idx=previewIdx; closePreview(); setAnnotating(idx); }}
+              style={{ padding:"6px 12px", borderRadius:6, background:"#2980b9", color:"#fff", border:"none", fontSize:13, cursor:"pointer", fontWeight:600, whiteSpace:"nowrap" }}>✏️ Modifier</button>
+            {!isMobile && <button onClick={function(e){ e.stopPropagation(); setPreviewZoomed(function(z){return !z;}); }}
+              title={previewZoomed?"Cliquer pour dézoomer":"Cliquer sur l'image pour zoomer"}
+              style={{ padding:"6px 10px", borderRadius:6, background:previewZoomed?"#444":"#333", color:"#fff", border:"none", fontSize:13, cursor:"pointer" }}>
+              {previewZoomed?"🔍 −":"🔍 +"}</button>}
+            <button onClick={function(e){ e.stopPropagation(); closePreview(); }}
+              style={{ padding:"6px 10px", borderRadius:6, background:"#555", color:"#fff", border:"none", fontSize:18, lineHeight:1, cursor:"pointer" }}>✕</button>
+          </div>
+
+          {/* Image area */}
+          <div style={{ flex:1, overflow:previewZoomed?"auto":"hidden", display:"flex", alignItems:previewZoomed?"flex-start":"center", justifyContent:previewZoomed?"flex-start":"center", position:"relative", minHeight:0 }}>
+            {previewIdx>0 && (
+              <button onClick={function(e){ e.stopPropagation(); openPrev(); }}
+                style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", background:"rgba(255,255,255,0.14)", border:"none", borderRadius:"50%", width:48, height:48, color:"#fff", fontSize:28, cursor:"pointer", zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>‹</button>
+            )}
+            {previewIdx<items.length-1 && (
+              <button onClick={function(e){ e.stopPropagation(); openNext(); }}
+                style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"rgba(255,255,255,0.14)", border:"none", borderRadius:"50%", width:48, height:48, color:"#fff", fontSize:28, cursor:"pointer", zIndex:2, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>›</button>
+            )}
+            <img src={items[previewIdx].url}
+              onClick={function(e){ if(!isMobile){ e.stopPropagation(); setPreviewZoomed(function(z){return !z;}); } }}
+              style={{ maxWidth:previewZoomed?"none":"92vw", maxHeight:previewZoomed?"none":"calc(100vh - 110px)", width:"auto", height:"auto",
+                objectFit:"contain", display:"block", borderRadius:previewZoomed?0:4,
+                cursor:isMobile?"default":(previewZoomed?"zoom-out":"zoom-in") }} alt="" />
+          </div>
+
+          {/* Thumbnails strip */}
+          {items.length>1 && (
+            <div style={{ display:"flex", gap:5, padding:"8px 12px", background:"rgba(0,0,0,0.55)", overflowX:"auto", flexShrink:0 }}>
+              {items.map(function(it,idx){ return it.url?(
+                <img key={idx} src={it.url} onClick={function(e){ e.stopPropagation(); setPreviewIdx(idx); setPreviewZoomed(false); }}
+                  style={{ width:54, height:42, objectFit:"cover", borderRadius:4, cursor:"pointer", flexShrink:0,
+                    border:idx===previewIdx?"2.5px solid "+GREEN:"2px solid transparent", opacity:idx===previewIdx?1:0.65 }} alt="" />
+              ):null; })}
+            </div>
+          )}
         </div>
       )}
 
-      {annotating !== null && items[annotating] && items[annotating].url && (
+      {/* Annotation modal */}
+      {annotating!==null && items[annotating] && items[annotating].url && (
         <AnnotationModal imageUrl={items[annotating].url}
-          onSave={function(newUrl) { onUpdate(annotating, newUrl); setAnnotating(null); }}
-          onClose={function() { setAnnotating(null); }} />
+          onSave={function(newUrl){ onUpdate(annotating,newUrl); setAnnotating(null); }}
+          onClose={function(){ setAnnotating(null); }} />
       )}
 
-      <input ref={refCamera} type="file" multiple accept="image/*" capture="environment" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files.length) handleFiles(e.target.files); }} />
-      <input ref={refFile} type="file" multiple accept="image/*,application/pdf,.heic,.heif" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files.length) handleFiles(e.target.files); }} />
+      <input ref={refCamera} type="file" multiple accept="image/*" capture="environment" style={{ display:"none" }} onChange={function(e){ if(e.target.files&&e.target.files.length) handleFiles(e.target.files); }} />
+      <input ref={refFile} type="file" multiple accept="image/*,application/pdf,.heic,.heif" style={{ display:"none" }} onChange={function(e){ if(e.target.files&&e.target.files.length) handleFiles(e.target.files); }} />
     </div>
   );
 }
@@ -1516,6 +1603,16 @@ function App() {
     ...prev,
     [catKey]: prev[catKey].map((item, i) => i === idx ? Object.assign({}, item, { url: newUrl }) : item)
   }));
+  const movePhoto = function(fromKey, fromIdx, toKey) {
+    setPhotos(function(prev) {
+      var next = Object.assign({}, prev);
+      var arr = next[fromKey].slice();
+      var item = arr.splice(fromIdx, 1)[0];
+      next[fromKey] = arr;
+      next[toKey] = next[toKey].concat([item]);
+      return next;
+    });
+  };
   const addString = function(instIdx) {
     setInstallations(function(prev) {
       var arr = JSON.parse(JSON.stringify(prev));
@@ -1592,53 +1689,37 @@ function App() {
   });
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 0, paddingBottom: "2rem" }}>
+    <div style={{ maxWidth: 880, margin: "0 auto", padding: "1rem 0.75rem", display: "flex", flexDirection: "column", gap: 14 }}>
 
-      {/* ── Top banner ────────────────────────────────────────────────── */}
-      <div id="no-print" style={{
-        background: "linear-gradient(135deg, #0f3d22 0%, #1B6B3A 60%, #2e8b57 100%)",
-        borderRadius: "0 0 16px 16px",
-        padding: "14px 20px 16px",
-        marginBottom: 18,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 10,
-        boxShadow: "0 4px 18px rgba(27,107,58,0.22)"
-      }}>
-        {/* Left: logo + title */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-          <img src={LOGO_SRC} alt="We Green" style={{ height: 44, width: "auto", flexShrink: 0, filter: "brightness(0) invert(1)", opacity: 0.92 }} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.12em" }}>We Green Energy</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", lineHeight: 1.25 }}>
-              🔆 Feuille de chantier PV
-              {client.nom && <span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,0.82)", marginLeft: 10 }}>— {client.nom}</span>}
-            </div>
-            <div style={{ fontSize: 11, marginTop: 3, color: saveStatus === "error" ? "#ffb3b3" : saveStatus === "saving" ? "#ffe082" : "rgba(255,255,255,0.62)" }}>
-              {!ref && "⚠ Pas de référence — ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde"}
-              {ref && saveStatus === "saving" && "⏳ Sauvegarde en cours…"}
-              {ref && saveStatus === "loading" && "⏳ Chargement…"}
-              {ref && saveStatus === "error" && "⚠ Erreur de sauvegarde"}
-              {ref && saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
-              {ref && !saveStatus && <span>Réf. <strong style={{ color: "#ffffff" }}>{ref}</strong> — <a href={"https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list"} target="_blank" rel="noreferrer" style={{ color: "#9effc8", textDecoration: "none" }}>← Odoo</a></span>}
-            </div>
+      {/* Header */}
+      <div id="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>
+            Feuille de chantier PV
+            {client.nom && <span style={{ fontSize: 15, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {client.nom}</span>}
+            {ref && <a href={"https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list"} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "2px 8px", background: GREEN_LIGHT, whiteSpace: "nowrap" }}>← Odoo</a>}
           </div>
+          {!ref && <div style={{ fontSize: 11, color: "#e07b00", marginTop: 2 }}>⚠ Pas de référence — ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</div>}
+          {ref && <div style={{ fontSize: 11, marginTop: 2, color: saveStatus === "saving" ? "#e07b00" : saveStatus === "error" ? "#c0392b" : saveStatus === "loading" ? MUTED : GREEN }}>
+            {saveStatus === "saving" && "⏳ Sauvegarde en cours…"}
+            {saveStatus === "loading" && "⏳ Chargement…"}
+            {saveStatus === "error" && "⚠ Erreur de sauvegarde"}
+            {saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
+          </div>}
         </div>
-        {/* Right: action buttons */}
-        <div style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, overflow: "hidden" }}>
-            <button onClick={() => setMode("form")} style={{ padding: "7px 14px", border: "none", borderRight: "1px solid rgba(255,255,255,0.22)", background: mode === "form" ? "rgba(255,255,255,0.2)" : "transparent", color: "#ffffff", fontSize: 13, fontWeight: mode === "form" ? 700 : 400, cursor: "pointer" }}>✏️ Formulaire</button>
-            <button onClick={() => setMode("preview")} style={{ padding: "7px 14px", border: "none", background: mode === "preview" ? "rgba(255,255,255,0.2)" : "transparent", color: "#ffffff", fontSize: 13, fontWeight: mode === "preview" ? 700 : 400, cursor: "pointer" }}>👁 Aperçu</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", border: "1px solid " + BORDER, borderRadius: 8, overflow: "hidden" }}>
+            <button onClick={() => setMode("form")} style={{ ...btnSt(mode === "form"), borderRadius: 0, border: "none", borderRight: "1px solid " + BORDER }}>Formulaire</button>
+            <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
           </div>
-          {mode === "preview" && <button onClick={() => window.print()} style={{ padding: "7px 13px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.14)", color: "#ffffff", fontSize: 13, cursor: "pointer" }}>⬇ PDF</button>}
-          <button onClick={exportData} title="Sauvegarde JSON locale" style={{ padding: "7px 11px", borderRadius: 7, border: "1px solid rgba(255,215,0,0.45)", background: "rgba(255,215,0,0.12)", color: "#ffe082", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💾 Export</button>
-          <label title="Restaurer depuis JSON" style={{ padding: "7px 11px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.28)", background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: 600, cursor: "pointer", margin: 0 }}>
+          {mode === "preview" && <button onClick={() => window.print()} style={btnSt(false)}>⬇ PDF</button>}
+          <button onClick={exportData} title="Sauvegarde JSON locale" style={{ ...btnSt(false), background: "#fffbe6", borderColor: "#e0c800", color: "#7a6000", fontSize: 12 }}>💾 Export</button>
+          <label title="Restaurer depuis JSON" style={{ ...btnSt(false), background: GREEN_LIGHT, borderColor: GREEN_MID, color: GREEN, fontSize: 12, cursor: "pointer", margin: 0 }}>
             📂 Import<input type="file" accept=".json" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files[0]) { importData(e.target.files[0]); e.target.value = ""; } }} />
           </label>
         </div>
       </div>
-
-      {/* ── Page content ──────────────────────────────────────────────── */}
-      <div style={{ padding: "0 0.75rem", display: "flex", flexDirection: "column", gap: 14 }}>
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
         <>
@@ -1754,7 +1835,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                 {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur","dc_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -1768,7 +1849,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                 {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec","ac_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -1776,7 +1857,6 @@ function App() {
         </>
       )}
 
-      </div>
     </div>
   );
 }
