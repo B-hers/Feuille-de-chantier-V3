@@ -188,7 +188,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   var [zoomLevel, setZoomLevel] = useState(1);
 
   var COLORS = ["#e74c3c","#f39c12","#27ae60","#2980b9","#9b59b6","#ffffff","#1a1a1a"];
-  var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["text","🔤 Texte"],["eraser","🧹 Gomme"]];
+  var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["rect","▭ Rect"],["text","🔤 Texte"],["eraser","🧹 Gomme"]];
 
   useEffect(function() {
     var canvas = canvasRef.current;
@@ -287,6 +287,11 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
       ctx.strokeStyle = color; ctx.putImageData(snapshot.current, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.beginPath(); ctx.moveTo(startPos.current.x, startPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+    } else if (tool === "rect") {
+      ctx.strokeStyle = color; ctx.putImageData(snapshot.current, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      var rx = startPos.current.x, ry = startPos.current.y, rw = pos.x - rx, rh = pos.y - ry;
+      ctx.strokeRect(rx, ry, rw, rh);
     }
   }
 
@@ -782,6 +787,13 @@ function PreviewDoc({ data }) {
         </div>
       )}
 
+      {data.pmNote && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Note du Project Manager</div>
+          <div style={{ padding: "10px 14px", background: "#fffdf0", borderRadius: 6, border: "1px solid #e8e0b0", fontSize: 13, whiteSpace: "pre-wrap", color: TEXT }}>{data.pmNote}</div>
+        </div>
+      )}
+
       {PHOTO_CATS.some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Photos</div>
@@ -791,8 +803,8 @@ function PreviewDoc({ data }) {
               {c.key === "td" && data.tdNote && <div style={{ fontSize: 12, color: MUTED, padding: "4px 8px", background: "#f9f9f7", borderRadius: 4, marginBottom: 6, border: `1px solid ${BORDER}` }}>{data.tdNote}</div>}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, pageBreakInside: "avoid", breakInside: "avoid" }}>
                 {data.photos[c.key].map((item, i) => item.url
-                  ? <img key={i} src={item.url} alt={item.name} style={{ width: "100%", aspectRatio: "4/3", pageBreakInside: "avoid", breakInside: "avoid", objectFit: "cover", borderRadius: 6, border: `1px solid ${BORDER}` }} />
-                  : <div key={i} style={{ aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, color: MUTED }}>📄 PDF</div>
+                  ? <img key={i} src={item.url} alt={item.name} style={{ width: "100%", maxHeight: 280, pageBreakInside: "avoid", breakInside: "avoid", objectFit: "contain", background: "#f8f8f6", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                  : <div key={i} style={{ minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", background: BG, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 13, color: MUTED }}>📄 PDF</div>
                 )}
               </div>
             </div>
@@ -1019,6 +1031,7 @@ function App() {
   const [calepinage, setCalepinage] = useState({ image: null, loading: false, msg: "" });
   const [tdNote, setTdNote] = useState("");
   const [schemaNote, setSchemaNote] = useState("");
+  const [pmNote, setPmNote] = useState("");
   const [date, setDate] = useState("");
   const [installations, setInstallations] = useState([makeEmptyInst()]);
   const [comments, setComments] = useState("");
@@ -1032,7 +1045,7 @@ function App() {
   const saveTimer = useRef(null);
   const isLoading = useRef(false);
 
-  const data = { client, weGreen, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote };
+  const data = { client, weGreen, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
   const setT = function(instIdx, path, val) {
@@ -1119,6 +1132,7 @@ function App() {
         }
         if (typeof d.tdNote === "string") setTdNote(d.tdNote);
         if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
+        if (typeof d.pmNote === "string") setPmNote(d.pmNote);
         if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
         setLastSaved(row.updated_at);
         setSaveStatus("saved");
@@ -1142,7 +1156,7 @@ function App() {
         else setSaveStatus("error");
       });
     }, 1200);
-  }, [client, weGreen, date, installations, comments, logistique, tdNote]);
+  }, [client, weGreen, date, installations, comments, logistique, tdNote, pmNote]);
 
   // ── Photos auto-save (separate, debounced longer due to size) ──────────────
   useEffect(function() {
@@ -1828,7 +1842,20 @@ function App() {
             </div>
           </div>
 
-          {/* ── 4. Photos ── */}
+          {/* ── 4. Note PM ── */}
+          <div style={CARD}>
+            <div style={SH}><span>📝</span> Note du Project Manager</div>
+            <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Remarques internes, instructions pour les monteurs, observations de visite…</div>
+            <textarea
+              value={pmNote}
+              onChange={e => setPmNote(e.target.value)}
+              placeholder="Saisir une note (visible dans le PDF)…"
+              rows={4}
+              style={{ width: "100%", fontSize: 13, resize: "vertical", boxSizing: "border-box", borderRadius: 6, border: "1px solid " + BORDER, padding: "8px 10px", fontFamily: "inherit" }}
+            />
+          </div>
+
+          {/* ── 5. Photos ── */}
           <div style={CARD}>
             <div style={SH}><span>📷</span> Photos de chantier</div>
 
