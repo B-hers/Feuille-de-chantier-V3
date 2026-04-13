@@ -55,6 +55,7 @@ const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BS
 const { useState, useRef, useEffect, useCallback } = React;
 
 const PHOTO_CATS = [
+  { key: "extra",           label: "Photos supplémentaires / à reclasser" },
   { key: "vue_generale",    label: "1. Vue générale du chantier" },
   { key: "toiture",         label: "2. État / photos de la toiture" },
   { key: "cablage",         label: "3. Câblage DC & AC" },
@@ -64,8 +65,9 @@ const PHOTO_CATS = [
   { key: "tgbt",            label: "7. Tableau(x) TGBT", hiRes: true },
   { key: "td",              label: "8. TD", hasNote: true, hiRes: true },
   { key: "schema_elec",     label: "9. Schéma électrique client", hiRes: true, hasNote: true },
-  { key: "dc_extra",        label: "10. Photos DC supplémentaires / à reclasser" },
-  { key: "ac_extra",        label: "11. Photos AC supplémentaires / à reclasser", hiRes: true },
+  // kept for retrocompatibility (old saves), not rendered directly
+  { key: "dc_extra",        label: "10. Photos DC supplémentaires / à reclasser", _legacy: true },
+  { key: "ac_extra",        label: "11. Photos AC supplémentaires / à reclasser", hiRes: true, _legacy: true },
 ];
 
 const PM_DATA = {
@@ -1110,6 +1112,9 @@ function App() {
             var arr = loadedPhotos[cat.key];
             return [cat.key, Array.isArray(arr) ? arr : []];
           }));
+          // Migrate legacy dc_extra + ac_extra → extra
+          var legacy = (loadedPhotos.dc_extra||[]).concat(loadedPhotos.ac_extra||[]);
+          if (legacy.length) merged.extra = (merged.extra||[]).concat(legacy);
           setPhotos(merged);
         }
         if (typeof d.tdNote === "string") setTdNote(d.tdNote);
@@ -1828,28 +1833,41 @@ function App() {
             <div style={SH}><span>📷</span> Photos de chantier</div>
 
             {/* DC */}
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <div style={{ height: 3, width: 18, background: "#3498db", borderRadius: 2 }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#2980b9", textTransform: "uppercase", letterSpacing: "0.07em" }}>DC — qualité standard</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#2980b9", textTransform: "uppercase", letterSpacing: "0.07em" }}>Photos DC — qualité standard</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-                {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur","dc_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
 
             {/* AC */}
-            <div>
+            <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <div style={{ height: 3, width: 18, background: "#e74c3c", borderRadius: 2 }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#c0392b", textTransform: "uppercase", letterSpacing: "0.07em" }}>AC — haute résolution (chiffres lisibles)</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#c0392b", textTransform: "uppercase", letterSpacing: "0.07em" }}>Photos AC — haute résolution</span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#c0392b", background: "#fdecea", padding: "1px 6px", borderRadius: 4 }}>HD</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-                {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec","ac_extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                })}
+              </div>
+            </div>
+
+            {/* Extra */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ height: 3, width: 18, background: "#999", borderRadius: 2 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em" }}>Photos supplémentaires / à reclasser</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
+                {PHOTO_CATS.filter(function(c){ return ["extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
