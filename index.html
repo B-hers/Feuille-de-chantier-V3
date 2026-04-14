@@ -190,22 +190,45 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   var COLORS = ["#e74c3c","#f39c12","#27ae60","#2980b9","#9b59b6","#ffffff","#1a1a1a"];
   var TOOLS = [["free","✏️ Libre"],["line","📏 Droit"],["rect","▭ Rect"],["text","🔤 Texte"],["eraser","🧹 Gomme"]];
 
+  // cssScale: display scale (1 = fit screen, 2 = 200%, etc.)
+  var [cssScale, setCssScale] = useState(1);
+  var initScale = useRef(1); // natural fit-screen scale (px/px)
+
   useEffect(function() {
     var canvas = canvasRef.current;
     if (!canvas) return;
     var img = new Image();
     img.onload = function() {
-      var maxW = window.innerWidth * 0.92;
-      var maxH = window.innerHeight * 0.62;
-      var scale = Math.min(maxW / img.width, maxH / img.height, 1);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      // Canvas at FULL image resolution — CSS handles display scaling
+      canvas.width = img.width;
+      canvas.height = img.height;
       var ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, img.width, img.height);
       setHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+      // Compute natural fit-screen CSS width (px)
+      var maxW = window.innerWidth * 0.98;
+      var maxH = window.innerHeight * 0.72;
+      var scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      initScale.current = scale;
+      zoom.current = 1;
+      setCssScale(1);
+      setZoomLevel(100);
+      canvas.style.width = Math.round(img.width * scale) + "px";
+      canvas.style.height = "auto";
     };
     img.src = imageUrl;
   }, []);
+
+  function applyZoom(factor) {
+    var canvas = canvasRef.current;
+    if (!canvas) return;
+    var newZoom = Math.min(Math.max(zoom.current * factor, 0.5), 6);
+    zoom.current = newZoom;
+    setZoomLevel(Math.round(newZoom * 100));
+    var img = canvas; // use canvas natural dims
+    canvas.style.width = Math.round(canvas.width * initScale.current * newZoom) + "px";
+    canvas.style.height = "auto";
+  }
 
   // Focus text input when it appears
   useEffect(function() {
@@ -265,9 +288,13 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
       var dist = Math.sqrt(dx*dx + dy*dy);
       if (lastPinchDist.current !== null) {
         var delta = dist / lastPinchDist.current;
-        zoom.current = Math.min(Math.max(zoom.current * delta, 1), 4);
-        setZoomLevel(Math.round(zoom.current * 100));
-        if (containerRef.current) { containerRef.current.style.transform = "scale(" + zoom.current + ")"; containerRef.current.style.transformOrigin = "center center"; }
+        var newZoom = Math.min(Math.max(zoom.current * delta, 0.5), 6);
+        zoom.current = newZoom;
+        setZoomLevel(Math.round(newZoom * 100));
+        if (canvasRef.current) {
+          canvasRef.current.style.width = Math.round(canvasRef.current.width * initScale.current * newZoom) + "px";
+          canvasRef.current.style.height = "auto";
+        }
       }
       lastPinchDist.current = dist; return;
     }
@@ -314,7 +341,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     var canvas = canvasRef.current;
     var out = document.createElement("canvas"); out.width = canvas.width; out.height = canvas.height;
     var ctx2 = out.getContext("2d"); ctx2.fillStyle = "#fff"; ctx2.fillRect(0, 0, out.width, out.height); ctx2.drawImage(canvas, 0, 0);
-    onSave(out.toDataURL("image/jpeg", 0.92));
+    onSave(out.toDataURL("image/jpeg", 0.97));
   }
 
   return (
@@ -352,6 +379,11 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
         </>}
         <div style={{ width: 1, height: 26, background: "#444" }} />
         <button onClick={undo} style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>↩</button>
+        <div style={{ width: 1, height: 26, background: "#444" }} />
+        <button onClick={function(){ applyZoom(1.3); }} title="Zoom +" style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>🔍+</button>
+        <span style={{ color: "#aaa", fontSize: 11, minWidth: 34, textAlign: "center" }}>{zoomLevel}%</span>
+        <button onClick={function(){ applyZoom(1/1.3); }} title="Zoom −" style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#333", color: "#fff", fontSize: 13, cursor: "pointer" }}>🔍−</button>
+        <div style={{ width: 1, height: 26, background: "#444" }} />
         <button onClick={save} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: GREEN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauver</button>
         <button onClick={onClose} style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#555", color: "#fff", fontSize: 13, cursor: "pointer" }}>✕</button>
       </div>
@@ -363,15 +395,15 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
           </span>
         ); })}
         <span style={{ color: "#666" }}>· Pincer pour zoomer</span>
-        {zoomLevel > 100 && <button onClick={function(){ zoom.current=1; setZoomLevel(100); if(containerRef.current) containerRef.current.style.transform="scale(1)"; }} style={{ padding: "2px 8px", borderRadius: 5, border: "none", background: "#555", color: "#fff", fontSize: 11, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
+        {zoomLevel !== 100 && <button onClick={function(){ zoom.current=1; setZoomLevel(100); if(canvasRef.current){ canvasRef.current.style.width=Math.round(canvasRef.current.width*initScale.current)+"px"; canvasRef.current.style.height="auto"; } }} style={{ padding: "2px 8px", borderRadius: 5, border: "none", background: "#555", color: "#fff", fontSize: 11, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
       </div>
       {/* Canvas area */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", position: "relative" }}>
-        <div ref={containerRef} style={{ transition: "transform 0.05s", transformOrigin: "center center", position: "relative" }}>
+      <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", width: "100%", position: "relative", minHeight: 0 }}>
+        <div ref={containerRef} style={{ position: "relative", width: "100%", maxWidth: "100%" }}>
           <canvas ref={canvasRef}
             onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
             onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
-            style={{ cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", maxWidth: "92vw" }} />
+            style={{ cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", height: "auto" }} />
           {/* Text input overlay */}
           {textInput && (
             <input ref={textInputRef} type="text" placeholder="Tapez le texte…"
@@ -409,11 +441,11 @@ function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder,
   const zoneRef = React.useRef();
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  // Compression: DC 1000px/0.72 — AC + strings + schémas 1800px/0.88
+  // Compression: DC 1600px/0.82 — AC + strings + schémas 2400px/0.92
   const compressImg = function(blob, isHiRes) { return new Promise(function(res) {
     const img = new Image(); const objUrl = URL.createObjectURL(blob);
     img.onload = function() {
-      const MAX = isHiRes ? 1800 : 1000; const QUALITY = isHiRes ? 0.88 : 0.72;
+      const MAX = isHiRes ? 2400 : 1600; const QUALITY = isHiRes ? 0.92 : 0.82;
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; } }
       else { if (h > MAX) { w = Math.round(w*MAX/h); h = MAX; } }
@@ -1035,7 +1067,7 @@ function App() {
   const [date, setDate] = useState("");
   const [installations, setInstallations] = useState([makeEmptyInst()]);
   const [comments, setComments] = useState("");
-  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: null, nacelle: null, manitou: null, grue: null });
+  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON" });
 
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
 
@@ -1566,15 +1598,27 @@ function App() {
       const allText = pageTexts.join(" ");
 
       // Detect report type
-      const isHelioScope = /helioscope|aurora solar|detailed layout/i.test(allText);
+      // HelioScope (Aurora Solar) → "Detailed Layout" page
+      // HelioScope/We Green web format → "Design Render" page
+      // Archelios → "Illustrations du projet" page
+      const isHelioScope = /helioscope|aurora solar|detailed layout|design render/i.test(allText);
       const isArchelios = /archelios|illustrations du projet/i.test(allText);
+      // "Annual Production Report" without explicit brand = likely HelioScope web export
+      const isAnnualProductionReport = /annual production report/i.test(allText);
 
       let targetPage = pdf.numPages; // default: last page
 
-      if (isHelioScope) {
-        // Hélioscope: find "Detailed Layout" page
+      if (isHelioScope || isAnnualProductionReport) {
+        // Priority 1: "Detailed Layout" (Aurora Solar)
+        // Priority 2: "Design Render" (HelioScope web / We Green format)
+        let foundLayout = false;
         for (let i = 1; i <= pdf.numPages; i++) {
-          if (/detailed layout/i.test(pageTexts[i-1])) { targetPage = i; break; }
+          if (/detailed layout/i.test(pageTexts[i-1])) { targetPage = i; foundLayout = true; break; }
+        }
+        if (!foundLayout) {
+          for (let i = 1; i <= pdf.numPages; i++) {
+            if (/design render/i.test(pageTexts[i-1])) { targetPage = i; break; }
+          }
         }
       } else if (isArchelios) {
         // Archelios: find "Illustrations du projet" page
@@ -1587,7 +1631,7 @@ function App() {
         for (let i = 1; i <= pdf.numPages; i++) {
           const txt = pageTexts[i-1];
           let score = 0;
-          if (/illustration|detailed layout|calepinage|layout plan/.test(txt)) score += 15;
+          if (/illustration|detailed layout|calepinage|layout plan|design render/.test(txt)) score += 15;
           if (/toiture|roof|panneaux|string|mppt/.test(txt)) score += 5;
           if (/google|maps?|satellite|localisation|location|météo|meteo|irradiation/.test(txt)) score -= 20;
           if (score >= bestScore) { bestScore = score; bestPage = i; }
@@ -1597,12 +1641,12 @@ function App() {
 
       // Render target page at high resolution
       const page = await pdf.getPage(targetPage);
-      const viewport = page.getViewport({ scale: 2.5 });
+      const viewport = page.getViewport({ scale: 3.5 });
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width; canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      const calUrl = canvas.toDataURL("image/jpeg", 0.90);
-      const type = isHelioScope ? "Hélioscope" : isArchelios ? "Archelios" : "PDF";
+      const calUrl = canvas.toDataURL("image/jpeg", 0.95);
+      const type = isArchelios ? "Archelios" : (isHelioScope || isAnnualProductionReport) ? "Hélioscope" : "PDF";
       applyCalepinage(calUrl, "✓ " + type + " — page " + targetPage + "/" + pdf.numPages);
 
     } catch (e) {
@@ -1799,7 +1843,57 @@ function App() {
             </div>
           </div>
 
-          {/* ── 2. Technique ── */}
+          {/* ── 2. Logistique ── */}
+          <div style={CARD}>
+            <div style={SH}><span>🚛</span> Logistique</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={G2}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[["parking","🅿️ Espace parking"],["tuileReserve","🧱 Tuiles / ardoises en réserve"]].map(function(item) {
+                    var k = item[0], lbl = item[1];
+                    return (
+                      <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 13 }}>{lbl}</span>
+                        <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <Field label="Hauteur corniche" value={logistique.hauteurCorniche} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { hauteurCorniche: v }); }); }} type="number" unit="m" />
+                  <Field label="Hauteur toit plat" value={logistique.hauteurToitPlat} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { hauteurToitPlat: v }); }); }} type="number" unit="m" />
+                  <Field label="Inclinaison rue / allée" value={logistique.inclinaisonRue} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { inclinaisonRue: v }); }); }} placeholder="%" />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: MUTED, marginBottom: 7 }}>Accès à la toiture</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["Côté rue", "Côté jardin", "Autre"].map(function(a) {
+                    return <Chip key={a} label={a} selected={logistique.acces === a} onClick={function(){ setLogistique(function(p){ return Object.assign({}, p, { acces: p.acces === a ? null : a }); }); }} />;
+                  })}
+                </div>
+                {logistique.acces === "Autre" && (
+                  <input value={logistique.autreAcces} onChange={function(e){ setLogistique(function(p){ return Object.assign({}, p, { autreAcces: e.target.value }); }); }} placeholder="Préciser…" style={{ marginTop: 8, width: "100%" }} />
+                )}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: MUTED, marginBottom: 7 }}>Équipements de levage / manutention</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(function(item) {
+                    var k = item[0], lbl = item[1];
+                    return (
+                      <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: logistique[k] === "OUI" ? GREEN_LIGHT : BG, borderRadius: 6, border: "1px solid " + (logistique[k] === "OUI" ? GREEN_MID : BORDER) }}>
+                        <span style={{ fontSize: 13, fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}</span>
+                        <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 3. Technique ── */}
           <div>
             {installations.map(function(inst, instIdx) {
               return React.createElement(InstallationBlock, {
@@ -1817,7 +1911,7 @@ function App() {
             </div>
           </div>
 
-          {/* ── 3. Calepinage ── */}
+          {/* ── 4. Calepinage ── */}
           <div style={CARD}>
             <div style={SH}><span>📐</span> Calepinage <span style={{ fontSize: 10, fontWeight: 400, color: MUTED, textTransform: "none", letterSpacing: 0, marginLeft: 4 }}>(image de garde PDF)</span></div>
             <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>Archelios, Hélioscope, ou capture du design PV en toiture — affichée en page de garde.</div>
@@ -1842,7 +1936,7 @@ function App() {
             </div>
           </div>
 
-          {/* ── 4. Note PM ── */}
+          {/* ── 5. Note PM ── */}
           <div style={CARD}>
             <div style={SH}><span>📝</span> Note du Project Manager</div>
             <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Remarques internes, instructions pour les monteurs, observations de visite…</div>
@@ -1855,7 +1949,7 @@ function App() {
             />
           </div>
 
-          {/* ── 5. Photos ── */}
+          {/* ── 6. Photos ── */}
           <div style={CARD}>
             <div style={SH}><span>📷</span> Photos de chantier</div>
 
