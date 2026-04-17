@@ -782,7 +782,10 @@ function PreviewDoc({ data }) {
             <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
             <table className="preview-table"><tbody>
               <tr><th>Panneaux</th><td>{[t.panneaux.type, t.panneaux.nbr && t.panneaux.nbr + " pcs", t.panneaux.kWc && t.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
-              <tr><th>Toiture</th><td>{[t.toiture.main, t.toiture.main === "Plat" && t.toiture.orientPlat, t.toiture.main === "Incliné" && t.toiture.sub.join(", ")].filter(Boolean).join(" — ") || "—"}</td></tr>
+              {t.panneaux2 && t.panneaux2.active && (t.panneaux2.type || t.panneaux2.nbr) && (
+                <tr><th>Panneaux 2</th><td>{[t.panneaux2.type, t.panneaux2.nbr && t.panneaux2.nbr + " pcs", t.panneaux2.kWc && t.panneaux2.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
+              )}
+              <tr><th>Toiture</th><td>{[t.toiture.main, t.toiture.main === "Plat" && t.toiture.orientPlat, t.toiture.main === "Incliné" && t.toiture.sub.join(", ")].filter(Boolean).join(" — ") || "—"}{t.toiture2 && t.toiture2.active && t.toiture2.main ? (" + " + [t.toiture2.main, t.toiture2.main === "Plat" && t.toiture2.orientPlat, t.toiture2.main === "Incliné" && (t.toiture2.sub||[]).join(", ")].filter(Boolean).join(" — ")) : ""}</td></tr>
               {t.onduleurs.map(function(o, i) { return <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>; })}
               <tr><th>Energy meter</th><td>{tv2(t.energyMeter)}</td></tr>
               <tr><th>Batterie</th><td>{t.batterie.inclus === "OUI" ? [t.batterie.qty && t.batterie.qty + "×", t.batterie.kwh && t.batterie.kwh + " kWh", t.batterie.type].filter(Boolean).join(" ") || "OUI" : tv2(t.batterie.inclus)}</td></tr>
@@ -851,8 +854,10 @@ function makeEmptyInst() {
   return {
     tech: {
       panneaux: { type: "", nbr: "", kWc: "" },
+      panneaux2: { active: false, type: "", nbr: "", kWc: "" },
       configStrings: "",
       toiture: { main: null, sub: [], orientPlat: null, autreText: "" },
+      toiture2: { active: false, main: null, sub: [], orientPlat: null, autreText: "" },
       onduleurs: [{ type: "", kva: "" }],
       energyMeter: null,
       batterie: { inclus: null, qty: "1", kwh: "", type: "" },
@@ -906,19 +911,39 @@ function InstallationBlock(props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
           <div><div style={SUBH}>Panneaux</div>
+            {/* Panneau 1 */}
             <div style={G3}>
               <Field label="Type / Modèle" value={tech.panneaux.type} onChange={function(v){ setT("panneaux.type", v); }} placeholder="Ex: Jinko 415Wc" />
               <Field label="Nombre" value={tech.panneaux.nbr} onChange={function(v){ setT("panneaux.nbr", v); }} type="number" />
               <Field label="Puissance totale" value={tech.panneaux.kWc} onChange={function(v){ setT("panneaux.kWc", v); }} type="number" unit="kWc" />
             </div>
+            {/* Panneau 2 */}
+            {tech.panneaux2 && tech.panneaux2.active ? (
+              <div style={{ marginTop: 10, padding: "10px 12px", background: "#f9f9f7", borderRadius: 8, border: "1px dashed " + BORDER, position: "relative" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: 8 }}>2ème type de panneaux</div>
+                <button onClick={function(){ setT("panneaux2.active", false); setT("panneaux2.type", ""); setT("panneaux2.nbr", ""); setT("panneaux2.kWc", ""); }}
+                  style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", fontSize: 18, color: MUTED, cursor: "pointer", lineHeight: 1 }}>×</button>
+                <div style={G3}>
+                  <Field label="Type / Modèle" value={tech.panneaux2.type} onChange={function(v){ setT("panneaux2.type", v); }} placeholder="Ex: Trina 450Wc" />
+                  <Field label="Nombre" value={tech.panneaux2.nbr} onChange={function(v){ setT("panneaux2.nbr", v); }} type="number" />
+                  <Field label="Puissance totale" value={tech.panneaux2.kWc} onChange={function(v){ setT("panneaux2.kWc", v); }} type="number" unit="kWc" />
+                </div>
+              </div>
+            ) : (
+              <button onClick={function(){ setT("panneaux2.active", true); }}
+                style={{ marginTop: 8, fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>
+                + 2ème type de panneaux
+              </button>
+            )}
           </div>
 
           <div><div style={SUBH}>Toiture</div>
+            {/* Toiture 1 */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
               {["Plat", "Incliné"].map(function(t) { return <Chip key={t} label={t} selected={tech.toiture.main === t} onClick={function(){ setT("toiture.main", tech.toiture.main === t ? null : t); }} />; })}
             </div>
             {tech.toiture.main === "Plat" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                 <div>
                   <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Orientation des panneaux</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -928,7 +953,7 @@ function InstallationBlock(props) {
               </div>
             )}
             {tech.toiture.main === "Incliné" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   {["Tuile", "Ardoise", "Panneaux sandwich", "Zinc", "Bac acier", "Autre"].map(function(t) {
                     return <Chip key={t} label={t} selected={tech.toiture.sub.includes(t)} onClick={function(){
@@ -941,6 +966,45 @@ function InstallationBlock(props) {
                   <input value={tech.toiture.autreText || ""} onChange={function(e){ setT("toiture.autreText", e.target.value); }} placeholder="Préciser le type de toiture" style={{ fontSize: 13, padding: "5px 8px", borderRadius: 6, border: "1px solid " + BORDER, width: "100%", boxSizing: "border-box" }} />
                 )}
               </div>
+            )}
+            {/* Toiture 2 */}
+            {tech.toiture2 && tech.toiture2.active ? (
+              <div style={{ marginTop: 6, padding: "10px 12px", background: "#f9f9f7", borderRadius: 8, border: "1px dashed " + BORDER, position: "relative" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: 8 }}>2ème type de toiture</div>
+                <button onClick={function(){ setT("toiture2.active", false); setT("toiture2.main", null); setT("toiture2.sub", []); setT("toiture2.orientPlat", null); setT("toiture2.autreText", ""); }}
+                  style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", fontSize: 18, color: MUTED, cursor: "pointer", lineHeight: 1 }}>×</button>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {["Plat", "Incliné"].map(function(t) { return <Chip key={t} label={t} selected={tech.toiture2.main === t} onClick={function(){ setT("toiture2.main", tech.toiture2.main === t ? null : t); }} />; })}
+                </div>
+                {tech.toiture2.main === "Plat" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Orientation des panneaux</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {["Sud", "Est-Ouest"].map(function(o) { return <Chip key={o} label={o} selected={tech.toiture2.orientPlat === o} onClick={function(){ setT("toiture2.orientPlat", tech.toiture2.orientPlat === o ? null : o); }} />; })}
+                    </div>
+                  </div>
+                )}
+                {tech.toiture2.main === "Incliné" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {["Tuile", "Ardoise", "Panneaux sandwich", "Zinc", "Bac acier", "Autre"].map(function(t) {
+                        return <Chip key={t} label={t} selected={(tech.toiture2.sub||[]).includes(t)} onClick={function(){
+                          var sub = tech.toiture2.sub || [];
+                          setT("toiture2.sub", sub.includes(t) ? sub.filter(function(x){ return x !== t; }) : sub.concat([t]));
+                        }} />;
+                      })}
+                    </div>
+                    {(tech.toiture2.sub||[]).includes("Autre") && (
+                      <input value={tech.toiture2.autreText || ""} onChange={function(e){ setT("toiture2.autreText", e.target.value); }} placeholder="Préciser le type de toiture" style={{ fontSize: 13, padding: "5px 8px", borderRadius: 6, border: "1px solid " + BORDER, width: "100%", boxSizing: "border-box" }} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button onClick={function(){ setT("toiture2.active", true); }}
+                style={{ marginTop: 6, fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>
+                + 2ème type de toiture
+              </button>
             )}
           </div>
 
@@ -1122,7 +1186,9 @@ function App() {
             if (inst.tech && typeof inst.tech === "object") {
               base.tech = Object.assign({}, base.tech, inst.tech);
               if (inst.tech.panneaux) base.tech.panneaux = Object.assign({}, base.tech.panneaux, inst.tech.panneaux);
+              if (inst.tech.panneaux2) base.tech.panneaux2 = Object.assign({}, base.tech.panneaux2, inst.tech.panneaux2);
               if (inst.tech.toiture) base.tech.toiture = Object.assign({}, base.tech.toiture, inst.tech.toiture);
+              if (inst.tech.toiture2) base.tech.toiture2 = Object.assign({}, base.tech.toiture2, inst.tech.toiture2);
               if (inst.tech.batterie) base.tech.batterie = Object.assign({}, base.tech.batterie, inst.tech.batterie);
               if (inst.tech.borne) base.tech.borne = Object.assign({}, base.tech.borne, inst.tech.borne);
               if (inst.tech.ems) base.tech.ems = Object.assign({}, base.tech.ems, inst.tech.ems);
@@ -1139,7 +1205,9 @@ function App() {
           var migratedInst = makeEmptyInst();
           migratedInst.tech = Object.assign({}, migratedInst.tech, d.tech);
           if (d.tech.panneaux) migratedInst.tech.panneaux = Object.assign({}, migratedInst.tech.panneaux, d.tech.panneaux);
+          if (d.tech.panneaux2) migratedInst.tech.panneaux2 = Object.assign({}, migratedInst.tech.panneaux2, d.tech.panneaux2);
           if (d.tech.toiture) migratedInst.tech.toiture = Object.assign({}, migratedInst.tech.toiture, d.tech.toiture);
+          if (d.tech.toiture2) migratedInst.tech.toiture2 = Object.assign({}, migratedInst.tech.toiture2, d.tech.toiture2);
           if (d.tech.batterie) migratedInst.tech.batterie = Object.assign({}, migratedInst.tech.batterie, d.tech.batterie);
           if (d.tech.borne) migratedInst.tech.borne = Object.assign({}, migratedInst.tech.borne, d.tech.borne);
           if (d.tech.ems) migratedInst.tech.ems = Object.assign({}, migratedInst.tech.ems, d.tech.ems);
@@ -1862,7 +1930,6 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <Field label="Hauteur corniche" value={logistique.hauteurCorniche} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { hauteurCorniche: v }); }); }} type="number" unit="m" />
                   <Field label="Hauteur toit plat" value={logistique.hauteurToitPlat} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { hauteurToitPlat: v }); }); }} type="number" unit="m" />
-                  <Field label="Inclinaison rue / allée" value={logistique.inclinaisonRue} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { inclinaisonRue: v }); }); }} placeholder="%" />
                 </div>
               </div>
               <div>
