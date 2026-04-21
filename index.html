@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f4f0; color: #1a1a1a; font-size: 14px; }
@@ -117,6 +118,246 @@ async function supaSave(ref, data) {
     });
     return true;
   } catch(e) { return false; }
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH + AUDIT
+// ══════════════════════════════════════════════════════
+const GOOGLE_CLIENT_ID = "765677431332-2leuvo90bvhnmid77hml6cj230av8eao.apps.googleusercontent.com";
+const ALLOWED_DOMAIN = "we-green.be";
+
+async function supaLogAudit(ref, user, action, detail) {
+  if (!ref || !user) return;
+  try {
+    await fetch(SUPA_URL + "/rest/v1/audit_log", {
+      method: "POST",
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: ref, user_email: user.email, user_name: user.name, action: action, detail: detail || {}, created_at: new Date().toISOString() })
+    });
+  } catch(e) {}
+}
+
+async function supaSaveVersion(ref, data, user, label) {
+  if (!ref || !user) return;
+  try {
+    var listRes = await fetch(SUPA_URL + "/rest/v1/versions?ref=eq." + encodeURIComponent(ref) + "&select=id,created_at&order=created_at.asc", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var list = await listRes.json();
+    if (Array.isArray(list) && list.length >= 15) {
+      var toDelete = list.slice(0, list.length - 14);
+      for (var vi = 0; vi < toDelete.length; vi++) {
+        await fetch(SUPA_URL + "/rest/v1/versions?id=eq." + toDelete[vi].id, {
+          method: "DELETE", headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+        });
+      }
+    }
+    await fetch(SUPA_URL + "/rest/v1/versions", {
+      method: "POST",
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: ref, data: data, user_email: user.email, user_name: user.name, label: label || "", created_at: new Date().toISOString() })
+    });
+  } catch(e) {}
+}
+
+async function supaLoadVersions(ref) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/versions?ref=eq." + encodeURIComponent(ref) + "&select=id,user_email,user_name,label,created_at,data&order=created_at.desc&limit=15", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var rows = await res.json(); return Array.isArray(rows) ? rows : [];
+  } catch(e) { return []; }
+}
+
+async function supaLoadAudit(ref) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/audit_log?ref=eq." + encodeURIComponent(ref) + "&select=id,user_email,user_name,action,detail,created_at&order=created_at.desc&limit=60", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var rows = await res.json(); return Array.isArray(rows) ? rows : [];
+  } catch(e) { return []; }
+}
+
+// ── Helpers ──────────────────────────────────────────
+function parseJwt(token) {
+  try { return JSON.parse(window.atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); } catch(e) { return {}; }
+}
+
+function makeSlimData(data) {
+  var slim = JSON.parse(JSON.stringify(data));
+  if (slim.photos) { Object.keys(slim.photos).forEach(function(cat) { slim.photos[cat] = (slim.photos[cat]||[]).map(function(p){ return { name: p.name, type: p.type }; }); }); }
+  if (slim.calepinage) slim.calepinage = { image: null, loading: false, msg: (slim.calepinage && slim.calepinage.msg) || "" };
+  return slim;
+}
+
+function diffData(oldD, newD) {
+  if (!oldD || !newD) return [];
+  var changes = [];
+  var clf = { nom: "Nom client", adresse: "Adresse chantier", tel: "Tél. client", email: "Email client" };
+  Object.keys(clf).forEach(function(k){ if ((oldD.client||{})[k] !== (newD.client||{})[k]) changes.push(clf[k] + " modifié"); });
+  if ((oldD.weGreen||{}).manager !== (newD.weGreen||{}).manager) changes.push("Project Manager modifié");
+  if (oldD.date !== newD.date) changes.push("Date de chantier modifiée");
+  if (oldD.comments !== newD.comments) changes.push("Commentaires modifiés");
+  if (oldD.pmNote !== newD.pmNote) changes.push("Note PM modifiée");
+  if (JSON.stringify(oldD.logistique||{}) !== JSON.stringify(newD.logistique||{})) changes.push("Logistique modifiée");
+  var oldI = oldD.installations||[], curI = newD.installations||[];
+  if (oldI.length !== curI.length) changes.push("Installations : " + oldI.length + " → " + curI.length);
+  curI.forEach(function(inst, i) {
+    var oi = oldI[i] || { tech: {}, strings: [] };
+    var pfx = curI.length > 1 ? "Install." + (i+1) + " — " : "";
+    var ot = oi.tech||{}, nt = inst.tech||{};
+    if (JSON.stringify(ot.panneaux) !== JSON.stringify(nt.panneaux)) changes.push(pfx + "Panneaux modifiés");
+    if (JSON.stringify(ot.onduleurs) !== JSON.stringify(nt.onduleurs)) changes.push(pfx + "Onduleur(s) modifié(s)");
+    if (JSON.stringify(ot.toiture) !== JSON.stringify(nt.toiture)) changes.push(pfx + "Toiture modifiée");
+    if (ot.reseau !== nt.reseau) changes.push(pfx + "Réseau modifié");
+    if (ot.amperageDisj !== nt.amperageDisj) changes.push(pfx + "Disjoncteur modifié");
+    if (ot.branchementOnduleur !== nt.branchementOnduleur) changes.push(pfx + "Branchement onduleur modifié");
+    if (JSON.stringify(oi.strings) !== JSON.stringify(inst.strings)) changes.push(pfx + "Strings modifiés");
+  });
+  return changes;
+}
+
+// ── LoginScreen ───────────────────────────────────────
+function LoginScreen({ onSignIn }) {
+  var btnRef = React.useRef();
+  var [gReady, setGReady] = React.useState(false);
+  React.useEffect(function() {
+    function tryRender() {
+      if (!window.google || !window.google.accounts || !btnRef.current) { setTimeout(tryRender, 200); return; }
+      try {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: function(response) {
+            var payload = parseJwt(response.credential);
+            if (!payload.email || !payload.email.endsWith("@" + ALLOWED_DOMAIN)) {
+              alert("⛔ Accès réservé aux membres @" + ALLOWED_DOMAIN); return;
+            }
+            var u = { email: payload.email, name: payload.name || payload.email.split("@")[0], picture: payload.picture || "", token: response.credential };
+            try { localStorage.setItem("wge_user", JSON.stringify(u)); } catch(e) {}
+            onSignIn(u);
+          },
+          hd: ALLOWED_DOMAIN,
+          auto_select: true
+        });
+        google.accounts.id.renderButton(btnRef.current, { theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 280, locale: "fr" });
+        google.accounts.id.prompt();
+        setGReady(true);
+      } catch(e) { setTimeout(tryRender, 400); }
+    }
+    tryRender();
+  }, []);
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f4f0" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: "40px 48px", boxShadow: "0 4px 32px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center", gap: 22, maxWidth: 360, width: "90%", boxSizing: "border-box" }}>
+        <div style={{ fontSize: 44 }}>🌿</div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: 18, color: "#1B6B3A", marginBottom: 4 }}>We Green Energy</div>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "#1a1a1a", marginBottom: 10 }}>Feuille de chantier PV</div>
+          <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>Connectez-vous avec votre compte<br /><strong style={{ color: "#1B6B3A" }}>@we-green.be</strong></div>
+        </div>
+        <div ref={btnRef} style={{ minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {!gReady && <div style={{ fontSize: 12, color: "#bbb" }}>⏳ Chargement…</div>}
+        </div>
+        <div style={{ fontSize: 11, color: "#ddd", textAlign: "center" }}>Réservé aux membres de l'équipe</div>
+      </div>
+    </div>
+  );
+}
+
+// ── HistoryPanel ──────────────────────────────────────
+function HistoryPanel({ refChantier, onRestore, onClose }) {
+  var [tab, setTab] = React.useState("versions");
+  var [versions, setVersions] = React.useState([]);
+  var [auditLog, setAuditLog] = React.useState([]);
+  var [loading, setLoading] = React.useState(true);
+  var [restoring, setRestoring] = React.useState(null);
+  React.useEffect(function() {
+    setLoading(true);
+    Promise.all([supaLoadVersions(refChantier), supaLoadAudit(refChantier)]).then(function(res) {
+      setVersions(Array.isArray(res[0]) ? res[0] : []);
+      setAuditLog(Array.isArray(res[1]) ? res[1] : []);
+      setLoading(false);
+    });
+  }, [refChantier]);
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    return d.toLocaleDateString("fr-BE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " +
+           d.toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
+  }
+  var ACT = { save: "💾 Sauvegarde", photo_delete: "🗑️ Photo supprimée", restore: "↩️ Restauration", load: "👁️ Consultation" };
+  return (
+    <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(460px, 100vw)", background: "#fff", boxShadow: "-4px 0 28px rgba(0,0,0,0.15)", zIndex: 9990, display: "flex", flexDirection: "column", fontFamily: "inherit" }}>
+      <div style={{ padding: "13px 16px", borderBottom: "1px solid #e8e8e4", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1B6B3A", color: "#fff", flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>📋 Historique — {refChantier}</span>
+        <button onClick={onClose} style={{ background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", borderRadius: 6, padding: "3px 9px", cursor: "pointer", fontSize: 15 }}>✕</button>
+      </div>
+      <div style={{ display: "flex", borderBottom: "1px solid #e8e8e4", flexShrink: 0 }}>
+        {[["versions","🔄 Versions (" + versions.length + ")"],["audit","📝 Journal (" + auditLog.length + ")"]].map(function(t) {
+          return <button key={t[0]} onClick={function(){ setTab(t[0]); }} style={{ flex: 1, padding: "9px 4px", border: "none", background: tab===t[0]?"#f0f7f2":"#fff", color: tab===t[0]?"#1B6B3A":"#666", fontWeight: tab===t[0]?700:400, cursor: "pointer", fontSize: 12, borderBottom: tab===t[0]?"2.5px solid #1B6B3A":"2.5px solid transparent", fontFamily: "inherit" }}>{loading ? t[1].split(" ")[0] : t[1]}</button>;
+        })}
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: "10px 12px" }}>
+        {loading && <div style={{ textAlign: "center", padding: 48, color: "#aaa", fontSize: 13 }}>⏳ Chargement…</div>}
+        {!loading && tab === "versions" && (
+          <div>
+            <div style={{ fontSize: 11, color: "#999", marginBottom: 10, background: "#fffdf0", border: "1px solid #e8e0b0", borderRadius: 6, padding: "6px 10px" }}>
+              ℹ️ Les versions restaurent les données du formulaire. Les photos ne sont pas affectées.
+            </div>
+            {versions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#bbb", fontSize: 13 }}>Aucune version disponible</div>}
+            {versions.map(function(v, i) {
+              return (
+                <div key={v.id} style={{ background: i===0?"#f0f7f2":"#fafaf8", border: "1px solid "+(i===0?"#d4ead9":"#e8e8e4"), borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {i===0 && <span style={{ fontSize: 9, fontWeight: 700, color: "#1B6B3A", background: "#d4ead9", padding: "1px 6px", borderRadius: 4, marginBottom: 4, display: "inline-block", textTransform: "uppercase" }}>Dernière version</span>}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{fmtDate(v.created_at)}</div>
+                      <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>👤 {v.user_name} <span style={{ color: "#bbb" }}>({v.user_email})</span></div>
+                      {v.label && <div style={{ fontSize: 11, color: "#888", marginTop: 3, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.label}</div>}
+                    </div>
+                    {i > 0 && (
+                      <button disabled={restoring===v.id} onClick={function(){
+                        if (!window.confirm("Restaurer la version du " + fmtDate(v.created_at) + " ?\n\nNote : les photos actuelles seront conservées.")) return;
+                        setRestoring(v.id);
+                        onRestore(v.data, function(){ setRestoring(null); });
+                      }} style={{ background: restoring===v.id?"#ccc":"#1B6B3A", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", cursor: restoring===v.id?"not-allowed":"pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {restoring===v.id ? "⏳" : "↩ Restaurer"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {!loading && tab === "audit" && (
+          <div>
+            {auditLog.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#bbb", fontSize: 13 }}>Aucune entrée dans le journal</div>}
+            {auditLog.map(function(entry) {
+              var isDel = entry.action === "photo_delete";
+              return (
+                <div key={entry.id} style={{ background: isDel?"#fff8f7":"#fafaf8", border: "1px solid "+(isDel?"#fcd9d4":"#e8e8e4"), borderRadius: 8, padding: "8px 11px", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: isDel?"#c0392b":"#1a1a1a" }}>{ACT[entry.action] || entry.action}</span>
+                    <span style={{ fontSize: 10, color: "#aaa", marginLeft: "auto", whiteSpace: "nowrap" }}>{fmtDate(entry.created_at)}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#666" }}>👤 {entry.user_name} <span style={{ color: "#bbb" }}>({entry.user_email})</span></div>
+                  {entry.detail && entry.detail.changes && entry.detail.changes.length > 0 && (
+                    <div style={{ fontSize: 11, color: "#555", background: "#f0f0ec", borderRadius: 4, padding: "4px 8px", marginTop: 4 }}>
+                      {entry.detail.changes.map(function(c, ci){ return <div key={ci} style={{ lineHeight: 1.6 }}>• {c}</div>; })}
+                    </div>
+                  )}
+                  {entry.detail && entry.detail.photo && (
+                    <div style={{ fontSize: 11, color: "#c0392b", marginTop: 4 }}>📷 <strong>{entry.detail.photo}</strong> — {entry.detail.category}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const GREEN = "#1B6B3A";
@@ -1140,6 +1381,10 @@ function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const saveTimer = useRef(null);
   const isLoading = useRef(false);
+  const [user, setUser] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const userRef = useRef(null);
+  const prevDataRef = useRef(null);
 
   const data = { client, weGreen, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
 
@@ -1236,7 +1481,11 @@ function App() {
         if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
         setLastSaved(row.updated_at);
         setSaveStatus("saved");
-        setTimeout(function() { isLoading.current = false; }, 100);
+        setTimeout(function() {
+          isLoading.current = false;
+          prevDataRef.current = makeSlimData(row.data);
+          if (userRef.current) supaLogAudit(urlRef, userRef.current, "load", {});
+        }, 100);
       } catch(loadErr) {
         console.error("Erreur chargement Supabase:", loadErr);
         isLoading.current = false;
@@ -1245,15 +1494,41 @@ function App() {
     });
   }, []);
 
+  // ── Auth: restore session from localStorage ─────────────────────────────
+  useEffect(function() {
+    try {
+      var stored = localStorage.getItem("wge_user");
+      if (stored) {
+        var u = JSON.parse(stored);
+        if (u && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN)) { setUser(u); userRef.current = u; }
+      }
+    } catch(e) {}
+  }, []);
+
+  // Keep userRef in sync with user state
+  useEffect(function() { userRef.current = user; }, [user]);
+
   // ── Auto-save on any data change ───────────────────────────────────────────
   useEffect(function() {
     if (!ref || isLoading.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus("saving");
+    var slimSnap = makeSlimData(data);
     saveTimer.current = setTimeout(function() {
       supaSave(ref, data).then(function(ok) {
-        if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
-        else setSaveStatus("error");
+        if (ok) {
+          setLastSaved(new Date().toISOString()); setSaveStatus("saved");
+          if (userRef.current) {
+            if (prevDataRef.current) {
+              var changes = diffData(prevDataRef.current, slimSnap);
+              if (changes.length > 0) {
+                supaLogAudit(ref, userRef.current, "save", { changes: changes });
+                supaSaveVersion(ref, slimSnap, userRef.current, changes.slice(0, 2).join(" | "));
+              }
+            }
+            prevDataRef.current = slimSnap;
+          }
+        } else setSaveStatus("error");
       });
     }, 1200);
   }, [client, weGreen, date, installations, comments, logistique, tdNote, pmNote]);
@@ -1723,7 +1998,11 @@ function App() {
   };
 
   const addPhotos = (catKey, items) => setPhotos(prev => ({ ...prev, [catKey]: [...prev[catKey], ...items] }));
-  const deletePhoto = (catKey, idx) => setPhotos(prev => ({ ...prev, [catKey]: prev[catKey].filter((_, i) => i !== idx) }));
+  const deletePhoto = function(catKey, idx) {
+    var photoName = ((photos[catKey] || [])[idx] || {}).name || "photo";
+    setPhotos(function(prev) { return Object.assign({}, prev, { [catKey]: prev[catKey].filter(function(_, i) { return i !== idx; }) }); });
+    if (userRef.current && ref) supaLogAudit(ref, userRef.current, "photo_delete", { photo: photoName, category: catKey });
+  };
   const reorderPhoto = (catKey, fromIdx, toIdx) => setPhotos(prev => {
     const arr = [...prev[catKey]];
     const [moved] = arr.splice(fromIdx, 1);
@@ -1819,6 +2098,39 @@ function App() {
     fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", ...extra
   });
 
+  // ── Restore a version (form fields only, photos untouched) ────────────────
+  const restoreVersion = function(vData, onDone) {
+    if (!vData) { if (onDone) onDone(); return; }
+    try {
+      isLoading.current = true;
+      if (vData.client) setClient(function(p){ return Object.assign({}, p, vData.client); });
+      if (vData.weGreen) setWeGreen(function(p){ return Object.assign({}, p, vData.weGreen); });
+      if (typeof vData.date === "string") setDate(vData.date);
+      if (Array.isArray(vData.installations) && vData.installations.length > 0) setInstallations(vData.installations);
+      if (typeof vData.comments === "string") setComments(vData.comments);
+      if (vData.logistique) setLogistique(function(p){ return Object.assign({}, p, vData.logistique); });
+      if (typeof vData.tdNote === "string") setTdNote(vData.tdNote);
+      if (typeof vData.schemaNote === "string") setSchemaNote(vData.schemaNote);
+      if (typeof vData.pmNote === "string") setPmNote(vData.pmNote);
+      // Photos intentionally NOT restored
+      setTimeout(function() {
+        isLoading.current = false;
+        if (userRef.current && ref) supaLogAudit(ref, userRef.current, "restore", { label: "Restauration de version" });
+        if (onDone) onDone();
+        setShowHistory(false);
+      }, 150);
+    } catch(e) {
+      isLoading.current = false;
+      if (onDone) onDone();
+      alert("Erreur lors de la restauration : " + e.message);
+    }
+  };
+
+  // ── Login guard ───────────────────────────────────────────────────────────
+  if (!user) {
+    return <LoginScreen onSignIn={function(u) { setUser(u); userRef.current = u; }} />;
+  }
+
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "1rem 0.75rem", display: "flex", flexDirection: "column", gap: 14 }}>
 
@@ -1849,8 +2161,31 @@ function App() {
           <label title="Restaurer depuis JSON" style={{ ...btnSt(false), background: GREEN_LIGHT, borderColor: GREEN_MID, color: GREEN, fontSize: 12, cursor: "pointer", margin: 0 }}>
             📂 Import<input type="file" accept=".json" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files[0]) { importData(e.target.files[0]); e.target.value = ""; } }} />
           </label>
+          {ref && (
+            <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
+          )}
+          {/* User pill */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: GREEN_LIGHT, border: "1px solid " + GREEN_MID, borderRadius: 20 }}>
+            {user.picture && <img src={user.picture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />}
+            <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</span>
+            <button onClick={function(){
+              if (window.confirm("Se déconnecter ?")) {
+                try { localStorage.removeItem("wge_user"); } catch(e) {}
+                try { if (window.google && window.google.accounts) google.accounts.id.disableAutoSelect(); } catch(e) {}
+                setUser(null);
+              }
+            }} title="Se déconnecter" style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 1px" }}>×</button>
+          </div>
         </div>
       </div>
+
+      {/* History panel + overlay */}
+      {showHistory && ref && (
+        <>
+          <div onClick={function(){ setShowHistory(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", zIndex: 9989 }} />
+          <HistoryPanel refChantier={ref} onRestore={restoreVersion} onClose={function(){ setShowHistory(false); }} />
+        </>
+      )}
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
         <>
