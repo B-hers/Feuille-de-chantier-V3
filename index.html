@@ -53,18 +53,54 @@ button { font-family: inherit; cursor: pointer; }
 
 <!-- ── Login screen : HTML pur, SANS React, zéro conflit DOM ── -->
 <div id="wge-login" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:#f4f4f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="background:#fff; border-radius:16px; padding:40px 48px; box-shadow:0 4px 32px rgba(0,0,0,0.10); display:flex; flex-direction:column; align-items:center; gap:22px; max-width:360px; width:90%; box-sizing:border-box;">
-    <div style="font-size:44px">🌿</div>
-    <div style="text-align:center">
-      <div style="font-weight:700; font-size:18px; color:#1B6B3A; margin-bottom:4px">We Green Energy</div>
-      <div style="font-weight:600; font-size:15px; color:#1a1a1a; margin-bottom:10px">Feuille de chantier PV</div>
-      <div style="font-size:13px; color:#888; line-height:1.6">Connectez-vous avec votre compte<br><strong style="color:#1B6B3A">@we-green.be</strong></div>
+  <div style="background:#fff; border-radius:16px; padding:32px 40px; box-shadow:0 4px 32px rgba(0,0,0,0.10); display:flex; flex-direction:column; align-items:center; gap:0; max-width:380px; width:92%; box-sizing:border-box;">
+    <div style="font-size:40px; margin-bottom:10px">🌿</div>
+    <div style="font-weight:700; font-size:18px; color:#1B6B3A; margin-bottom:2px">We Green Energy</div>
+    <div style="font-weight:600; font-size:14px; color:#1a1a1a; margin-bottom:18px">Feuille de chantier PV</div>
+
+    <!-- Tabs -->
+    <div style="display:flex; width:100%; border-bottom:2px solid #e8e8e4; margin-bottom:22px;">
+      <button id="tab-wge" onclick="wgeTab('wge')" style="flex:1; padding:9px 4px; border:none; background:none; font-weight:700; font-size:13px; color:#1B6B3A; border-bottom:2.5px solid #1B6B3A; margin-bottom:-2px; cursor:pointer; font-family:inherit;">🌿 Équipe WGE</button>
+      <button id="tab-st" onclick="wgeTab('st')" style="flex:1; padding:9px 4px; border:none; background:none; font-weight:400; font-size:13px; color:#888; border-bottom:2.5px solid transparent; margin-bottom:-2px; cursor:pointer; font-family:inherit;">🔧 Sous-traitant</button>
     </div>
-    <div id="wge-google-btn" style="min-height:44px; display:flex; align-items:center; justify-content:center;">
-      <div style="font-size:13px; color:#aaa">⏳ Chargement…</div>
+
+    <!-- Panel WGE -->
+    <div id="panel-wge" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:14px;">
+      <div style="font-size:13px; color:#888; text-align:center; line-height:1.6">Connectez-vous avec votre compte<br><strong style="color:#1B6B3A">@we-green.be</strong></div>
+      <div id="wge-google-btn" style="min-height:44px; display:flex; align-items:center; justify-content:center; width:100%;">
+        <div style="font-size:13px; color:#aaa">⏳ Chargement…</div>
+      </div>
     </div>
-    <div id="wge-login-error" style="font-size:12px; color:#c0392b; display:none;"></div>
-    <div style="font-size:11px; color:#ddd; text-align:center">Réservé aux membres de l'équipe</div>
+
+    <!-- Panel Sous-traitant -->
+    <div id="panel-st" style="width:100%; display:none; flex-direction:column; gap:12px;">
+      <div style="font-size:13px; color:#888; text-align:center; margin-bottom:4px">Identifiez-vous pour accéder au chantier</div>
+
+      <!-- Nom / Société -->
+      <div>
+        <label style="font-size:12px; color:#666; font-weight:500; display:block; margin-bottom:5px">Nom / Société</label>
+        <select id="st-select" onchange="wgeStSelectChange()" style="width:100%; padding:9px 12px; border:1px solid #d0d0c8; border-radius:8px; font-size:14px; font-family:inherit; background:#fff; color:#1a1a1a; appearance:none; -webkit-appearance:none; background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22%3E%3Cpath d=%22M1 1l5 5 5-5%22 stroke=%22%23666%22 stroke-width=%221.5%22 fill=%22none%22/%3E%3C/svg%3E'); background-repeat:no-repeat; background-position:right 12px center;">
+          <option value="">— Sélectionner —</option>
+          <option value="Sildjan (Green Future)">Sildjan — Green Future</option>
+          <option value="Ronaldo (Instasol)">Ronaldo — Instasol</option>
+          <option value="Manu (DM Electricité)">Manu — DM Électricité</option>
+          <option value="Fast-Elec (Christophe)">Fast-Elec — Christophe & team</option>
+          <option value="__autre__">Autre — saisir le nom</option>
+        </select>
+        <input id="st-name-input" type="text" placeholder="Votre nom ou société…" style="width:100%; padding:9px 12px; border:1px solid #d0d0c8; border-radius:8px; font-size:14px; font-family:inherit; margin-top:8px; display:none; box-sizing:border-box;" />
+      </div>
+
+      <!-- Code d'accès -->
+      <div>
+        <label style="font-size:12px; color:#666; font-weight:500; display:block; margin-bottom:5px">Code d'accès</label>
+        <input id="st-password" type="password" placeholder="Code fourni par We Green" style="width:100%; padding:9px 12px; border:1px solid #d0d0c8; border-radius:8px; font-size:14px; font-family:inherit; box-sizing:border-box;" onkeydown="if(event.key==='Enter') wgeStLogin()" />
+      </div>
+
+      <button onclick="wgeStLogin()" style="width:100%; padding:11px; background:#1B6B3A; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:2px;">Accéder →</button>
+    </div>
+
+    <div id="wge-login-error" style="font-size:12px; color:#c0392b; display:none; margin-top:8px; text-align:center;"></div>
+    <div style="font-size:11px; color:#ddd; text-align:center; margin-top:10px">Réservé à l'équipe et aux partenaires We Green</div>
   </div>
 </div>
 
@@ -75,9 +111,16 @@ button { font-family: inherit; cursor: pointer; }
 (function() {
   var GOOGLE_CLIENT_ID_PLAIN = "765677431332-2leuvo90bvhnmid77hml6cj230av8eao.apps.googleusercontent.com";
   var ALLOWED_DOMAIN_PLAIN = "we-green.be";
+  // Code partagé sous-traitants — identifiant uniquement, pas de protection de données sensibles
+  var ST_CODE = "0479627511";
 
   function parseJwtPlain(token) {
     try { return JSON.parse(window.atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); } catch(e) { return {}; }
+  }
+
+  function showErr(msg) {
+    var el = document.getElementById("wge-login-error");
+    if (el) { el.textContent = msg; el.style.display = msg ? "block" : "none"; }
   }
 
   function showApp() {
@@ -92,6 +135,7 @@ button { font-family: inherit; cursor: pointer; }
     var root = document.getElementById("root");
     if (login) login.style.display = "flex";
     if (root) root.style.display = "none";
+    showErr("");
 
     function initGSI() {
       if (!window.google || !window.google.accounts) { setTimeout(initGSI, 200); return; }
@@ -101,11 +145,10 @@ button { font-family: inherit; cursor: pointer; }
           callback: function(response) {
             var payload = parseJwtPlain(response.credential);
             if (!payload.email || !payload.email.endsWith("@" + ALLOWED_DOMAIN_PLAIN)) {
-              var errEl = document.getElementById("wge-login-error");
-              if (errEl) { errEl.textContent = "⛔ Accès réservé aux membres @" + ALLOWED_DOMAIN_PLAIN; errEl.style.display = "block"; }
+              showErr("⛔ Accès réservé aux membres @" + ALLOWED_DOMAIN_PLAIN);
               return;
             }
-            var u = { email: payload.email, name: payload.name || payload.email.split("@")[0], picture: payload.picture || "", token: response.credential };
+            var u = { email: payload.email, name: payload.name || payload.email.split("@")[0], picture: payload.picture || "", type: "wge" };
             try { localStorage.setItem("wge_user", JSON.stringify(u)); } catch(e) {}
             showApp();
           },
@@ -121,6 +164,45 @@ button { font-family: inherit; cursor: pointer; }
     initGSI();
   }
 
+  // Tab switching
+  window.wgeTab = function(tab) {
+    var isWge = tab === "wge";
+    document.getElementById("panel-wge").style.display = isWge ? "flex" : "none";
+    document.getElementById("panel-st").style.display = isWge ? "none" : "flex";
+    document.getElementById("tab-wge").style.fontWeight = isWge ? "700" : "400";
+    document.getElementById("tab-wge").style.color = isWge ? "#1B6B3A" : "#888";
+    document.getElementById("tab-wge").style.borderBottom = isWge ? "2.5px solid #1B6B3A" : "2.5px solid transparent";
+    document.getElementById("tab-st").style.fontWeight = isWge ? "400" : "700";
+    document.getElementById("tab-st").style.color = isWge ? "#888" : "#1B6B3A";
+    document.getElementById("tab-st").style.borderBottom = isWge ? "2.5px solid transparent" : "2.5px solid #1B6B3A";
+    showErr("");
+  };
+
+  // Subcontractor select change
+  window.wgeStSelectChange = function() {
+    var sel = document.getElementById("st-select");
+    var inp = document.getElementById("st-name-input");
+    if (sel && inp) inp.style.display = sel.value === "__autre__" ? "block" : "none";
+  };
+
+  // Subcontractor login
+  window.wgeStLogin = function() {
+    var sel = document.getElementById("st-select");
+    var inp = document.getElementById("st-name-input");
+    var pwd = document.getElementById("st-password");
+    if (!sel || !pwd) return;
+    var name = sel.value === "__autre__" ? (inp ? inp.value.trim() : "") : sel.value;
+    if (!name) { showErr("⚠ Veuillez sélectionner ou saisir un nom."); return; }
+    if (!pwd.value) { showErr("⚠ Veuillez entrer le code d'accès."); return; }
+    // Normalize: remove spaces and dashes for comparison
+    var codeEntered = pwd.value.replace(/[\s\-\.]/g, "");
+    var codeRef = ST_CODE.replace(/[\s\-\.]/g, "");
+    if (codeEntered !== codeRef) { showErr("⛔ Code d'accès incorrect."); return; }
+    var u = { email: "sous-traitant@externe", name: name, picture: "", type: "contractor" };
+    try { localStorage.setItem("wge_user", JSON.stringify(u)); } catch(e) {}
+    showApp();
+  };
+
   // Expose sign-out globally so React can call it
   window.wgeSignOut = function() {
     try { localStorage.removeItem("wge_user"); } catch(e) {}
@@ -133,7 +215,10 @@ button { font-family: inherit; cursor: pointer; }
     var stored = localStorage.getItem("wge_user");
     if (stored) {
       var u = JSON.parse(stored);
-      if (u && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN_PLAIN)) {
+      if (u && u.name && (
+        (u.type === "wge" && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN_PLAIN)) ||
+        (u.type === "contractor" && u.name)
+      )) {
         showApp();
         return;
       }
@@ -1475,6 +1560,11 @@ function App() {
       var stored = localStorage.getItem("wge_user");
       if (stored) {
         var u = JSON.parse(stored);
+        if (u && u.name && (
+          (u.type === "wge" && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN)) ||
+          (u.type === "contractor" && u.name)
+        )) return u;
+        // Rétrocompat : anciens saves sans champ type (équipe WGE)
         if (u && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN)) return u;
       }
     } catch(e) {}
@@ -2261,9 +2351,10 @@ function App() {
           )}
           {/* User pill */}
           {user && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: GREEN_LIGHT, border: "1px solid " + GREEN_MID, borderRadius: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: user.type === "contractor" ? "#fff8f0" : GREEN_LIGHT, border: "1px solid " + (user.type === "contractor" ? "#e8c080" : GREEN_MID), borderRadius: 20 }}>
             {user.picture && <img src={user.picture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />}
-            <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</span>
+            {user.type === "contractor" && <span style={{ fontSize: 11 }}>🔧</span>}
+            <span style={{ fontSize: 12, fontWeight: 600, color: user.type === "contractor" ? "#7a4800" : GREEN, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</span>
             <button onClick={function(){
               if (window.confirm("Se déconnecter ?")) {
                 try { localStorage.removeItem("wge_user"); } catch(e) {}
