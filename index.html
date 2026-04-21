@@ -236,11 +236,9 @@ function LoginScreen({ onSignIn }) {
             try { localStorage.setItem("wge_user", JSON.stringify(u)); } catch(e) {}
             onSignIn(u);
           },
-          hd: ALLOWED_DOMAIN,
-          auto_select: true
+          hd: ALLOWED_DOMAIN
         });
         google.accounts.id.renderButton(btnRef.current, { theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 280, locale: "fr" });
-        google.accounts.id.prompt();
         setGReady(true);
       } catch(e) { setTimeout(tryRender, 400); }
     }
@@ -256,7 +254,7 @@ function LoginScreen({ onSignIn }) {
           <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>Connectez-vous avec votre compte<br /><strong style={{ color: "#1B6B3A" }}>@we-green.be</strong></div>
         </div>
         <div ref={btnRef} style={{ minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {!gReady && <div style={{ fontSize: 12, color: "#bbb" }}>⏳ Chargement…</div>}
+          {!gReady && <div style={{ fontSize: 13, color: "#aaa", padding: "10px 0" }}>⏳ Chargement du bouton Google…</div>}
         </div>
         <div style={{ fontSize: 11, color: "#ddd", textAlign: "center" }}>Réservé aux membres de l'équipe</div>
       </div>
