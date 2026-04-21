@@ -1470,7 +1470,16 @@ function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const saveTimer = useRef(null);
   const isLoading = useRef(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(function() {
+    try {
+      var stored = localStorage.getItem("wge_user");
+      if (stored) {
+        var u = JSON.parse(stored);
+        if (u && u.email && u.email.endsWith("@" + ALLOWED_DOMAIN)) return u;
+      }
+    } catch(e) {}
+    return null;
+  });
   const [showHistory, setShowHistory] = useState(false);
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
@@ -2251,6 +2260,7 @@ function App() {
             <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
           )}
           {/* User pill */}
+          {user && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: GREEN_LIGHT, border: "1px solid " + GREEN_MID, borderRadius: 20 }}>
             {user.picture && <img src={user.picture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />}
             <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</span>
@@ -2262,6 +2272,7 @@ function App() {
               }
             }} title="Se déconnecter" style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 1px" }}>×</button>
           </div>
+          )}
         </div>
       </div>
 
