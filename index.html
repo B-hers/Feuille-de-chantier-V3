@@ -2349,6 +2349,18 @@ function App() {
           {ref && (
             <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
           )}
+          {/* Lien Rapport de Chantier */}
+          {ref && (
+            <a href={"https://b-hers.github.io/Rapport-de-chantier-SAV-Maintenance/?ref=" + encodeURIComponent(ref)}
+              target="_blank" rel="noopener noreferrer"
+              title={"Ouvrir le Rapport de Chantier — " + ref}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px",
+                background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.4)",
+                borderRadius:7, color:"#fff", fontSize:12, fontWeight:600,
+                textDecoration:"none", whiteSpace:"nowrap" }}>
+              ✅ Rapport
+            </a>
+          )}
           {/* User pill */}
           {user && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: user.type === "contractor" ? "#fff8f0" : GREEN_LIGHT, border: "1px solid " + (user.type === "contractor" ? "#e8c080" : GREEN_MID), borderRadius: 20 }}>
