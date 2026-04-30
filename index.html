@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Feuille de chantier PV — We Green Energy</title>
+<title>Briefing de chantier PV — We Green Energy</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -590,10 +590,13 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   var textInputRef = useRef();
   var [tool, setTool] = useState("free");
   var [color, setColor] = useState("#e74c3c");
-  var [thickness, setThickness] = useState(4);
+  var [thickness, setThickness] = useState(8);
   var [fontSize, setFontSize] = useState(24);
   var [history, setHistory] = useState([]);
   var [textInput, setTextInput] = useState(null); // {x,y,screenX,screenY}
+  var [textObjects, setTextObjects] = useState([]); // floating text layer, baked on save
+  var [draggingTextId, setDraggingTextId] = useState(null);
+  var textDragStartObj = useRef(null);
   var drawing = useRef(false);
   var startPos = useRef({ x: 0, y: 0 });
   var snapshot = useRef(null);
@@ -662,16 +665,13 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
 
   function commitText(txt) {
     if (!txt || !txt.trim() || !textInput) { setTextInput(null); return; }
-    var canvas = canvasRef.current;
-    var ctx = canvas.getContext("2d");
-    var scaledFontSize = fontSize * (canvas.width / canvas.getBoundingClientRect().width);
-    ctx.font = "bold " + scaledFontSize + "px Arial, sans-serif";
-    ctx.fillStyle = color;
-    ctx.strokeStyle = (color === "#ffffff" || color === "#f39c12") ? "#333" : "rgba(0,0,0,0.4)";
-    ctx.lineWidth = scaledFontSize / 14;
-    ctx.strokeText(txt.trim(), textInput.x, textInput.y);
-    ctx.fillText(txt.trim(), textInput.x, textInput.y);
-    setHistory(function(prev) { return prev.concat([ctx.getImageData(0, 0, canvas.width, canvas.height)]); });
+    setTextObjects(function(prev) {
+      return prev.concat([{
+        id: Date.now() + Math.random(),
+        x: textInput.x, y: textInput.y,
+        text: txt.trim(), color: color, fontSize: fontSize
+      }]);
+    });
     setTextInput(null);
   }
 
@@ -746,6 +746,10 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
   }
 
   function undo() {
+    if (textObjects.length > 0) {
+      setTextObjects(function(prev) { return prev.slice(0, -1); });
+      return;
+    }
     if (history.length <= 1) return;
     var newHist = history.slice(0, -1); setHistory(newHist);
     var canvas = canvasRef.current; var ctx = canvas.getContext("2d");
@@ -756,6 +760,14 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
     var canvas = canvasRef.current;
     var out = document.createElement("canvas"); out.width = canvas.width; out.height = canvas.height;
     var ctx2 = out.getContext("2d"); ctx2.fillStyle = "#fff"; ctx2.fillRect(0, 0, out.width, out.height); ctx2.drawImage(canvas, 0, 0);
+    textObjects.forEach(function(obj) {
+      ctx2.font = "bold " + obj.fontSize + "px Arial, sans-serif";
+      ctx2.fillStyle = obj.color;
+      ctx2.strokeStyle = (obj.color === "#ffffff" || obj.color === "#f39c12") ? "#333" : "rgba(0,0,0,0.4)";
+      ctx2.lineWidth = Math.max(1, obj.fontSize / 14);
+      ctx2.strokeText(obj.text, obj.x, obj.y + obj.fontSize);
+      ctx2.fillText(obj.text, obj.x, obj.y + obj.fontSize);
+    });
     onSave(out.toDataURL("image/jpeg", 0.97));
   }
 
@@ -777,9 +789,9 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
         ); })}
         <div style={{ width: 1, height: 26, background: "#444" }} />
         {/* Thickness dots */}
-        {[2,4,8].map(function(t) { return (
+        {[4, 8, 16].map(function(t) { return (
           <div key={t} onClick={function() { setThickness(t); }}
-            style={{ width: t*3+8, height: t*3+8, minWidth: 10, minHeight: 10, borderRadius: "50%", background: thickness === t ? "#fff" : "#555", cursor: "pointer", flexShrink: 0 }} />
+            style={{ width: t*2+8, height: t*2+8, minWidth: 10, minHeight: 10, borderRadius: "50%", background: thickness === t ? "#fff" : "#555", cursor: "pointer", flexShrink: 0 }} />
         ); })}
         {/* Font size (text tool) */}
         {tool === "text" && <>
@@ -819,6 +831,64 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
             onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
             onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
             style={{ cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair", borderRadius: 6, touchAction: "none", display: "block", height: "auto" }} />
+
+          {/* ── Floating text objects — draggable in text tool mode ── */}
+          {textObjects.map(function(obj) {
+            var ds = initScale.current * zoom.current;
+            var displayFont = Math.round(obj.fontSize * ds);
+            var isActive = tool === "text";
+            return (
+              <div key={obj.id}
+                onMouseDown={function(e) {
+                  if (!isActive) return;
+                  e.preventDefault(); e.stopPropagation();
+                  textDragStartObj.current = { id: obj.id, mx: e.clientX, my: e.clientY, ox: obj.x, oy: obj.y };
+                  setDraggingTextId(obj.id);
+                  function onMv(ev) {
+                    if (!textDragStartObj.current) return;
+                    var d = initScale.current * zoom.current;
+                    var dx = (ev.clientX - textDragStartObj.current.mx) / d;
+                    var dy = (ev.clientY - textDragStartObj.current.my) / d;
+                    setTextObjects(function(prev) { return prev.map(function(o) { return o.id === obj.id ? Object.assign({}, o, { x: textDragStartObj.current.ox + dx, y: textDragStartObj.current.oy + dy }) : o; }); });
+                  }
+                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; window.removeEventListener("mousemove", onMv); window.removeEventListener("mouseup", onUp); }
+                  window.addEventListener("mousemove", onMv); window.addEventListener("mouseup", onUp);
+                }}
+                onTouchStart={function(e) {
+                  if (!isActive) return; e.stopPropagation();
+                  var t0 = e.touches[0];
+                  textDragStartObj.current = { id: obj.id, mx: t0.clientX, my: t0.clientY, ox: obj.x, oy: obj.y };
+                  setDraggingTextId(obj.id);
+                  function onMv(ev) {
+                    if (!textDragStartObj.current) return;
+                    var tt = ev.touches[0]; var d = initScale.current * zoom.current;
+                    var dx = (tt.clientX - textDragStartObj.current.mx) / d;
+                    var dy = (tt.clientY - textDragStartObj.current.my) / d;
+                    setTextObjects(function(prev) { return prev.map(function(o) { return o.id === obj.id ? Object.assign({}, o, { x: textDragStartObj.current.ox + dx, y: textDragStartObj.current.oy + dy }) : o; }); });
+                  }
+                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; window.removeEventListener("touchmove", onMv); window.removeEventListener("touchend", onUp); }
+                  window.addEventListener("touchmove", onMv, { passive: false }); window.addEventListener("touchend", onUp);
+                }}
+                onDoubleClick={function(e) { if (isActive) { e.stopPropagation(); setTextObjects(function(prev){ return prev.filter(function(o){ return o.id !== obj.id; }); }); } }}
+                title={isActive ? "Glisser pour déplacer · Double-clic pour supprimer" : ""}
+                style={{
+                  position: "absolute",
+                  left: Math.round(obj.x * ds) + "px",
+                  top: Math.round(obj.y * ds) + "px",
+                  fontSize: displayFont + "px", fontWeight: "bold", fontFamily: "Arial, sans-serif",
+                  color: obj.color,
+                  textShadow: obj.color === "#ffffff" ? "0 0 3px #000, 1px 1px 2px #000" : "1px 1px 3px rgba(0,0,0,0.55)",
+                  cursor: isActive ? (draggingTextId === obj.id ? "grabbing" : "grab") : "default",
+                  pointerEvents: isActive ? "auto" : "none",
+                  outline: isActive ? "1.5px dashed rgba(255,255,255,0.5)" : "none",
+                  outlineOffset: "3px", borderRadius: 2,
+                  userSelect: "none", touchAction: "none", whiteSpace: "nowrap",
+                  opacity: draggingTextId === obj.id ? 0.7 : 1, zIndex: 6
+                }}>
+                {obj.text}
+              </div>
+            );
+          })}
           {/* Text input overlay */}
           {textInput && (
             <input ref={textInputRef} type="text" placeholder="Tapez le texte…"
@@ -1150,7 +1220,7 @@ function PreviewDoc({ data }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, paddingBottom: 16, borderBottom: `2px solid ${GREEN}` }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Feuille de chantier PV</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>Briefing de chantier PV</div>
         </div>
         <div style={{ textAlign: "right", fontSize: 13, color: MUTED }}>
           <div>{data.date || "Date non définie"}</div>
@@ -2324,7 +2394,7 @@ function App() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
-            Feuille de chantier PV
+            Briefing de chantier PV
             {client.nom && <span style={{ fontSize: 15, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {client.nom}</span>}
             {ref && <a href={"https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list"} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "2px 8px", background: GREEN_LIGHT, whiteSpace: "nowrap" }}>← Odoo</a>}
           </div>
@@ -2349,16 +2419,16 @@ function App() {
           {ref && (
             <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
           )}
-          {/* Lien Rapport de Chantier */}
+          {/* Lien Rapport de suivi de chantier */}
           {ref && (
             <a href={"https://b-hers.github.io/Rapport-de-chantier-SAV-Maintenance/?ref=" + encodeURIComponent(ref)}
               target="_blank" rel="noopener noreferrer"
-              title={"Ouvrir le Rapport de Chantier — " + ref}
+              title={"Ouvrir le Rapport de suivi — " + ref}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px",
-                background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.4)",
-                borderRadius:7, color:"#fff", fontSize:12, fontWeight:600,
+                background: GREEN_LIGHT, border:"1.5px solid "+GREEN_MID,
+                borderRadius:7, color:GREEN, fontSize:12, fontWeight:700,
                 textDecoration:"none", whiteSpace:"nowrap" }}>
-              ✅ Rapport
+              ✅ Rapport de suivi de chantier
             </a>
           )}
           {/* User pill */}
