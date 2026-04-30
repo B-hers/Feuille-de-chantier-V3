@@ -269,6 +269,39 @@ const ORIENTS = ["Nord","Sud","Est","Ouest"];
 const SUPA_URL = "https://brodjywccrirlzplovxg.supabase.co";
 const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
 
+// ── Entités We Green ──────────────────────────────────────────────────────────
+// prefix : préfixe ajouté à la ref Odoo dans l'URL et Supabase
+// cids   : identifiant de société dans Odoo (à adapter si besoin)
+const ENTITIES = {
+  wge:     { label: "We Green Energy",          flag: "🇧🇪", prefix: "",          color: "#1B6B3A", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+  wcover:  { label: "We Cover SRL",             flag: "🇧🇪", prefix: "WC-",       color: "#2980b9", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+  wgies:   { label: "WG Energy Solutions",      flag: "🇫🇷", prefix: "WG-IDF-",  color: "#e67e22", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+  wgbdx:   { label: "WG Bordeaux SAS",          flag: "🇫🇷", prefix: "WG-BDX-",  color: "#9b59b6", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+  wgghana: { label: "We Green Ghana",           flag: "🇬🇭", prefix: "WG-GH-",   color: "#c0392b", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+  wginvest:{ label: "We Green Invest",          flag: "🇧🇪", prefix: "WG-INV-",  color: "#16a085", odooUrl: "https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list" },
+};
+
+// Détecte l'entité depuis une ref (ex: "WC-S05041" → "wcover")
+function detectEntity(ref) {
+  if (!ref) return "wge";
+  var r = ref.toUpperCase();
+  if (r.startsWith("WG-BDX-"))  return "wgbdx";
+  if (r.startsWith("WG-IDF-"))  return "wgies";
+  if (r.startsWith("WG-GH-"))   return "wgghana";
+  if (r.startsWith("WG-INV-"))  return "wginvest";
+  if (r.startsWith("WC-"))      return "wcover";
+  return "wge";
+}
+
+// Extrait la ref Odoo brute depuis une ref complète (ex: "WC-S05041" → "S05041")
+function rawRef(fullRef, entityKey) {
+  var prefix = (ENTITIES[entityKey] || ENTITIES.wge).prefix;
+  if (prefix && fullRef.toUpperCase().startsWith(prefix.toUpperCase())) {
+    return fullRef.slice(prefix.length);
+  }
+  return fullRef;
+}
+
 async function supaLoad(ref) {
   try {
     var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) + "&select=data,updated_at", {
@@ -1219,7 +1252,7 @@ function PreviewDoc({ data }) {
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, paddingBottom: 16, borderBottom: `2px solid ${GREEN}` }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: (ENTITIES[data.entity]||ENTITIES.wge).color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{(ENTITIES[data.entity]||ENTITIES.wge).flag} {(ENTITIES[data.entity]||ENTITIES.wge).label}</div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>Briefing de chantier PV</div>
         </div>
         <div style={{ textAlign: "right", fontSize: 13, color: MUTED }}>
@@ -1609,6 +1642,7 @@ function App() {
   const [bcMsg, setBcMsg] = useState("");
   const [client, setClient] = useState({ nom: "", adresse: "", tel: "", email: "" });
   const [weGreen, setWeGreen] = useState({ manager: "", tel: "", email: "" });
+  const [entity, setEntity] = useState("wge"); // wge | wcover | wgies | wgbdx
   const [calepinage, setCalepinage] = useState({ image: null, loading: false, msg: "" });
   const [tdNote, setTdNote] = useState("");
   const [schemaNote, setSchemaNote] = useState("");
@@ -1644,7 +1678,7 @@ function App() {
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
 
-  const data = { client, weGreen, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
+  const data = { client, weGreen, entity, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
   const setT = function(instIdx, path, val) {
@@ -1671,6 +1705,8 @@ function App() {
     var urlRef = params.get("ref");
     if (!urlRef) return;
     setRef(urlRef);
+    // Auto-detect entity from ref prefix (retrocompat: no prefix = wge)
+    setEntity(detectEntity(urlRef));
     setSaveStatus("loading");
     supaLoad(urlRef).then(function(row) {
       if (!row || !row.data) { setSaveStatus(""); return; }
@@ -1680,6 +1716,8 @@ function App() {
         // Each field validated before applying - crash-safe
         if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
         if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+        if (typeof d.entity === "string" && ENTITIES[d.entity]) setEntity(d.entity);
+        else setEntity(detectEntity(urlRef)); // retrocompat
         if (typeof d.date === "string") setDate(d.date);
         // Rétrocompatibilité: ancien format (tech+strings) → installations[0]
         if (Array.isArray(d.installations) && d.installations.length > 0) {
@@ -1789,7 +1827,7 @@ function App() {
         } else setSaveStatus("error");
       });
     }, 1200);
-  }, [client, weGreen, date, installations, comments, logistique, tdNote, pmNote]);
+  }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, pmNote]);
 
   // ── Photos auto-save (separate, debounced longer due to size) ──────────────
   useEffect(function() {
@@ -2331,6 +2369,7 @@ function App() {
         var obj = JSON.parse(e.target.result); var d = obj.data || obj;
         if (d.client) setClient(function(p){ return Object.assign({}, p, d.client); });
         if (d.weGreen) setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+        if (typeof d.entity === "string" && ENTITIES[d.entity]) setEntity(d.entity);
         if (typeof d.date === "string") setDate(d.date);
         if (Array.isArray(d.installations) && d.installations.length > 0) setInstallations(d.installations);
         if (typeof d.comments === "string") setComments(d.comments);
@@ -2363,6 +2402,7 @@ function App() {
       isLoading.current = true;
       if (vData.client) setClient(function(p){ return Object.assign({}, p, vData.client); });
       if (vData.weGreen) setWeGreen(function(p){ return Object.assign({}, p, vData.weGreen); });
+      if (typeof vData.entity === "string" && ENTITIES[vData.entity]) setEntity(vData.entity);
       if (typeof vData.date === "string") setDate(vData.date);
       if (Array.isArray(vData.installations) && vData.installations.length > 0) setInstallations(vData.installations);
       if (typeof vData.comments === "string") setComments(vData.comments);
@@ -2396,7 +2436,7 @@ function App() {
           <div style={{ fontSize: 22, fontWeight: 600 }}>
             Briefing de chantier PV
             {client.nom && <span style={{ fontSize: 15, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {client.nom}</span>}
-            {ref && <a href={"https://me-green.odoo.com/web#action=292&cids=2&model=sale.order&view_type=list"} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "2px 8px", background: GREEN_LIGHT, whiteSpace: "nowrap" }}>← Odoo</a>}
+            {ref && <a href={(ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: (ENTITIES[entity] || ENTITIES.wge).color, textDecoration: "none", border: "1px solid " + (ENTITIES[entity] || ENTITIES.wge).color + "55", borderRadius: 5, padding: "2px 8px", background: (ENTITIES[entity] || ENTITIES.wge).color + "12", whiteSpace: "nowrap" }}>← Odoo</a>}
           </div>
           {!ref && <div style={{ fontSize: 11, color: "#e07b00", marginTop: 2 }}>⚠ Pas de référence — ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</div>}
           {ref && <div style={{ fontSize: 11, marginTop: 2, color: saveStatus === "saving" ? "#e07b00" : saveStatus === "error" ? "#c0392b" : saveStatus === "loading" ? MUTED : GREEN }}>
@@ -2493,7 +2533,14 @@ function App() {
             <div style={CARD}>
               <div style={SH}><span>🌿</span> We Green</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div><label style={LBL}>Project Manager</label>
+                {/* Entité détectée automatiquement depuis le préfixe de l'URL */}
+                {entity && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 7, border: "1px solid " + (ENTITIES[entity]||ENTITIES.wge).color + "44", background: (ENTITIES[entity]||ENTITIES.wge).color + "10" }}>
+                    <span style={{ fontSize: 16 }}>{(ENTITIES[entity]||ENTITIES.wge).flag}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: (ENTITIES[entity]||ENTITIES.wge).color }}>{(ENTITIES[entity]||ENTITIES.wge).label}</span>
+                    <span style={{ fontSize: 11, color: MUTED, marginLeft: "auto" }}>détecté via URL</span>
+                  </div>
+                )}                <div><label style={LBL}>Project Manager</label>
                   <select value={weGreen.manager} onChange={e => {
                     const name = e.target.value;
                     const pm = PM_DATA[name] || { tel: "", email: "" };
