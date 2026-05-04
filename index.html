@@ -316,7 +316,7 @@ async function supaLoad(ref) {
 
 async function supaSave(ref, data) {
   try {
-    await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
       method: "POST",
       headers: {
         "apikey": SUPA_KEY,
@@ -326,8 +326,15 @@ async function supaSave(ref, data) {
       },
       body: JSON.stringify({ ref: ref, data: data, updated_at: new Date().toISOString() })
     });
+    if (!res.ok) {
+      console.error("Supabase save error:", res.status, await res.text());
+      return false;
+    }
     return true;
-  } catch(e) { return false; }
+  } catch(e) {
+    console.error("Supabase network error:", e);
+    return false;
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1689,6 +1696,7 @@ function App() {
   const saveTimer = useRef(null);
   const photoSaveTimer = useRef(null);
   const isLoading = useRef(false);
+  const latestDataRef = useRef(null); // always points to latest data — fixes stale closure in timeouts
   const [user, setUser] = useState(function() {
     try {
       var stored = localStorage.getItem("wge_user");
@@ -1709,6 +1717,7 @@ function App() {
   const prevDataRef = useRef(null);
 
   const data = { client, weGreen, entity, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
+  latestDataRef.current = data; // always fresh — used in save timeouts to avoid stale closures
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
   const setT = function(instIdx, path, val) {
@@ -1839,20 +1848,21 @@ function App() {
     if (!ref || isLoading.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus("saving");
-    var slimSnap = makeSlimData(data);
     saveTimer.current = setTimeout(function() {
-      supaSave(ref, data).then(function(ok) {
+      var currentData = latestDataRef.current;
+      supaSave(ref, currentData).then(function(ok) {
         if (ok) {
           setLastSaved(new Date().toISOString()); setSaveStatus("saved");
           if (userRef.current) {
+            var slimCurrent = makeSlimData(currentData);
             if (prevDataRef.current) {
-              var changes = diffData(prevDataRef.current, slimSnap);
+              var changes = diffData(prevDataRef.current, slimCurrent);
               if (changes.length > 0) {
                 supaLogAudit(ref, userRef.current, "save", { changes: changes });
-                supaSaveVersion(ref, slimSnap, userRef.current, changes.slice(0, 2).join(" | "));
+                supaSaveVersion(ref, slimCurrent, userRef.current, changes.slice(0, 2).join(" | "));
               }
             }
-            prevDataRef.current = slimSnap;
+            prevDataRef.current = slimCurrent;
           }
         } else setSaveStatus("error");
       });
@@ -1865,7 +1875,7 @@ function App() {
     if (photoSaveTimer.current) clearTimeout(photoSaveTimer.current);
     setSaveStatus("saving");
     photoSaveTimer.current = setTimeout(function() {
-      supaSave(ref, data).then(function(ok) {
+      supaSave(ref, latestDataRef.current).then(function(ok) {
         if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
         else setSaveStatus("error");
       });
