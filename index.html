@@ -269,6 +269,68 @@ const ORIENTS = ["Nord","Sud","Est","Ouest"];
 
 const SUPA_URL = "https://brodjywccrirlzplovxg.supabase.co";
 const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
+const SUPA_STORAGE_BUCKET = "chantier-photos";
+
+// Upload a base64 data URL to Supabase Storage → returns storage URL or original base64 on failure
+async function uploadPhotoToStorage(ref, catKey, base64DataUrl, fileName) {
+  if (!base64DataUrl || !base64DataUrl.startsWith("data:")) return base64DataUrl;
+  try {
+    var fetchRes = await fetch(base64DataUrl);
+    var blob = await fetchRes.blob();
+    var ext = blob.type === "image/jpeg" ? "jpg" : "png";
+    var safeName = (fileName || "photo").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
+    var path = ref + "/" + catKey + "/" + Date.now() + "-" + safeName + "." + ext;
+    var uploadRes = await fetch(SUPA_URL + "/storage/v1/object/" + SUPA_STORAGE_BUCKET + "/" + path, {
+      method: "POST",
+      headers: {
+        "apikey": SUPA_KEY,
+        "Authorization": "Bearer " + SUPA_KEY,
+        "Content-Type": blob.type,
+        "x-upsert": "true"
+      },
+      body: blob
+    });
+    if (uploadRes.ok) {
+      return SUPA_URL + "/storage/v1/object/public/" + SUPA_STORAGE_BUCKET + "/" + path;
+    }
+    console.warn("Storage upload failed (" + uploadRes.status + "), keeping base64");
+    return base64DataUrl;
+  } catch(e) {
+    console.warn("Storage upload error, keeping base64:", e);
+    return base64DataUrl;
+  }
+}
+
+// Upload all base64 photos in data to Storage — returns updated data with storage URLs
+async function uploadBase64PhotosToStorage(ref, data) {
+  var photosChanged = false;
+  var newPhotos = {};
+  var cats = Object.keys(data.photos || {});
+  for (var ci = 0; ci < cats.length; ci++) {
+    var catKey = cats[ci];
+    var arr = data.photos[catKey] || [];
+    newPhotos[catKey] = await Promise.all(arr.map(async function(photo) {
+      var np = photo;
+      if (photo.url && photo.url.startsWith("data:")) {
+        var u = await uploadPhotoToStorage(ref, catKey, photo.url, photo.name);
+        if (u !== photo.url) { np = Object.assign({}, np, { url: u }); photosChanged = true; }
+      }
+      if (photo.drawingUrl && photo.drawingUrl.startsWith("data:")) {
+        var du = await uploadPhotoToStorage(ref, catKey, photo.drawingUrl, "draw-" + photo.name);
+        if (du !== photo.drawingUrl) { np = Object.assign({}, np, { drawingUrl: du }); photosChanged = true; }
+      }
+      return np;
+    }));
+  }
+  // Also upload calepinage
+  var newCalepinage = data.calepinage;
+  if (data.calepinage && data.calepinage.image && data.calepinage.image.startsWith("data:")) {
+    var calUrl = await uploadPhotoToStorage(ref, "calepinage", data.calepinage.image, "calepinage.jpg");
+    if (calUrl !== data.calepinage.image) { newCalepinage = Object.assign({}, data.calepinage, { image: calUrl }); photosChanged = true; }
+  }
+  if (!photosChanged) return { data: data, changed: false };
+  return { data: Object.assign({}, data, { photos: newPhotos, calepinage: newCalepinage }), changed: true };
+}
 
 // ── Entités We Green ──────────────────────────────────────────────────────────
 // prefix : préfixe ajouté à la ref Odoo dans l'URL et Supabase
@@ -664,7 +726,7 @@ function AnnotationModal({ imageUrl, initialTextObjects, onSave, onClose }) {
       // Canvas at FULL image resolution — CSS handles display scaling
       canvas.width = img.width;
       canvas.height = img.height;
-      var ctx = canvas.getContext("2d");
+      var ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(img, 0, 0, img.width, img.height);
       setHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
       // Compute natural fit-screen CSS width (px)
@@ -1869,16 +1931,24 @@ function App() {
     }, 1200);
   }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, schemaNote, pmNote]);
 
-  // ── Photos auto-save (timer séparé) ──────────────────────────────────────
+  // ── Photos auto-save : upload Storage puis JSON léger ────────────────────
   useEffect(function() {
     if (!ref || isLoading.current) return;
     if (photoSaveTimer.current) clearTimeout(photoSaveTimer.current);
     setSaveStatus("saving");
-    photoSaveTimer.current = setTimeout(function() {
-      supaSave(ref, latestDataRef.current).then(function(ok) {
-        if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
-        else setSaveStatus("error");
-      });
+    photoSaveTimer.current = setTimeout(async function() {
+      var currentData = latestDataRef.current;
+      // Upload base64 photos to Supabase Storage → JSON n'aura que des URLs
+      var result = await uploadBase64PhotosToStorage(ref, currentData);
+      if (result.changed) {
+        // Mettre à jour le state avec les URLs storage (évite re-upload au prochain save)
+        setPhotos(result.data.photos);
+        if (result.data.calepinage !== currentData.calepinage) setCalepinage(result.data.calepinage);
+        currentData = result.data;
+      }
+      var ok = await supaSave(ref, currentData);
+      if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
+      else setSaveStatus("error");
     }, 2000);
   }, [photos, calepinage]);
 
