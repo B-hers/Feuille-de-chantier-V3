@@ -384,7 +384,8 @@ async function supaSave(ref, data) {
         "apikey": SUPA_KEY,
         "Authorization": "Bearer " + SUPA_KEY,
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
+        "Prefer": "resolution=merge-duplicates",
+        "x-supabase-statement-timeout": "25000"
       },
       body: JSON.stringify({ ref: ref, data: data, updated_at: new Date().toISOString() })
     });
@@ -1910,24 +1911,30 @@ function App() {
     if (!ref || isLoading.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus("saving");
-    saveTimer.current = setTimeout(function() {
+    saveTimer.current = setTimeout(async function() {
       var currentData = latestDataRef.current;
-      supaSave(ref, currentData).then(function(ok) {
-        if (ok) {
-          setLastSaved(new Date().toISOString()); setSaveStatus("saved");
-          if (userRef.current) {
-            var slimCurrent = makeSlimData(currentData);
-            if (prevDataRef.current) {
-              var changes = diffData(prevDataRef.current, slimCurrent);
-              if (changes.length > 0) {
-                supaLogAudit(ref, userRef.current, "save", { changes: changes });
-                supaSaveVersion(ref, slimCurrent, userRef.current, changes.slice(0, 2).join(" | "));
-              }
+      // Upload base64 photos to storage first (no-op si déjà des URLs)
+      var result = await uploadBase64PhotosToStorage(ref, currentData);
+      if (result.changed) {
+        setPhotos(result.data.photos);
+        if (result.data.calepinage !== currentData.calepinage) setCalepinage(result.data.calepinage);
+        currentData = result.data;
+      }
+      var ok = await supaSave(ref, currentData);
+      if (ok) {
+        setLastSaved(new Date().toISOString()); setSaveStatus("saved");
+        if (userRef.current) {
+          var slimCurrent = makeSlimData(currentData);
+          if (prevDataRef.current) {
+            var changes = diffData(prevDataRef.current, slimCurrent);
+            if (changes.length > 0) {
+              supaLogAudit(ref, userRef.current, "save", { changes: changes });
+              supaSaveVersion(ref, slimCurrent, userRef.current, changes.slice(0, 2).join(" | "));
             }
-            prevDataRef.current = slimCurrent;
           }
-        } else setSaveStatus("error");
-      });
+          prevDataRef.current = slimCurrent;
+        }
+      } else setSaveStatus("error");
     }, 1200);
   }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, schemaNote, pmNote]);
 
