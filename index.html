@@ -620,18 +620,19 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
   </div>
 );
 
-function AnnotationModal({ imageUrl, onSave, onClose }) {
+function AnnotationModal({ imageUrl, initialTextObjects, onSave, onClose }) {
   var canvasRef = useRef();
   var containerRef = useRef();
   var textInputRef = useRef();
   var [tool, setTool] = useState("free");
   var [color, setColor] = useState("#e74c3c");
   var [thickness, setThickness] = useState(8);
-  var [fontSize, setFontSize] = useState(24);
+  var [fontSize, setFontSize] = useState(48);
   var [history, setHistory] = useState([]);
   var [textInput, setTextInput] = useState(null); // {x,y,screenX,screenY}
-  var [textObjects, setTextObjects] = useState([]); // floating text layer, baked on save
+  var [textObjects, setTextObjects] = useState(function() { return Array.isArray(initialTextObjects) ? initialTextObjects : []; }); // floating text layer, baked on save
   var [draggingTextId, setDraggingTextId] = useState(null);
+  var [trashHover, setTrashHover] = useState(false);
   var textDragStartObj = useRef(null);
   var drawing = useRef(false);
   var startPos = useRef({ x: 0, y: 0 });
@@ -794,6 +795,11 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
 
   function save() {
     var canvas = canvasRef.current;
+    // drawingUrl = canvas WITHOUT text (for future re-editing)
+    var drawingOut = document.createElement("canvas"); drawingOut.width = canvas.width; drawingOut.height = canvas.height;
+    var dctx = drawingOut.getContext("2d"); dctx.fillStyle = "#fff"; dctx.fillRect(0, 0, drawingOut.width, drawingOut.height); dctx.drawImage(canvas, 0, 0);
+    var drawingUrl = drawingOut.toDataURL("image/jpeg", 0.97);
+    // url = fully baked (drawings + text) for display/PDF
     var out = document.createElement("canvas"); out.width = canvas.width; out.height = canvas.height;
     var ctx2 = out.getContext("2d"); ctx2.fillStyle = "#fff"; ctx2.fillRect(0, 0, out.width, out.height); ctx2.drawImage(canvas, 0, 0);
     textObjects.forEach(function(obj) {
@@ -804,7 +810,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
       ctx2.strokeText(obj.text, obj.x, obj.y + obj.fontSize);
       ctx2.fillText(obj.text, obj.x, obj.y + obj.fontSize);
     });
-    onSave(out.toDataURL("image/jpeg", 0.97));
+    onSave(out.toDataURL("image/jpeg", 0.97), drawingUrl, textObjects);
   }
 
   return (
@@ -833,7 +839,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
         {tool === "text" && <>
           <div style={{ width: 1, height: 26, background: "#444" }} />
           <span style={{ color: "#aaa", fontSize: 11 }}>Taille :</span>
-          {[12,18,24,32,44].map(function(s) { return (
+          {[40,48,56,68].map(function(s) { return (
             <button key={s} onClick={function() { setFontSize(s); }}
               style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: fontSize === s ? GREEN : "#333", color: "#fff", fontSize: 11, cursor: "pointer", fontWeight: fontSize === s ? 700 : 400 }}>
               {s}
@@ -850,7 +856,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
         <button onClick={save} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: GREEN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Sauver</button>
         <button onClick={onClose} style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "#555", color: "#fff", fontSize: 13, cursor: "pointer" }}>✕</button>
       </div>
-      {/* Legend */}
+      {/* Legend + trash zone */}
       <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "4px 10px", background: "#111", fontSize: 11, color: "#aaa", flexWrap: "wrap", justifyContent: "center", width: "100%", boxSizing: "border-box" }}>
         {[["#e74c3c","DC"],["#27ae60","AC"],["#2980b9","Onduleur"],["#f39c12","Borne"]].map(function(item) { return (
           <span key={item[0]} style={{ display: "flex", alignItems: "center", gap: 3 }}>
@@ -858,7 +864,23 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
           </span>
         ); })}
         <span style={{ color: "#666" }}>· Pincer pour zoomer</span>
+        {textObjects.length > 0 && <span style={{ color: "#f39c12", fontSize: 10 }}>🔤 {textObjects.length} texte(s) — déplaçables, sauvegardés</span>}
         {zoomLevel !== 100 && <button onClick={function(){ zoom.current=1; setZoomLevel(100); if(canvasRef.current){ canvasRef.current.style.width=Math.round(canvasRef.current.width*initScale.current)+"px"; canvasRef.current.style.height="auto"; } }} style={{ padding: "2px 8px", borderRadius: 5, border: "none", background: "#555", color: "#fff", fontSize: 11, cursor: "pointer" }}>🔍 {zoomLevel}% ✕</button>}
+        {/* Trash drop zone — active when dragging a text object */}
+        {draggingTextId && (
+          <div
+            onMouseEnter={function() { setTrashHover(true); }}
+            onMouseLeave={function() { setTrashHover(false); }}
+            onMouseUp={function() { setTextObjects(function(prev){ return prev.filter(function(o){ return o.id !== draggingTextId; }); }); setDraggingTextId(null); textDragStartObj.current = null; setTrashHover(false); }}
+            onTouchEnd={function() { setTextObjects(function(prev){ return prev.filter(function(o){ return o.id !== draggingTextId; }); }); setDraggingTextId(null); textDragStartObj.current = null; setTrashHover(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 14px", borderRadius: 7,
+              background: trashHover ? "#c0392b" : "rgba(192,57,43,0.25)",
+              border: "1.5px dashed " + (trashHover ? "#fff" : "#e74c3c"),
+              color: trashHover ? "#fff" : "#e74c3c", fontSize: 13, fontWeight: 700,
+              cursor: "pointer", transition: "all 0.1s", userSelect: "none" }}>
+            🗑️ {trashHover ? "Relâcher pour supprimer" : "Déposer ici pour supprimer"}
+          </div>
+        )}
       </div>
       {/* Canvas area */}
       <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", width: "100%", position: "relative", minHeight: 0 }}>
@@ -887,7 +909,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
                     var dy = (ev.clientY - textDragStartObj.current.my) / d;
                     setTextObjects(function(prev) { return prev.map(function(o) { return o.id === obj.id ? Object.assign({}, o, { x: textDragStartObj.current.ox + dx, y: textDragStartObj.current.oy + dy }) : o; }); });
                   }
-                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; window.removeEventListener("mousemove", onMv); window.removeEventListener("mouseup", onUp); }
+                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; setTrashHover(false); window.removeEventListener("mousemove", onMv); window.removeEventListener("mouseup", onUp); }
                   window.addEventListener("mousemove", onMv); window.addEventListener("mouseup", onUp);
                 }}
                 onTouchStart={function(e) {
@@ -904,7 +926,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
                     var dy = (tt.clientY - textDragStartObj.current.my) / d;
                     setTextObjects(function(prev) { return prev.map(function(o) { return o.id === obj.id ? Object.assign({}, o, { x: textDragStartObj.current.ox + dx, y: textDragStartObj.current.oy + dy }) : o; }); });
                   }
-                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; window.removeEventListener("touchmove", onMv); window.removeEventListener("touchend", onUp); }
+                  function onUp() { setDraggingTextId(null); textDragStartObj.current = null; setTrashHover(false); window.removeEventListener("touchmove", onMv); window.removeEventListener("touchend", onUp); }
                   window.addEventListener("touchmove", onMv, { passive: false }); window.addEventListener("touchend", onUp);
                 }}
                 onDoubleClick={function(e) { if (isActive) { e.stopPropagation(); setTextObjects(function(prev){ return prev.filter(function(o){ return o.id !== obj.id; }); }); } }}
@@ -1205,8 +1227,10 @@ function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder,
 
       {/* Annotation modal */}
       {annotating!==null && items[annotating] && items[annotating].url && (
-        <AnnotationModal imageUrl={items[annotating].url}
-          onSave={function(newUrl){ onUpdate(annotating,newUrl); setAnnotating(null); }}
+        <AnnotationModal
+          imageUrl={items[annotating].drawingUrl || items[annotating].url}
+          initialTextObjects={items[annotating].textObjects || []}
+          onSave={function(newUrl, drawingUrl, textObjs){ onUpdate(annotating, newUrl, drawingUrl, textObjs); setAnnotating(null); }}
           onClose={function(){ setAnnotating(null); }} />
       )}
 
@@ -1835,7 +1859,7 @@ function App() {
     }, 1200);
   }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, schemaNote, pmNote]);
 
-  // ── Photos auto-save (timer séparé — évite d'annuler le save des données) ──
+  // ── Photos auto-save (timer séparé) ──────────────────────────────────────
   useEffect(function() {
     if (!ref || isLoading.current) return;
     if (photoSaveTimer.current) clearTimeout(photoSaveTimer.current);
@@ -2311,9 +2335,9 @@ function App() {
     arr.splice(toIdx, 0, moved);
     return { ...prev, [catKey]: arr };
   });
-  const updatePhoto = (catKey, idx, newUrl) => setPhotos(prev => ({
+  const updatePhoto = (catKey, idx, newUrl, drawingUrl, textObjs) => setPhotos(prev => ({
     ...prev,
-    [catKey]: prev[catKey].map((item, i) => i === idx ? Object.assign({}, item, { url: newUrl }) : item)
+    [catKey]: prev[catKey].map((item, i) => i === idx ? Object.assign({}, item, { url: newUrl, drawingUrl: drawingUrl || newUrl, textObjects: textObjs || [] }) : item)
   }));
   const movePhoto = function(fromKey, fromIdx, toKey) {
     setPhotos(function(prev) {
@@ -2686,7 +2710,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                 {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -2700,7 +2724,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                 {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -2713,7 +2737,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                 {PHOTO_CATS.filter(function(c){ return ["extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url) { return updatePhoto(key, idx, url); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
