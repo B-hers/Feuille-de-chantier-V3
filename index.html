@@ -146,7 +146,7 @@ button { font-family: inherit; cursor: pointer; }
           callback: function(response) {
             var payload = parseJwtPlain(response.credential);
             if (!payload.email || (!payload.email.endsWith("@" + ALLOWED_DOMAIN_PLAIN) && !payload.email.endsWith("@" + ALLOWED_DOMAIN_PLAIN_FR))) {
-              showErr("⛔ Accès réservé aux membres @" + ALLOWED_DOMAIN_PLAIN + " / @" + ALLOWED_DOMAIN_PLAIN_FR);
+              showErr("⛔ Accès réservé aux membres @we-green.be / @we-green.fr");
               return;
             }
             var u = { email: payload.email, name: payload.name || payload.email.split("@")[0], picture: payload.picture || "", type: "wge" };
@@ -336,9 +336,7 @@ async function supaSave(ref, data) {
 const GOOGLE_CLIENT_ID = "765677431332-2leuvo90bvhnmid77hml6cj230av8eao.apps.googleusercontent.com";
 const ALLOWED_DOMAIN = "we-green.be";
 const ALLOWED_DOMAIN_FR = "we-green.fr";
-function isAllowedEmail(email) {
-  return email && (email.endsWith("@" + ALLOWED_DOMAIN) || email.endsWith("@" + ALLOWED_DOMAIN_FR));
-}
+function isAllowedEmail(email) { return email && (email.endsWith("@" + ALLOWED_DOMAIN) || email.endsWith("@" + ALLOWED_DOMAIN_FR)); }
 
 async function supaLogAudit(ref, user, action, detail) {
   if (!ref || !user) return;
@@ -864,7 +862,7 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
       </div>
       {/* Canvas area */}
       <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", width: "100%", position: "relative", minHeight: 0 }}>
-        <div ref={containerRef} style={{ position: "relative", width: "100%", maxWidth: "100%" }}>
+        <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
           <canvas ref={canvasRef}
             onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
             onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
@@ -893,11 +891,13 @@ function AnnotationModal({ imageUrl, onSave, onClose }) {
                   window.addEventListener("mousemove", onMv); window.addEventListener("mouseup", onUp);
                 }}
                 onTouchStart={function(e) {
-                  if (!isActive) return; e.stopPropagation();
+                  if (!isActive) return;
+                  e.preventDefault(); e.stopPropagation();
                   var t0 = e.touches[0];
                   textDragStartObj.current = { id: obj.id, mx: t0.clientX, my: t0.clientY, ox: obj.x, oy: obj.y };
                   setDraggingTextId(obj.id);
                   function onMv(ev) {
+                    ev.preventDefault();
                     if (!textDragStartObj.current) return;
                     var tt = ev.touches[0]; var d = initScale.current * zoom.current;
                     var dx = (tt.clientX - textDragStartObj.current.mx) / d;
@@ -1835,7 +1835,7 @@ function App() {
     }, 1200);
   }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, schemaNote, pmNote]);
 
-  // ── Photos auto-save (separate timer — évite d'annuler le save des données) ──
+  // ── Photos auto-save (timer séparé — évite d'annuler le save des données) ──
   useEffect(function() {
     if (!ref || isLoading.current) return;
     if (photoSaveTimer.current) clearTimeout(photoSaveTimer.current);
