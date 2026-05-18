@@ -232,21 +232,50 @@ button { font-family: inherit; cursor: pointer; }
 const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCADmAjwDASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAYHBAUCAwgBCf/EAFIQAAEDAwEDBgoECAwFBAMAAAEAAgMEBREGEiExB0FRYXGBCBMUIjKRobHB0RUjQlIWNWJyc5KisiQzNDZDU3SCg8Lh8CVUk9LxFyZjlERVdf/EABsBAQACAwEBAAAAAAAAAAAAAAABAgMGBwUE/8QAQhEAAgECAgYIAwQJAQkAAAAAAAECAxEEBQYSITFBUWFxgZGhscHREyIyNXLh8BQWIzNCUmKispIVJDRTgsLS4vH/2gAMAwEAAhEDEQA/APZaIiAIiIAiIgCIiAIiIAiLjLJHEwvle1jRxLjgBQ2krsHJFrm3u2PmMUVQ6Z4/qYnyD1tBCz43h7A9ocAfvNIPqKxUsRSq3+HJPqaYOSIizAIi4yyNiYXuDyB91hcfUN6htJXYOSLEguNFM/YbOGvzjYkaWO9TgCstVhUhUV4NPqAREVwEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREARF11M8NNC6aeRscbeLnFRKSim5OyQOxYVwulHREMkeXzH0YYxtPd3LAFTcbwcUO1RUR/p3D6yQfkjmHWuttRbLTKaW3QOra92doNO08n8p3MvIrZk3HWptRj/M+P3Y75eHRcmxkh16rvRbHbYTwLhtynu4BYskFkp6gNqpJblV/deTM/8AVG4LGknqa6UxVM8lS/8A5SiOGN/Pk/1WxobZUtj2HPioIf6mkbgn8553nuwvhpyeJl8kXPplt/t2Rj36y4xJObq6eNgDKWnoY/s+UyBpPYxufeuyAVdQcurJg088cAjH7eSVlUtDSUp2oYWh54vPnOPa471kL2KWGqv97LsT9reRBitoWfbqKt565nD3YXMUsQGNqbvmf813ovpVCmv4SDp8mjHB8w/xXfNBC9ow2ol/vYPwXcin4UeCB0SRvezYlZDO3oc3HzXR5JHHvgdNSHoacs9RyPcs5FWVCEtr/Pbv8QYfjqyH+OhbUR/1kPpDtafgT2LIp54Z2l0MgdjcRzg9Y4hc9kZyNx6l0VFJFM8SHMcwGGyxnDh8x1HIUatSH0u65P39+8GQiwvKJqU7NaA6LmnYNw/OHN28OxZoIIBBBB3ghXhUU9nHl+f/AIAiIsgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIixLtcILbSGonOTwYwcXu6AsdWrClBzm7Jb2BdbhT26m8dOSSThjG+k89AC1TaR9T/wAV1A9scUfnR0xPmRjpd0n/AH1D5TRCna6/354bKBmKM8IRzAD7yiV5vFbfrgyGKNxi2sRQN5+s9JWp5rmsaaU60bt/RT58pT9I+u6yRubrqCWv+rpnvpaLOztNH1s3U0f7+CzrTY55oNmoaaKkdxgjP1knW93Hu9gWVpuwR0DW1NXsy1hHH7MfUPmt6vqwGVVsQ/0jHu8n/DyXJ8l/Stn82sG+R1UtPBSwiKniZEwczRhdqItkjGMEoxVkioREVgEREAREQBERAEREAWGYJKVxkpBtRE5dBnd2t6D1cOxZiKk6an18wcIJo54xJG7I4dYPQRzFc1jzQuZIainA8YfTZnAkHz612wSsmjD2ZxwIIwQecHrUQm76st/mDmiIsgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgOFRNHBA+aZ4ZGxpc5x5go7Qf8AEKh+oLl9XSwg+Sxu4NA+0ev49y7Ly513u8dmhcRTxYkq3A+pv+/gtBrq8NlkFppCG08GA/Z4Ejm7AtVzfM4U1KrPbCDsl/NP2j59SLJGt1NeZ7zXbLNoQNOIox7z1lTLR9hZbKYVFQwGskG/P2B0dvStNyf2Xxj/AKVqWea04hB5z97u9/Ypyvl0cyydebzLF7Zy+m/Dp9uSJk+CCIi3QoEREAREQBERAEREAREQBERAEREAWPOx0UhqIm5/rGD7Q6R1j28OhZCKs46yB8Y5r2hzSC0jII519XQ0GCfZ/opDu/Jd0dh9/au9ISutu8BERWAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBYl5rWW62zVbsZY3zQedx4D1rLUevf/EtQ0VqG+GH+ETjmPQP9/eXw5jiJUaD+H9UrRj1vYu7e+hEowZZ3WHTL6mRx+ka5xcSeIJ+QPrKiNloZbpdIqZufPdl7ugc5Wfra4+X3p7WOzDB9Wzu4n1/BSPk6t3iaGS4SN8+Y7LM8zRx9Z9y598FZrmcMJD91T2daX1Prk+PUX3K5J6aGOngjghaGxxtDWgcwC7ERdOjFRVluMYREUgIiIAiIgCIiAIiIAiIgCIiAIiIAiIgOMjGyRljuBXyFzi3Zf6bdzuvrXNcHDEgeOwqrVncHNERWAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQAnAyVD6Ks8VQXm/uOHzPMcB6uA94/VUi1BP5NZauUHBERa09Z3D2lQzUr/ACTS9roG7jK0zvA694/ePqWsZ/i/gy1l/BFy/wCqXyR85FkiNU0T6mrjhYMvkeGgdZKuGigZS0kVNH6MTA0dwVcaCpfKNQRvIy2FpkPuHtIVmLz9CsIo0KmIe+Tsupfi/AmbCKLcq+o6nSmgrle6OMSVMTWshyMta57g0OPUM57l5QpeUbXFPdxc26muT59raLXzl0Z6iw+bjqwt4SKHthFpNB31mptIWy+Na1rquAOka07mvG54HY4FbtQAi4TSxQROmmkZHGwZc5xwAOsryty9z6l01yj1sVLfrvDR1gFVTtZWSNa0O9IDBwAHB27owiB6sRecvB05Rr5U6rj0zfLlNXU1XG7yd9Q8vfHI0bWNo7yCARg8+Mc+fRqMBEVP+Elr256XoaGzWOpNLW1wdJLOz044wcAN6C45382ygLgReReSnlK1VbNY0ENVdq240VZUshngqZnS5D3BuW7RJBGc7l66UtWARFTXKxy20en6maz6Zihr7hGS2Woecwwu5wMem4eode8KAXKut1RA04dNGD0FwXiPUeuNWahlc+632tma7P1TZCyMdjG4b7FHi954uJ71NiLn6ANex3oua7sOV9XgWiuFfRSiajraimkHB8UpY4d4Vl6F5b9V2OeOG8S/TVBkBzZziZo/JfxJ/Oz3JYXPV6LTaN1PaNWWSO7Wao8bC7zXsO58TudrhzH/AGFuVBIREQBERAERR3VGporYTTUwbLVY359Fnb0nqXy4zG0cFSdWtKy/OxEpXJEuBliDtkyMB6NoKprhd7jXOJqauR4P2c4b6huWDk9K02rpxBStTo3XS7eFn5ltQuob+CKn6K5V1E4OpqqWPHMHbvVzqaaZ1a2rkZSXENjmccNlG5rj0HoK9LLdLMLi5qnUWpJ7r7V3+6IcWiWIqsvtzrheawR1tSxgneA0SkAYcetSDk5qqmonqxUVEsoDRjbeXY39atg9KKWKxiwqptNtq9+V/YONlcmaItBryaWCxbcMr43eNaMtcQeBXvY3ErC4eddq+qrkJXN+ip8XK4ZH8Oqf+qVYFTf4LZYKOaUmaolgYWszvcdkbyeheHl2lGHxaqSmtRQV22yXGxIFxdJG0gOkaCeYlVXc9QXSveTJVPYzO5kZ2Wju5+9Ylsc43OmJJJMrfevNqaa03UUKVJtX3t28LMnULhRF01tVBR0z6ipkEcbBkkrdpzjCLlJ2SKHchIAySAOtV9e9ZVk73R28eTxcz+Lz8u71qN1FVU1DtqeeSU9L3ErT8ZpnhaUnGhBz6dy7N78C6gy4hLE44EjCepwXNUqCQsqjudfRuBpquWPHMHbvUvkp6cRb/aUbLod/ReY1C4EUN0/rESvbT3QNYTuEzRgd4+KmQIIBBBB4ELbsvzPD5hT+JQlfmuK60VasERF95ARR7Uup6e1k08DRPVc4z5rO3r6lCLhfbpXPJmq5A37jTst9QWtZnpRhMDN0188lvS3Lrftcsotlrl7Bxc0d6Ag8CCqWLieJyuUc0sbtqORzT0g4XirTnbtof3f+pOoXQirK06qulE5rZJTUxDi2U5Pr4qfWW60l2pvHUzsOHpsPFpWx5Xn+EzJ6kHaXJ+nMq4tGeiL4/wBE9i9wg+oqgfcrhtn+HVP/AFXfNS/Q90EdprZ6+pe5sLmkue4k787h6lqmX6V0cZXVFw1d7u2rbFcs42JgvjnNb6TgO0qub5q2urHujo3Glg4DZPnntPyUellklcXSPc9x4knK+XF6aYenNxoQc1zvZdmxvyJUC52ua70XA9hX1UvFNLE7aikcxw4FpwVKdN6tqIJmU9yeZoXHHjDvcz5hXwOmWHr1FCvDUvxvdduxWIcCfovjHNewPaQ5rhkEcCF9W5byoREQBERAR/XryLK2Bp86aZrB7T8Aopr2UOvYp2nzaeJkYHdn4qS64dtVVop+aSp3+to+KhuqJPG6grXZziZzfUcfBc50qrvXqx6YLsUZS82i8SR8mMO6sqD+Swe3PuCmqjHJvHs2SV/35z+6FJ1tWjdJU8spLmr97bKy3mj19Zxf9F3ez7IL6mle2Pd9sDLD+sAvDLmlri0ggg4IK/QJeK+WSyfQHKTeaFrNmF85nh6NiTzwB2Zx3L3UVZdvgnXnyvR1fZXvy+gqdtg6I5Bn95rvWrnXlPwXbz9Hco/0e9+I7lTPix+W3z2+xrh3r1YjJK08JO9fRPJjUwRv2ZrhMymb04ztO9jSO9V3yr/+9eRPT2tYxt1lvxT1pHHfhjif77Wn++uHhbXnx+obVYo3+bSU7p5AOG1IcDPYG/tLq8HSf6d01qrQdQC6OrpHTwE8GOI2CfWYyOwoQVNpW6yWTUtuu8RO1SVLJsDnDXAkd43L3bTyxzwRzxODo5Gh7XDnBGQV4CnikgnkhlaWSRuLXNPEEHeF7I5Crz9N8l9omc7alpozSSdIMZ2R+zsnvUsInC8f+ERefpflSuIY7aioQ2kj3/cHnftly9bXiuhtlprLlUECKlgfM/sa0k+5eDrlVy19xqa6c7U1RK6WQ9LnEk+0qEGTfwfrMbzypWsObtRUZNXJu4bAy39otXsRUL4I1k2KG8ahkZvle2khJHM0bT/aWepX0jJRVvhGa2l0vpVltt0xjuV02mNe04dFEPTcOgnIA7SeZeTt5PWrH8I+7PufKnXxF2YqFjKWMZ4YbtO/ac5Y/IDpyDUnKPRw1cYkpaNjquZhG52xjZB6tot7sqVsRBKuTLkKrL3QQ3bU1VLbaWYB8VNG0eOe08C4nczPRgnsVoQch3J5HEGPtlVM7GNt9XICevcQPYrKUJv/ACq6Fsd2mtdwvYbVQu2JWRwSSBjucEtaRlRdkkS1J4PulqyBxstbW2yox5oe7x0eesHzvavP2udJXnR16da7xAGvI2opWHMczfvNPw4heydL6t03qdrzYrvTVroxl7Gkh7R0lpwcdeFEfCN0/BeuTarqzGDVWwiphfzgZAeOwtOe0BEyDz9yLa0n0brKnmklIttW4Q1rM7tgnc/taTnsyOdeygQQCCCDwIX5+L23yTXN935N7DXSOLpHUbY3uPEuZ5hPrajCJQiIoJCLqpqmKoMoidkxSGN46HD/AMrtVYyUldMGr1Rc/oq0yTtI8c7zIs/ePP3KqpHukkdI9xc5xySTxKlnKXUl1fT0oJ2Y49s9pP8AoFHLPSGuudPSg48Y8A9Q5/YuW6T4qpjcx/R47o2il0vf47OwyRVkbPT2may6tE73CCn++4ZLuwKTQ6KtbG/WTVLz07QA9yksMccMTIomhjGANa0cwC5LcMDovgcPTSqQ15cW/RbirkyJVmh6NzCaWrljdzCQBw9mFD7xa6y1VPiapmM72vG9rh1FW6tZqe3MuVomiLQZGNL4j0OHz4L5M30WwtWjKeGjqzW3ZufRb2CkVQ5xc4ucSXE5JPEqY8mP8orPzB71DSMHCmXJj/KKz8we9aZo1tzSl1vyZeW4nKjvKF/N/wDxW+4qRKO8oX83/wDFb7ium559nVvusxx3lbLIYKqvqIoWh80mAxjRv3DgFjqwOTu2xxUDri9oMspLWEj0Wjj6z7lyrJ8unmOJVBOy3vqX52GRuxiW3Q5LA+4VRaT9iIZI7z8ltYNIWqGRkjHVG0xwcCXDiO5SFF1Cho7l1CKSpJ9L2sx6zCrfXN3dXXJ1JE/+D052QB9p3Ofh/wCVPrtUGktlTUj0o4nOb243e1U+8lzi478leDppj5U6cMNB/VtfUty7/ItBHfbqOor6tlNTRl8jz6usqcW3RNFGwOrZnzSc7Wea35+5cuTmgZDbH1zmjxkzi1p6Gj/XPqClKnR3RzDPDRxGJjrSltSe5Lhs4337RKRoTpGxkYFO8HpEhWlvWijHE6a2SukIGfFPxk9hU4Re7idHsuxEHF0lHpWx+HqV1mUq5rmOLXAhwOCDzKfcnt2dU0z7dO7L4RtRk87eju+PUtNyh0TKa7tqIwAKhm0R+UNx+CwNIVBptQ0jg7Ae/YPXtbviufZfKpk+bqk3svqvpT4+TMj2otRajVl1+irU6Rh+vkOxH1HnPd8lt1X3KTUmS7RUwPmxR5x1nefZhdA0hx0sFgJ1IO0nsXW/wuY4q7IvI90j3Pe4uc45JJ3kqR6c0pPcom1VTIaend6O7LnDq6O1arTtELheaalcDsOfl3YN59gVtNa1rQ1oAaBgAcwWlaMZHTx7lXxG2Kdrc309ReTsaGPSFka0B0MshHO6Qg+zC6azRlqlZ9Q6WndzEHaHeD81JUW9yyPLpR1XRj3W8d5S7Kmv1mq7RUBk4Do3ehI3g5cLDcpbXcY6mMnZBw9v3m84VlanomV1kqYnNy5rC9nU4DP+neqmIwSOhc5zzLnk+MjKg9j2x5q3D88DIndF0QyMmhZLG4OY9oc0jnBXJ/oHsWk0PUOn07BtHJjJZ7cj2ELdv9A9i6jg8QsThoVl/Ek+9GJ7Cl5PTPavrZJBEYWudsOIJbncSOHvK+Seme1SDQVvZW3jxsrQ6Onbt4PAu5vn3Li2Cw08XiI0Ke+Tt7+Bm3IybHo2oqomz10hp2OGQwDLyPgt63RloDcE1BPTtj5KRouq4XRrLqEFF01J83t/DuMesyv9R6SdQ0zquildNEwZexw85o6esKKK6pGNkjcx4y1wII6QqarI/E1UsWc7Dy1aXpVlFHAVIVKCtGV9nJr3uWi7lhcn1a6qsxgkOXU7tkfmnh8VJFAuTKXFwqoM+lEHY7CB8VPVuujeIdfLablvWzudl4WKS3hERe6QEREBF9bNP0pY38zanf8ArM+Sg96/HNb/AGiT94qea9zHR0VRj+KqQSejcT8FA7yc3esP/wA7/wB4rl+la1cTUXNxf9tvQyRJ9ye/zf8A8V3uCkSi/JtJtWWZh+xOfUWhShbzkMlLLaLX8qKPeF538LmybFbZ9RRsGJWOpJj1tO0z2F3qXohQTl6sn05yX3WNjNqakaKuLdkgx73fs7Q717CIPJmkbq+x6otl3YSDSVUcpxzgOBI7xkL3ZFIyWJksbg5j2hzSOcHgV+fy9ZaV1gI/B6bqF0n8Iorc+nyTv8az6tme07J71LIR535Wrz9Pco16uLXbUZqXRRHO7YZ5jSO0NB71dHgk2XxFgut+kZh1XO2niJ+6wZJHaXfsrzcSXOJJySV7b5KbL+D/ACeWW2FgZK2mbJMP/kf57va4juRhHlzl2sv0Hyn3eFjNmGpk8rixziTzj+1tDuVl+CLecw3rT8jvRLKuIZ6fMf8A5Fx8Lqy7rLqGNv3qOY4/vs/zqu+QC8/Q3KlanOdsxVjjSSde2MN/a2U4Av3wj7z9E8l1bE1+zLcJGUrOwnad+y0jvXkRXt4XN58bd7PYY37oIXVMoHS87LfUGn1qp+TyynUOtrRZ9naZUVLRL+jBy/8AZBRbgz1vyOWT6A5NrNQuZszOgE8wPHbk88g9mQO5S5fGgNaGtAAAwAOZfVUk8Tcrxzynaj//AKEv7xVjeCIxp1NepCBtCja0dhePkFAOWqmfS8qmoY5BvdVukHY8Bw9hUw8E+uZT6/rKJ5ANVQODMni5rmux6tr1K3Agu3lK05qS+Pp32PWs2n42MLZImM3SHPpbQII6F5C1NBPS6judLVVZrJ4auWOWoJJMrg8gvyek7+9eu+Unk1s+uqmlqblXXGmkpmGNgp5GhpBOd4cDv6wvPWqORzWlvv8AV0lss1TX0TZT5PUMc07cefNJ3jBxx4b8ogyC2O7XKyXGO42msmo6qPOzLG7BGRghb+48o+t7jQT0FbqKrnpqhhjljdjDmkYIO5T3k45CbzX1wqdYRut1AzP1DJWmaU83DIaO3f1c6sX/ANBNB9F0/wDsj/tS6B5RXr3wbnOdyQ2raJOJJwM9HjXLA/8AQTQfRdP/ALI/7VP9I6ft+l7BT2S1iUUkBcWeNftO85xccntJUNg2yIsW41sVFEx8h9OQRjtJWOpUjTi5SdkiTSaYqC7UV5g2iW+NLgOjDiD7wpKoVoSUTX+4zA5Egc71uBU1XjaPVXVwWt/VL/JsmW8rTlAcXajlB4Na0D9UFfNAtDtSQEgea1xH6pXbyiR7F/28fxkTXfD4LF0VMIdSUpOMOJb6wQPaVoFT5M/vP/mf9xf+EtFERdbMYREQFN3BgjrpmAYDXke1Svkx/lFZ+YPeotdPxlU/pXe9Snkx/lFZ+YPeuQ5ArZxTS5vyZlluJyo7yhfzf/xW+4qRKO8oX83/APFb7iuk559nVvusxx3lbK2dLNDdP0QH9Xn1nKqZW1pn8QUX6ILSdCV/vdT7vqi89xsURF0sxmo1k4t01WEHBw0ftBVWrY1VF43T1a3fuj2vUQfgqnXM9Nk/0yD4avqzJDcWvpIBunaMDHoE+0rA1fqI2rZpqVrXVLxkk7wwfNZGh5hNpun4ZYXMPVvJ9xCV2mLbWVUlTUGd0khyTtj5LapLF1sqpRwLSk4x2t7lbh08Cuy+0g7tTXtxJNe/uAHuC4/hJev+ek9amn4HWfon/XHyT8DrP0T/AK4+S1p5Bnr31v75FtZEAuNxrLgWGsndKWZ2c82ePuX2x7r1Rf2iP94KffgdZ+if9cfJdlPpS0wVEc8Ym243h7cvHEHI5lihormbrRq1JJu6bbbb2dg1kb1VfrhxdqaqyOGyP2QrQVa8oERj1HK48JGNcPUB8F72mkW8BFr+ZeTKw3nPk7aDf8nmicQrCrKmKkpZKmd2zHG3Liq30JMIdRwAnAkDmew49uFYV1t8FypvJ6h0gj2tohjsZ7Vj0UnP/Zc/gpOSbtfdeytcmW8gNz1ddaiocaWXyaHPmta0E46yQsT8JL1/z0imf4HWfon/AFx8k/A6z9E/64+S82rkefVZOUq21/1NeCQvEhTtRXlzS11dIQRg71qjvOSrK/A6z9E/64+SfgdZ/uz/AK4+S+Wrotm1a3xZqVucm/NE6yOPJ3+ID+md7mqRP9A9ixbVb6e2Upp6YODC7a84534HyWU/0D2Lf8tw88Ng6dGe+Ksyj3lLyeme1TPkwA2q48+Gf5lDJPTPappyYca7sZ/mXL9GPtWl2/4syS3E1REXXzEFT13/ABrVfpne9XCqeu/41qv0zvetF04/dUet+heBvuTT8ez/ANld+81WGq85NPx7P/ZXfvNVhr0tEPs1dbIlvCIi2gqEREBpdbQmbTtRsjJYWv8AUd/sJVa1z/G1T5fv+ce071b1dAKmjmp3cJY3MPeMKnZ2Ojmex4Ic0kEHmXONNaLjWp1OElb/AE3/APIyQJhyZVGJqumLvSa17R2HB94U4VWaOrBR3+ne44Y8+Ld2Hd78epWmvd0QxKq5f8PjBtd+31KyW0LhPFHPBJBK0PjkaWPaeBBGCFzRbUVPCOr7RJYdUXKzyg5pKl8QJ52g7j3jB71tqPVstPyYV2jxt/wm4x1OebYDTtD9ZsZ9amvhVWLyDXVPeY2YiudOC44/pI/NP7OwqfVyCR8mVlOode2e0lu1HNUtMox/Rt85/wCyCvcC81+CXYzUajud/kYdijgEERPDbkO8jsa0/rL0oqsIhHLnZfpzkwu8DW7U1PH5VFu35j8447W7Q7145o6iWkrIaqB2xLDI2RjuhwOQV77mjZNE+KRocx7S1zTwIPELwrrO0SWDVdzs0gINJUvjaTztB8094we9SgzP5TtS/hbrStvjGvZFNsNiY7i1rWgY9hPerF8E2yeVaquN9kZllBTiKMkf0kh4j+613rVKL1z4N9i+huTKlqJGbM9ykdVv6dk+az9loPej3AspERVJPNfhYabkptQUWp4Yz4isjFPO4DhKzhntb+4VUmlL3Wac1FRXugIE9JKHtB4OHAtPUQSO9e2NY6et+qdO1VkuTCYKhuA8elG4ei9vWD8l431/oy9aLvT7fdICYySYKlo+rnb0tPT0jiFZMg9f6E1hZdY2aO42mpaXbI8dTucPGQO+64fHgVIF4Gtlxr7XVtq7bW1FHUM9GSGQscO8Ka0PLHyiUkYjbqB0rRw8dTxvPrLclRYXPYipvwgeU9lioDp7Ttfi8SuHj5oXb6VgOcZ5nnhjmGekKk71ypa9u8LoarUdUyJwwWwBsOR2sAKhrnOc4ucS5xOSTxKlIXJY3lI16XADVV1JJ3Dx5XrvQcF0ptHWuO91MtTcjTtfUvlOXbbvOIPZnHcvPvg+8mNVd7pTaovdM6K10zhJTRyDBqXjgcfcB355+HSvTqhhBV3qK6OrbUCwkBta8tPt/wAwUn1XdhQRGGN+JDC95xzZ81vtOf7qr2odi2U8ed5kfIR2ho/yrRNKs0Svhqb3J37429TJFEn5MYyZ6yXBw1rW+sn5KcKNcnVMYbI6c8ZpCR2Dd78qSr3tG6Lo5ZST4q/e7+RWW8iPKTQmSjgrmA/VHYf2HgfX71BYZHRSslYcOYQ4HoIVyVUEVVTSU8zdqORpa4KrNRWaotFWWPBdC4/VyY3OHzWp6XZXUp1/02mvldr9DWzx8y8XwLG0/dYLtQsmjc0SgYlZne0/JbFUzTVE9NKJaeV8Txwc12Cto3VF8bgCvdgdLGn4L7MFppTVJRxMHrLirbena1YhwLSRV9b9a18UgFZHHOznIGy72bvYprabjS3SkFTSvy3g5p4tPQVsuXZ5g8xerRl83J7H+PYVaaKpuv4zqv0rvepTyY/yis/MHvUWu340qv0zvepTyY/yis/MHvXOch+2IdcvJmSW4nKjvKF/N/8AxW+4qRKO8oX83/8AFb7iukZ59nVvusxx3lbK2tM/iCi/RBVKrb01+IKL9C1aVoT/AMVU+76ovPcbBERdKMZxlY2WJ8bxlr2lpHUVUF1pJKG4TUsmdqN5Gekcx71cKjetLAbnCKulaPKoxgt/rB0dq1bSnKZ47DqpSV5w4c09/aWi7Ec0RfGW2pdS1RxTTH0vuO6exWNG9kjA+NzXtcMhwOQVS8sb4nlkjHMcDggjBCy6C63ChGKWrljH3Qd3q4LV8k0nll9P9Hrx1ordbeujpLONy3lwmljhidLK9rGNGXOccAKtPwsvmzjysdvi2/Ja6vudfXY8rqpJQOYnd6uC9yvpthVD9lTk302S82RqM3Go9T1dRcXfR9TLDTsGy3ZcRtdZXZpSuu9xvcEL66odE07cgMhxgfPcO9RunhlqJmwwsc97jhrQMkqzNI2QWijLpcGpl3vP3R0Lw8lWOzXH/FnN6qd5bWl1Lr3W5EuyRu1DuUqhc+CC4MbnY+rk3cx3j4+tTFdVXBFVU0lPM3ajkbsuC6DmuBWPwk6D3vd1raiidmU7TzPgnZNE4texwc09BCtPT15prvStexzWzgfWRE7wekdSr7UVkqbRVFrml8Dj9XIBuI6D0FayKSSJ4fE9zHDgWnBC5llmZ4nIsRKnUjs4xfmvzZoyNXLoRVbBqi9xDArXOA+80O9pC+VOpr1O0tdXPaD9wBvtC2z9dcFq31JX7PcpqMmesL7FbaN9PBKDWSDDQ072DpPR1KDfT14z+MKn/qFa97nPcXPcXOPElb/SWn5blUtqKhhbSMOXEj0+oLVsRmePzrGKNC8b7Ek3sXN+rL2SRNtLCrNlgkrZXyTSjbJeckA8PZv71s3+gexfQAAABgDgF8f6B7F1PD0fgUY073srXfHpMRS8npntU05MP/zj+Z/mULk9M9qmvJh6Fd/c/wAy5Rov9q0+3/FmWW4miIi68Ygqeu/41q/0zverhVP3j8bVf6Z/vK0XTj91R636F4G95NPx7P8A2V37zVYarzk0/Hs/9ld+81WGvS0Q+zV1siW8IiLaCoREQBVjrmiNJfpXBuGT/WN3dPH25VnKOa+t3llo8ojbmWmO1/dPH4HuWu6T4F4vAScfqh8y7N/gWi7MrhpLXAjiFbWnq8XK0QVOcvLdmT84cfn3qpFKeT66+S15oJXYiqD5ueZ/N6+HqWk6K5isJjPhzfyz2dvD27S0ldFhIiLrBjI5ygaNs+trKLZd2yN2HbcM0RAfE7hkZ3doKq0eDja/GAnU9WWZ3gUrc47dr4K9US4NFobSlp0dYmWi0RvEQcXySSHL5Xni5x6dwHct6iIAq45S+SGw61uf0s6qnt1wc0NkliaHNlA3AuaecDdkEKx0QFJWrwdrFT10c1ffaysgYcuhbEI9vqLsnd2K6aWCGlpoqanjbFDEwMjY0YDWgYAHVhdiIAiIgCwr3aLZe7e+33ahgraV/GOVuRnpHQesb1mogKT1L4PNiq5XS2K71VtzvEUrPHsHUDkO9ZKi03g56gH8Tf7Y/wDOa9vwK9KopuDzhReDldnSN8t1JRRM+0YoHPPt2VYejORTR2n5Y6qqilvFWw5D6vHiwekRjd68qzES4PjQGtDWgAAYAHMvksjIonyyODWMaXOJ5gFyUX5QbmKa3ihjd9bUb3Y5mD5n3FfDmONhgsNOvLgu98F3kpXIbe7lJcK6eZ2QJH5AJ4AbgFgxNfNJHE0FxJ2Wjv4LgpJoC3Gru4qXtzFTDa7Xc3z7lx3DUquZYuNNu8pvb5t+bMu5E/tlM2jt8FK3+jYGk9J5z61kIi7ZThGnFQjuWwwhdVVTwVULoaiJssbuLXDK7UUyipJxkrpgiVw0RSSOLqKpfB+S8bQ9f/lYH4DVe1/LIMd/yU8ReDV0XyyrLW+HbqbXhctrMh9DoaBjg6srHSD7sbce0/JSi30VLQQCCkhbEwcccT1k86yEX34LKcHgdtCmk+e9972kNtlO3X8Z1P6V3vUp5Mf5RWfmD3qK3Ih1wqHDgZHH2qVcmP8AH1n5rfeuZ5Btzin1y8mZJbicrX3+2Nu1B5I6UxDaDtoNz0/NbBF1ivRhXpunUV4vYzEQ78BYP/2D/wDpf6qVW+mFHQw0odtiJgaHYxnC70Xx4LKcHgZOeHhqt7N79WS22ERF6JAREQGuu1kt1zGamAeM5pGbnf696jdToXzs01eNnoezf6x8lNUXlYzJMDjJa1Wmr81sfhv7SU2iB/gNVf8AOQ+35LIpdCtDs1Vdlv3Y2b/Wfkpoi+KGiuWRd/h37X7k6zMC1Wi32xuKSANceL3b3HvWeiL3aNGnQgoU4pJcFsKhERZQcJ4Yp4nRTRtkjcMFrhkFRq46Lt87i+llkpnHm9Jvz9qlCL4sZl2FxqtXgpeffvJTaIG/QtUPQrYXdoI+CR6Fqj/GVsLetoJ+SniLyP1Tyy99R979ydZkctmj7ZSuD5y+qeOZ25vqUiY1rGhjGhrQMAAYAX1F7OEwGGwcdWhBR/PF72Q3cIRkEdKIvrIIedCwk5+kH/8AS/1W503Y2WUThlQZvG7OctxjGevrW3ReThsjwGFqqrRp2kuN36sm7CIi9YgKJ1eioaiqlnNc5pkeXY8Xwye1SxF8WNy7DY5JYiOtbdtfoSnY0GndNR2aufVMqjKXRmPZLMcSDnj1LfoiyYTB0cHT+FQjaPb6kN3CIi+kBERAF8c1rmlrgC0jBB5wvqICqNT2x9ruskOD4px2oj0tP+8LWNcWuDmkgg5BCtLVdoF2tpYwDyiPzoj09I7/AJKrpGOjkdG9pa5pwQeYrj+kOUvLsU9VfJLavbs8rGWLuWfpK8tutvAkcPKYhiQdPQ5bpU/aK+e21zKqnOHNO8czhzgq07Ncqa6UTamnd1PaeLD0Fbxo3nix1JUar/aR8Vz6+feUkrGaiItoKhERAEREAREQBERAEREAREQBEWDe7pTWqidUTnJ4MYOLz0LHWrQowdSo7Jb2BernTWqidUTu38GMHF56FVl0rp7jWyVU7sveeHMBzALnebnU3SsdUVDs8zWjg0dAWEuTZ/ns8zqasNlNblz6X6cjLFWOUbHSSNYwEuccADnKtbTNsFrtMdOQPGu8+U/lHm7uCjPJ/ZS+QXWpZ5jTiEHnP3u739inK2fRDKHRpvGVVtl9PVz7fLrKyfAIiLdihotcS1lNZxU0c74nRyDbLTjccj34UFGoLxnfXz/rlWjW00dZSS00wyyRpaerrVT3m21FrrX087eB81w4OHSFz7S+liqFaOIpTkoNWdm7J/ii8bFnaeuMdztcM7Xh0gaGyjnDuf5rYKnbfX1dvm8dSTuidz44HtHOpBBre5sbiSGnk6y0g+wr68u0xw7pKOKTUlxW1Pp5hx5FhLWalucVrtkkpeBK4FsTecu6e5Q+o1tdHtxFFTxdYaSfaVHq6sqq2YzVUz5Xnncf94Vcy0xofCcMKm5Pi9iXTzCjzOknJJU+5NaV0dvqKpwx414a3rDc7/b7FDrLbai6VraeBvHe53M0dJVrUFLFRUcVLCMMjbgdfWvM0Oy6dTEPFyXyxul0t7PBEzfA71odc3musloiqbdT0VRUzVLII46upEDHF2cAOPPnGAt8q68IBodpG2tNUaQG80o8eCAYvOPn5O7dx7l0sxi4az1tYaR101JoumhtUJHlM1LcWySRNJxtBmPOwSNysSN7ZI2yMOWuAIPSCqR1vZaGfS1eKrlglro44jKKaWpheyZzd7WlrTlwJAGFbWj66puelbVca2n8mqamkjlliAIDXFoJGDwHUgIq3VOua2pqzZdK2ivpIKmSATNvDcksdjDhs+a7hkcy3mlLjq6srJWah05SWuBseY5Ia4TFzsjdgAY3Z39Sq3Q9nstbLqCor9d3SxzfTtY3yWmuzaZpG36Wyd+T09StHQ8NoooZ6O3aqqb89x8Y41NxbVSMHDdjgFIOOsdUSaYuFtlrqNpslVJ4iorQ85pZD6Bc3HoHhnO71L5V6qfJrim0tZ6RlbKyPx9ynL8MpIj6I3A5e7mHRv4LeXmgpLpaaq3V8DZ6WoicyWN3Agj/AHvUE8Hahpqfk1pqyNmamsmlfUSuOXSFsjmNyegNaBjt6VAJtqO82/T9lqbvdJvE0tO3aecZJPANA5ySQAOtQx2uNYRUpu9RydVkdmDdtzhWMdVNj47Zhxnh9nOVl8tNHVz6WpK6lp5KttruVPX1FNGMumijdlwA59xz3LLn5SNEx2I3cahoZISzabEyUGZxx6Pi/S2urCAkNkudFebTTXS3TiekqYxJE8c4PuI4EcxWBDqSjOrKjTVUx9LWNjbNSmT0aqMjziw85acgjjuz2afkYt1bbdA0rK6ndSyVE01S2mcMGBkjy5rMc24g461H5bOzVWv9aWerqZ4XULqGqt1TG7z6OZ0Jy9nRnZbkcDjvQE0j1C5/KFNpXyVuzHa213j9veSZCzZ2cdWc5WJrK/3y23ahtlhtduuNTVRvk8VUVwgfhuMloIOR0lRHQUuon8s1ZFqakZFXQWEQePi/i6trZwRK3oztbxzEHhwW11fWUlDyy6XqK2qgpYRb6sGSaQMbk7POdyAy7dre50l6pLTrHTb7HJXP8XSVUdS2enkk5mFwxsuPMDxU4VZcqV4tep4LfpCw1sFxutXXQyh1K8SCljjeHOlc4bm4AxxycqzUAUX1rfr3a7jbbfYrbb7hVVrZXCGprhA87GyTsAg7W4knowpQqp5YaWlreUXRVNW3ios8Do64uq4KkQPjwxhGHncM8OvKA3Tb3ynlwB0PawM7z9Lt/wC1TS4zy0tuqamGmfVSxROeyBhw6QgZDR1ngq+stm01brrTVw5ULtWGF4cIKm+xvjk6nN5wpfruR8WiL7LG4te23VDmuacEHxbt4KA56Z1FbdRWNt2tkpfHgh8bhh8TxxY8czgurQN+dqfSFuvz6ZtM6sjLzEH7QbhxGM4GeCr622e90elrRrrS+1U3KqtkD7vQOdhtxBjGXjol4nPP68ybkJBHJPYmOBDmxyNII3giV4wgMduqtcVtXWiyaWtFwpKaqkpxM27tByw4w4bPmuxjI5sreaVuOrqyslj1DpyktcAjzHJDXCYudkebgAY3Z39SqzRlms1fU6knr9d3SxS/T9Y3yamuradpAf6Wyec9PUrN0FS2i3R1NJb9W1V/kkIkd5VcG1L4wN27HAb1IMfX+qbxZL3Y7NY7RT3KsuxnDWzVHig3xTWuO/B5ifUtLV631rbL5Z7Zd9KW2J90q208bYbltyBv2n7IbwaMklcOVq2C88oehra6traESurvr6OXxcrcRNPmu5s4x2FYQsVNyd8otuvdTU1lytt0j8gfW3CXx01HOTlp2zwY/h1dKAsvUV5t9gstTd7pN4mkpm7T3YyTzAAc5JIAHWolFqrX1fCyqtvJ6I6aQbUflt0ZFKW8xLNk7PYSsjlmoqup0nBV0tK+sFtuFPXTUzBl00UbsvaBz7t+OpYN+rtKaxoqa40Gv6q2bER2WUN0bTl+d+HsO/I7AVAJvZZrhUWuCa60UdFWuB8bBHN41rDk7g7AzuxzLRWjVjnaquem75SxW6rpmmopZPG5jqqb+sBIGC37Q5u4rH5Fq6ruXJjZa2vqpqqpkjf4yWV5c5xEjhvJ47gFpvCEtNDX6WoamoiPj4rhDCyVji1wZK7YkbkcxB3hASTQ+panVLq64QUDYLKyUxUNQ5526vZ3OkDceazO4c56lJl00NLT0NHDR0kLIaeBgjijYMBrQMABdyAIiIAiIgCIiAKH660+Zw650bMyAZmYB6Q+8Pipgi+HMcvpZhQdGr2Pk+ZKdilFn2S6VVqrBPTu3cHsPB46CpLrHTGzt3C3M83jLEObrHV1KFrkOMweKynE2lsktqa49KMidy3LLdqS60wlp34cB58ZPnNP++dZ6puhrKihqW1FNK6ORvAhT7T2rKWtDYK4tp6jhtE4Y75Lfsl0ppYtKliXqz58H7Po7uRRxsSZEBBGRvCLbioREQBERAEREAREQBF01lXTUcJlqp2RM6XHj2dKh171oTtRWuPZHDxrxv7h815mYZvhMvjetLbyW1vs99hKTZJr5eKO0wbdQ8GQjzIwfOd8h1qs71dKm61jqiod1MYODR0BYtTPNUzOlnkdI9xyXOOSutczzrP62ZvVXywW5er/ADsMijYLd6Uscl2rNp4LaWM5kd09Q61w03Yqi71A3GOmafrJCPYOkqzaGlgoqVlNTRhkbBgD4nrX2aO6PSxs1Xrq1Nf3fhz7uqJSsdkMbIYmxRNDGMAa1o4ALkiLqSSSsjGERFICxbnb6S4weJq4RI3mPO09RWUipUpwqxcJq6fBgg9w0NIHF1DVscOZsowR3jj7Fq5NIXtjsNp2PHSJG/EqzEWtV9Ecuqu8U49T97ltZlZxaRvb3YdTtYOkyN+BW1t2h5NoOr6toHOyIZJ7z8lN0Shojl1KV5Jy637WGszFttBSW6DxNJC2NvOedx6SVlIi2WnThSioQVkuCKhYV6tNsvVH5HdqCnrqbaD/ABU7A5u0OBwe1ZqK4I5TaD0XTTsng0rZ2SsOWu8kZkHpG5SNEQEbqdB6LqamWpqNL2mWaV5fI91M0lzickk44krNsel9O2OofUWey0NBNIzYe+CEMLm5zg45sgLbogBGRgrGtdvobXRMordSQ0lNGSWRRNDWtySTgDrJKyUQBalmmNNsuH0gzT9qbWbW348UkYftdO1jOetbZEAWNT0FFT1tTWwUsMdTVbPj5WsAdLsjDdo8+BuCyUQHExxmVspY0yNBaHY3gHGRnuHqWsvum7BfZIpLzZ6K4PhBEZqIQ8tB44ytqiA19lsVlssbmWi00NA1/peTwNj2u3A3rYIiALV37TtivxhN6tFHcDBnxXlEQfsZxnGeGcD1LaIgIwOT3Q4II0pZwRw/grfkpHVU8NVSy0tTEyWCVhZJG8Za5pGCCOghdiIDqoqanoqSGkpIWQU8LBHFGwYaxoGAAOYBc4o44mlsTGsaSXENGBknJPeTlckQEcqtB6MqqmWpqNMWqWaV5fI99M0uc4nJJOOJKy7HpfTljqX1NnslDQTPZsOfBCGEtyDgkc2QFuEQGNUUFFUV1NXT0sMlVS7fk8rmAui2hh2yebIGClzt9DdKGShuNJDV00mNuKZgc12DkZB61kogPjGtYwMaMNaMAdAWhuGidIV9S6prNM2iaZ5y6R1IzaceknG9b9EBjWugorXQxUFupYaWliBEcUTQ1rcnJwB1kpcrfQ3KnFPcKWGpia9sgZK0OAc05B7QVkogCIiAIiIAiIgCIiAIiIAotqjSkVZtVVvDYqji6Pg1/Z0FSlF8WOwFDHUnSrxuvFdKJTsUzVU81LM6GoidHI04LXDBXUrdu9pobpFsVUQLgPNe3c5veoLe9JV9EXSUoNVD+QPOHaPkuaZrovisE3OkteHRvXWvVeBdSTMWy6kuNsDY2yeOgH9G/eB2dCmVq1ba6wBszzSynmk9H1/PCrV7XMcWuaQRzFfF82X6RY7A2jGWtHk9vdxRLimXTG9kjA+N7XtPAtOQVyVO0dfWUbtqmqZYj+S4jPatxTawvMTQHSxzY/rGD4YW24bTXCzX7aDi+izXo/ArqMspFAma5rAPPpICerI+K+u11V/Zo4B25PxX3/rbllvrfcyNVk8RVzPrS7SZ2BBEObZZv9uVq6y+XWr3T10xHQDsj1Dcvkr6aYKC/ZxlJ9iX57BqMsy4Xe20APlNXG1w+wDl3qCi131s45jtsGyOHjJN57hw96hhJPE5Xxa3jtLsbiE40rQXRtff7JFlFHfW1lTWzGWqnfK887iuhFsrRZLjc3DyeAhmd8jtzR3rW6dOtiqlopyk+1ljWqUaa0pPWltTXh0FPxDftP8AkOtSSw6WobdsyzAVNQPtOHmt7B8Vv1vWT6IarVXG/wCn3fou8o5cjrpoIaaBsMEbY42jAaF2Ii32MVFJJWRQIiKQEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAYFzs9uuI/hVM1z/vt3O9YUZuOhuLqCrHUyUfEfJTVF5WNyXA43bVpq/NbH3r1JTaKsrdM3mlyXUb5Gjnj873b1q5YJonbEsT2O6HDBVzrjIxkg2Xsa4dDhla5iNCKMnejVa61f2La5S5BHEFfFb0tptcpzJb6Vx6fFBdLtP2ZxybfD3ZC86WhGJX01IvvXuTrlTr7su+6VbTLHaGcLdTnHSzPvWVDS0sP8TTQx/mMAV6ehFZ/XVS6k37DXKopbRc6o4gop3Dp2Dj18Fu6DRVxmINVLFTt6M7TvUN3tVhIvWw2hmDpu9WTl4Lw2+JVzZorXpW1URD3xmpkHPLvHq4evK3jWta0NaAAOAA4L6i2fC4LD4SOrRgoro/O0re4REX0gIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiA+ZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiAZTKIgGUyiIBlMoiA//2Q==";
 const { useState, useRef, useEffect, useCallback } = React;
 
-const PHOTO_CATS = [
-  { key: "extra",           label: "Photos supplémentaires / à reclasser" },
-  { key: "vue_generale",    label: "1. Vue générale du chantier" },
-  { key: "toiture",         label: "2. État / photos de la toiture" },
-  { key: "cablage",         label: "3. Câblage DC & AC" },
-  { key: "strings_design",  label: "4. Design des strings", hiRes: true },
-  { key: "onduleur",        label: "5. Emplacement de l'onduleur" },
-  { key: "compteur",        label: "6. Compteur électrique & disjoncteur général", hiRes: true },
-  { key: "tgbt",            label: "7. Tableau(x) TGBT", hiRes: true },
-  { key: "td",              label: "8. TD", hasNote: true, hiRes: true },
-  { key: "schema_elec",     label: "9. Schéma électrique client", hiRes: true, hasNote: true },
-  // kept for retrocompatibility (old saves), not rendered directly
-  { key: "dc_extra",        label: "10. Photos DC supplémentaires / à reclasser", _legacy: true },
-  { key: "ac_extra",        label: "11. Photos AC supplémentaires / à reclasser", hiRes: true, _legacy: true },
-];
+// Clés fixes — ne jamais modifier pour rétrocompatibilité
+const PHOTO_CATS_KEYS = ["extra","vue_generale","toiture","cablage","strings_design","onduleur","compteur","tgbt","td","schema_elec","dc_extra","ac_extra"];
+
+// Labels adaptés selon le type d'installation (mêmes clés = rétrocompat parfaite)
+function getPhotoCats(installType) {
+  var isBR = installType === "br" || installType === "pvbr";
+  var isBoth = installType === "pvbr";
+  return [
+    { key: "extra",          label: "Photos supplémentaires / à reclasser" },
+    { key: "vue_generale",   label: "1. Vue générale du chantier" },
+    { key: "toiture",        label: isBR && !isBoth ? "2. Photos du site / emplacement" : "2. État / photos de la toiture" },
+    { key: "cablage",        label: isBR ? (isBoth ? "3. Câblage DC & AC / Fourreau & tranchée" : "3. Câblage / Fourreau & tranchée") : "3. Câblage DC & AC" },
+    { key: "strings_design", label: "4. Design des strings", hiRes: true },
+    { key: "onduleur",       label: isBR ? (isBoth ? "5. Emplacement onduleur / borne de recharge" : "5. Emplacement borne de recharge") : "5. Emplacement de l'onduleur" },
+    { key: "compteur",       label: "6. Compteur électrique & disjoncteur général", hiRes: true },
+    { key: "tgbt",           label: "7. Tableau(x) TGBT", hiRes: true },
+    { key: "td",             label: "8. TD", hasNote: true, hiRes: true },
+    { key: "schema_elec",    label: "9. Schéma électrique client", hiRes: true, hasNote: true },
+    { key: "dc_extra",       label: "Legacy DC", _legacy: true },
+    { key: "ac_extra",       label: "Legacy AC", hiRes: true, _legacy: true },
+  ];
+}
+// PHOTO_CATS constant pour initialisation state (rétrocompat — mêmes clés)
+const PHOTO_CATS = getPhotoCats("pv");
+
+// ── BR : structure d'une installation borne de recharge ──────────────────────
+function makeEmptyBRInst() {
+  return {
+    borne:        { modele: "", type: "simple", puissance: "22 kW", autrePuissance: "", cable: "integre" },
+    cablageAC:    { distance: "< 5m" },
+    cableRecharge: null,
+    coffret:      { inclus: null, type: null },
+    cableInternet: "",
+    tubePVC:      "",
+    rfid:         { inclus: null, qty: "1" },
+    booster:      null,
+    poteau:       { inclus: null, modele: "" },
+    dalle:        { inclus: null, modele: "" },
+    tranchee:     { inclus: null, metres: "", revetement: null, autreRevetement: "" },
+    fourreau:     { inclus: null, metres: "" },
+    prisesCPL:    null,
+    alarme:       { inclus: null, metres: "" },
+  };
+}
 
 const PM_DATA = {
   "Alexander Vos":           { tel: "+32 475 86 92 76", email: "alexander.vos@we-green.be" },
@@ -1405,49 +1434,96 @@ function PreviewDoc({ data }) {
         </div>
       </div>
 
-            {data.installations.map(function(inst, instIdx) {
-        var t = inst.tech;
-        var strs = inst.strings;
+      {(data.sites || []).map(function(site, siteIdx) {
+        var elec = site.electrical || {};
         var tv2 = function(v){ return v || "—"; };
         return (
-          <div key={instIdx} style={{ marginBottom: 18, pageBreakBefore: instIdx === 0 ? "always" : "avoid", breakBefore: instIdx === 0 ? "always" : "avoid" }}>
-            {data.installations.length > 1 && (
-              <div style={{ background: GREEN, color: "#fff", borderRadius: 6, padding: "3px 14px", fontWeight: 700, fontSize: 13, marginBottom: 10, display: "inline-block" }}>
-                Installation {instIdx + 1}
+          <div key={siteIdx}>
+            {(data.sites||[]).length > 1 && (
+              <div style={{ background: "#555", color: "#fff", borderRadius: 6, padding: "4px 14px", fontWeight: 700, fontSize: 14, marginBottom: 12, display: "inline-block" }}>
+                📍 Site {siteIdx + 1}
               </div>
             )}
-            <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
-            <table className="preview-table"><tbody>
-              <tr><th>Panneaux</th><td>{[t.panneaux.type, t.panneaux.nbr && t.panneaux.nbr + " pcs", t.panneaux.kWc && t.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
-              {t.panneaux2 && t.panneaux2.active && (t.panneaux2.type || t.panneaux2.nbr) && (
-                <tr><th>Panneaux 2</th><td>{[t.panneaux2.type, t.panneaux2.nbr && t.panneaux2.nbr + " pcs", t.panneaux2.kWc && t.panneaux2.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
-              )}
-              <tr><th>Toiture</th><td>{[t.toiture.main, t.toiture.main === "Plat" && t.toiture.orientPlat, t.toiture.main === "Incliné" && t.toiture.sub.join(", ")].filter(Boolean).join(" — ") || "—"}{t.toiture2 && t.toiture2.active && t.toiture2.main ? (" + " + [t.toiture2.main, t.toiture2.main === "Plat" && t.toiture2.orientPlat, t.toiture2.main === "Incliné" && (t.toiture2.sub||[]).join(", ")].filter(Boolean).join(" — ")) : ""}</td></tr>
-              {t.onduleurs.map(function(o, i) { return <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>; })}
-              <tr><th>Energy meter</th><td>{tv2(t.energyMeter)}</td></tr>
-              <tr><th>Batterie</th><td>{t.batterie.inclus === "OUI" ? [t.batterie.qty && t.batterie.qty + "×", t.batterie.kwh && t.batterie.kwh + " kWh", t.batterie.type].filter(Boolean).join(" ") || "OUI" : tv2(t.batterie.inclus)}</td></tr>
-              <tr><th>Borne recharge</th><td>{t.borne.inclus === "OUI" ? [t.borne.qty && t.borne.qty + "×", t.borne.type].filter(Boolean).join(" ") || "OUI" : tv2(t.borne.inclus)}</td></tr>
-              {t.accessoires && <tr><th>Accessoires</th><td>{t.accessoires}</td></tr>}
-              {t.ems && t.ems.inclus === "OUI" && <tr><th>EMS</th><td>{t.ems.modele || "OUI"}</td></tr>}
-              {t.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
-              {t.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
-              <tr><th>Réseau</th><td>{tv2(t.reseau)}</td></tr>
-              <tr><th>Disjoncteur général</th><td>{t.amperageDisj ? t.amperageDisj + " A" : "—"}</td></tr>
-              <tr><th>Compteur réseau</th><td>{[t.compteur.serie && "N° " + t.compteur.serie, t.compteur.ean && "EAN: " + t.compteur.ean].filter(Boolean).join(" — ") || "—"}</td></tr>
-              <tr><th>Branchement onduleur</th><td>{tv2(t.branchementOnduleur)}</td></tr>
-              <tr><th>Distances</th><td>{[t.distances.onduleurTGBT && "Ond→TGBT: " + t.distances.onduleurTGBT + "m", t.distances.onduleurTD && "Ond→TD: " + t.distances.onduleurTD + "m", t.distances.borneTGBT && "Borne→TGBT: " + t.distances.borneTGBT + "m"].filter(Boolean).join(" | ") || "—"}</td></tr>
-            </tbody></table>
-            {strs.length > 0 && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
-                <table className="preview-table">
-                  <thead><tr>{["String","Onduleur","Panneaux","Orientation"].map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
-                  <tbody>
-                    {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>STR {i+1}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
-                  </tbody>
-                </table>
+            {/* Electrical */}
+            {(elec.reseau || elec.amperageDisj || (elec.compteur && (elec.compteur.serie || elec.compteur.ean)) || elec.branchementOnduleur) && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Installation électrique</div>
+                <table className="preview-table"><tbody>
+                  {elec.reseau && <tr><th>Réseau</th><td>{elec.reseau}</td></tr>}
+                  {elec.amperageDisj && <tr><th>Disjoncteur général</th><td>{elec.amperageDisj} A</td></tr>}
+                  {elec.compteur && (elec.compteur.serie || elec.compteur.ean) && <tr><th>Compteur réseau</th><td>{[elec.compteur.serie && "N° " + elec.compteur.serie, elec.compteur.ean && "EAN: " + elec.compteur.ean].filter(Boolean).join(" — ")}</td></tr>}
+                  {elec.branchementOnduleur && <tr><th>Branchement onduleur</th><td>{elec.branchementOnduleur}</td></tr>}
+                  {elec.distances && (elec.distances.onduleurTGBT || elec.distances.onduleurTD || elec.distances.borneTGBT) && (
+                    <tr><th>Distances</th><td>{[elec.distances.onduleurTGBT && "Ond→TGBT: "+elec.distances.onduleurTGBT+"m", elec.distances.onduleurTD && "Ond→TD: "+elec.distances.onduleurTD+"m", elec.distances.borneTGBT && "Borne→TGBT: "+elec.distances.borneTGBT+"m"].filter(Boolean).join(" | ")}</td></tr>
+                  )}
+                </tbody></table>
               </div>
             )}
+            {/* PV installations */}
+            {(site.pvInstallations || []).map(function(inst, instIdx) {
+              var t = inst.tech; var strs = inst.strings;
+              return (
+                <div key={instIdx} style={{ marginBottom: 18 }}>
+                  {(site.pvInstallations||[]).length > 1 && (
+                    <div style={{ background: GREEN, color: "#fff", borderRadius: 6, padding: "3px 14px", fontWeight: 700, fontSize: 13, marginBottom: 10, display: "inline-block" }}>
+                      ⚡ PV {instIdx + 1}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Informations techniques</div>
+                  <table className="preview-table"><tbody>
+                    <tr><th>Panneaux</th><td>{[t.panneaux.type, t.panneaux.nbr && t.panneaux.nbr + " pcs", t.panneaux.kWc && t.panneaux.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
+                    {t.panneaux2 && t.panneaux2.active && (t.panneaux2.type || t.panneaux2.nbr) && (
+                      <tr><th>Panneaux 2</th><td>{[t.panneaux2.type, t.panneaux2.nbr && t.panneaux2.nbr + " pcs", t.panneaux2.kWc && t.panneaux2.kWc + " kWc"].filter(Boolean).join(" — ") || "—"}</td></tr>
+                    )}
+                    <tr><th>Toiture</th><td>{[t.toiture.main, t.toiture.main === "Plat" && t.toiture.orientPlat, t.toiture.main === "Incliné" && t.toiture.sub.join(", ")].filter(Boolean).join(" — ") || "—"}{t.toiture2 && t.toiture2.active && t.toiture2.main ? (" + " + [t.toiture2.main, t.toiture2.main === "Plat" && t.toiture2.orientPlat, t.toiture2.main === "Incliné" && (t.toiture2.sub||[]).join(", ")].filter(Boolean).join(" — ")) : ""}</td></tr>
+                    {t.onduleurs.map(function(o, i) { return <tr key={i}><th>Onduleur {i + 1}</th><td>{[o.type, o.kva && o.kva + " kVA"].filter(Boolean).join(" — ") || "—"}</td></tr>; })}
+                    <tr><th>Energy meter</th><td>{tv2(t.energyMeter)}</td></tr>
+                    <tr><th>Batterie</th><td>{t.batterie.inclus === "OUI" ? [t.batterie.qty && t.batterie.qty+"×", t.batterie.kwh && t.batterie.kwh+" kWh", t.batterie.type].filter(Boolean).join(" ") || "OUI" : tv2(t.batterie.inclus)}</td></tr>
+                    <tr><th>Borne recharge</th><td>{t.borne.inclus === "OUI" ? [t.borne.qty && t.borne.qty+"×", t.borne.type].filter(Boolean).join(" ") || "OUI" : tv2(t.borne.inclus)}</td></tr>
+                    {t.accessoires && <tr><th>Accessoires</th><td>{t.accessoires}</td></tr>}
+                    {t.ems && t.ems.inclus === "OUI" && <tr><th>EMS</th><td>{t.ems.modele || "OUI"}</td></tr>}
+                    {t.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
+                    {t.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
+                  </tbody></table>
+                  {strs && strs.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
+                      <table className="preview-table">
+                        <thead><tr>{["String","Onduleur","Panneaux","Orientation"].map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
+                        <tbody>
+                          {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>STR {i+1}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* BR installations */}
+            {(site.brInstallations || []).map(function(br, brIdx) {
+              return (
+                <div key={brIdx} style={{ marginBottom: 18 }}>
+                  {(site.brInstallations||[]).length > 1 && <div style={{ background: "#2980b9", color: "#fff", borderRadius: 6, padding: "3px 14px", fontWeight: 700, fontSize: 13, marginBottom: 10, display: "inline-block" }}>🔌 BR {brIdx + 1}</div>}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#2980b9", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>🔌 Borne de recharge</div>
+                  <table className="preview-table"><tbody>
+                    {br.borne && <tr><th>Borne</th><td>{[br.borne.modele, br.borne.type && (br.borne.type === "double" ? "Double" : "Simple"), br.borne.puissance === "autre" ? (br.borne.autrePuissance || "Autre") : br.borne.puissance, br.borne.cable === "integre" ? "Avec câble" : br.borne.cable === "sans" ? "Sans câble" : ""].filter(Boolean).join(" — ") || "—"}</td></tr>}
+                    {br.cablageAC && br.cablageAC.distance && <tr><th>Distance câblage AC</th><td>{br.cablageAC.distance}</td></tr>}
+                    {br.cableRecharge && <tr><th>Câble type B</th><td>{br.cableRecharge === "non_inclus" ? "Non inclus" : br.cableRecharge === "inclus" ? "Inclus" : "À prévoir (+120€ HTVA)"}</td></tr>}
+                    {br.coffret && br.coffret.inclus && <tr><th>Coffret électrique</th><td>{br.coffret.inclus === "OUI" ? (br.coffret.type === "interieur" ? "Intérieur" : br.coffret.type === "exterieur" ? "Extérieur" : "OUI") : "NON"}</td></tr>}
+                    {br.cableInternet && <tr><th>Câble internet</th><td>{br.cableInternet}</td></tr>}
+                    {br.tubePVC && <tr><th>Tube PVC</th><td>{br.tubePVC}</td></tr>}
+                    {br.rfid && br.rfid.inclus && <tr><th>Carte RFID</th><td>{br.rfid.inclus === "OUI" ? br.rfid.qty + " carte(s)" : "NON"}</td></tr>}
+                    {br.booster && <tr><th>Booster / Load Balancing</th><td>{br.booster}</td></tr>}
+                    {br.prisesCPL && <tr><th>Prises CPL</th><td>{br.prisesCPL}</td></tr>}
+                    {br.poteau && br.poteau.inclus === "OUI" && <tr><th>Poteau / Piédestal</th><td>OUI{br.poteau.modele ? " — "+br.poteau.modele : ""}</td></tr>}
+                    {br.dalle && br.dalle.inclus === "OUI" && <tr><th>Dalle de béton</th><td>OUI{br.dalle.modele ? " — "+br.dalle.modele : ""}</td></tr>}
+                    {br.tranchee && br.tranchee.inclus === "OUI" && <tr><th>Tranchée</th><td>{[br.tranchee.metres && br.tranchee.metres+"m", br.tranchee.revetement === "Autre" ? (br.tranchee.autreRevetement||"Autre") : br.tranchee.revetement].filter(Boolean).join(" — ")}</td></tr>}
+                    {br.fourreau && br.fourreau.inclus === "OUI" && <tr><th>Fourreau flex rouge</th><td>{br.fourreau.metres ? br.fourreau.metres+"m" : "OUI"}</td></tr>}
+                    {br.alarme && br.alarme.inclus === "OUI" && <tr><th>Alarme incendie</th><td>{br.alarme.metres ? br.alarme.metres+"m" : "OUI"}</td></tr>}
+                  </tbody></table>
+                </div>
+              );
+            })}
           </div>
         );
       })}
@@ -1466,10 +1542,10 @@ function PreviewDoc({ data }) {
         </div>
       )}
 
-      {PHOTO_CATS.some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
+      {getPhotoCats((data.sites||[]).some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").some(c => data.photos[c.key] && data.photos[c.key].length > 0) && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Photos</div>
-          {PHOTO_CATS.filter(c => (data.photos[c.key] && Array.isArray(data.photos[c.key]) && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
+          {getPhotoCats((data.sites||[]).some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(c => (data.photos[c.key] && Array.isArray(data.photos[c.key]) && data.photos[c.key].length > 0) || (c.key === "td" && data.tdNote)).map(c => (
             <div key={c.key} style={{ marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: TEXT }}>{c.label}</div>
               {c.key === "td" && data.tdNote && <div style={{ fontSize: 12, color: MUTED, padding: "4px 8px", background: "#f9f9f7", borderRadius: 4, marginBottom: 6, border: `1px solid ${BORDER}` }}>{data.tdNote}</div>}
@@ -1511,6 +1587,38 @@ function makeEmptyInst() {
     },
     strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]
   };
+}
+
+
+function makeEmptyElectrical() {
+  return {
+    reseau: null, amperageDisj: "",
+    compteur: { serie: "", ean: "" },
+    branchementOnduleur: null,
+    distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
+  };
+}
+function makeEmptyPVInst() {
+  // PV install sans les champs électriques (déplacés au niveau site)
+  return {
+    tech: {
+      panneaux: { type: "", nbr: "", kWc: "" },
+      panneaux2: { active: false, type: "", nbr: "", kWc: "" },
+      configStrings: "",
+      toiture: { main: null, sub: [], orientPlat: null, autreText: "" },
+      toiture2: { active: false, main: null, sub: [], orientPlat: null, autreText: "" },
+      onduleurs: [{ type: "", kva: "" }],
+      energyMeter: null,
+      batterie: { inclus: null, qty: "1", kwh: "", type: "" },
+      borne: { inclus: null, qty: "1", type: "" },
+      ems: { inclus: null, modele: "" },
+      compteurVert: null, greenbox: null, accessoires: "",
+    },
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]
+  };
+}
+function makeEmptySite() {
+  return { electrical: makeEmptyElectrical(), pvInstallations: [makeEmptyPVInst()], brInstallations: [] };
 }
 
 function InstallationBlock(props) {
@@ -1701,36 +1809,6 @@ function InstallationBlock(props) {
 
           <Field label="Autres accessoires" value={tech.accessoires} onChange={function(v){ setT("accessoires", v); }} placeholder="Ex: Optimiseurs, câblage spécifique…" />
 
-          <div><div style={SUBH}>Réseau électrique</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["Monophasé 230V", "Triphasé 3×230V", "Triphasé 3×400+N"].map(function(r){ return <Chip key={r} label={r} selected={tech.reseau === r} onClick={function(){ setT("reseau", tech.reseau === r ? null : r); }} />; })}
-            </div>
-          </div>
-
-          <div style={G2}>
-            <Field label="Ampérage disjoncteur général ⚠" value={tech.amperageDisj} onChange={function(v){ setT("amperageDisj", v); }} type="number" unit="A" />
-            <div />
-          </div>
-
-          <div style={G2}>
-            <Field label="Compteur réseau — N° de série (optionnel)" value={tech.compteur.serie} onChange={function(v){ setT("compteur.serie", v); }} />
-            <Field label="EAN (optionnel)" value={tech.compteur.ean} onChange={function(v){ setT("compteur.ean", v); }} />
-          </div>
-
-          <div><div style={SUBH}>Branchement de l'onduleur</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["Sur le TGBT", "Sur un tableau divisionnaire"].map(function(b){ return <Chip key={b} label={b} selected={tech.branchementOnduleur === b} onClick={function(){ setT("branchementOnduleur", tech.branchementOnduleur === b ? null : b); }} />; })}
-            </div>
-          </div>
-
-          <div><div style={SUBH}>Distances</div>
-            <div style={G3}>
-              <Field label="Onduleur → TGBT" value={tech.distances.onduleurTGBT} onChange={function(v){ setT("distances.onduleurTGBT", v); }} type="number" unit="m" />
-              <Field label="Onduleur → Tableau div." value={tech.distances.onduleurTD} onChange={function(v){ setT("distances.onduleurTD", v); }} type="number" unit="m" />
-              <Field label="Borne → TGBT" value={tech.distances.borneTGBT} onChange={function(v){ setT("distances.borneTGBT", v); }} type="number" unit="m" />
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -1754,6 +1832,243 @@ function InstallationBlock(props) {
 }
 
 
+function SiteElectricalBlock({ electrical, onSet }) {
+  function setE(path, val) {
+    onSet(path, val);
+  }
+  return (
+    <div style={CARD}>
+      <div style={SH}><span>⚡</span> Installation électrique</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <div style={SUBH}>Réseau électrique</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {["Monophasé 230V", "Triphasé 3×230V", "Triphasé 3×400+N"].map(function(r){
+              return <Chip key={r} label={r} selected={electrical.reseau === r} onClick={function(){ setE("reseau", electrical.reseau === r ? null : r); }} />;
+            })}
+          </div>
+        </div>
+        <div style={G2}>
+          <Field label="Ampérage disjoncteur général ⚠" value={electrical.amperageDisj} onChange={function(v){ setE("amperageDisj", v); }} type="number" unit="A" />
+          <div />
+        </div>
+        <div style={G2}>
+          <Field label="Compteur réseau — N° de série (optionnel)" value={electrical.compteur.serie} onChange={function(v){ setE("compteur.serie", v); }} />
+          <Field label="EAN (optionnel)" value={electrical.compteur.ean} onChange={function(v){ setE("compteur.ean", v); }} />
+        </div>
+        <div>
+          <div style={SUBH}>Branchement de l'onduleur</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {["Sur le TGBT", "Sur un tableau divisionnaire"].map(function(b){
+              return <Chip key={b} label={b} selected={electrical.branchementOnduleur === b} onClick={function(){ setE("branchementOnduleur", electrical.branchementOnduleur === b ? null : b); }} />;
+            })}
+          </div>
+        </div>
+        <div><div style={SUBH}>Distances</div>
+          <div style={G3}>
+            <Field label="Onduleur → TGBT" value={electrical.distances.onduleurTGBT} onChange={function(v){ setE("distances.onduleurTGBT", v); }} type="number" unit="m" />
+            <Field label="Onduleur → Tableau div." value={electrical.distances.onduleurTD} onChange={function(v){ setE("distances.onduleurTD", v); }} type="number" unit="m" />
+            <Field label="Borne → TGBT" value={electrical.distances.borneTGBT} onChange={function(v){ setE("distances.borneTGBT", v); }} type="number" unit="m" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
+  var BR_BLUE = "#2980b9";
+  function set(path, val) { onSet(instIdx, path, val); }
+  var BCARD = Object.assign({}, CARD, { borderColor: "#bde0f5" });
+  var BSH = Object.assign({}, SH, { color: BR_BLUE, borderBottomColor: "#bde0f5" });
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 16 }}>
+        <div style={{ background: "linear-gradient(90deg, #2980b9 0%, #3498db 100%)", color: "#fff", borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: 14, letterSpacing: "0.04em" }}>
+          🔌 Installation BR {total > 1 ? instIdx + 1 : ""}
+        </div>
+        <button onClick={function(){ onRemove(instIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>
+          Supprimer
+        </button>
+      </div>
+      <div style={BCARD}>
+        <div style={BSH}><span>🔌</span> Borne de recharge</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Borne — modèle + type + puissance + câble */}
+          <div>
+            <Field label="Modèle / Référence borne" value={inst.borne.modele} onChange={function(v){ set("borne.modele", v); }} placeholder="Ex: Wallbox Pulsar Plus, Easee, Hager…" />
+            <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ ...SUBH }}>Type</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["Simple", "Double"].map(function(t) {
+                    return <button key={t} onClick={function(){ set("borne.type", t.toLowerCase()); }}
+                      style={{ ...chipSt(inst.borne.type === t.toLowerCase()), borderColor: inst.borne.type === t.toLowerCase() ? BR_BLUE : BORDER, background: inst.borne.type === t.toLowerCase() ? "#eaf4fd" : WHITE, color: inst.borne.type === t.toLowerCase() ? BR_BLUE : MUTED }}>{t}</button>;
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...SUBH }}>Puissance</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {["22 kW", "11 kW", "7,5 kW"].map(function(p) {
+                    return <button key={p} onClick={function(){ set("borne.puissance", p); }}
+                      style={{ ...chipSt(inst.borne.puissance === p), borderColor: inst.borne.puissance === p ? BR_BLUE : BORDER, background: inst.borne.puissance === p ? "#eaf4fd" : WHITE, color: inst.borne.puissance === p ? BR_BLUE : MUTED }}>{p}</button>;
+                  })}
+                  <button onClick={function(){ set("borne.puissance", "autre"); }}
+                    style={{ ...chipSt(inst.borne.puissance === "autre"), borderColor: inst.borne.puissance === "autre" ? BR_BLUE : BORDER, background: inst.borne.puissance === "autre" ? "#eaf4fd" : WHITE, color: inst.borne.puissance === "autre" ? BR_BLUE : MUTED }}>Autre</button>
+                  {inst.borne.puissance === "autre" && (
+                    <input value={inst.borne.autrePuissance || ""} onChange={function(e){ set("borne.autrePuissance", e.target.value); }} placeholder="Ex: 3,7 kW" style={{ width: 90, fontSize: 12, padding: "3px 6px" }} />
+                  )}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...SUBH }}>Câble de charge</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[["integre","Avec câble intégré"],["sans","Sans câble"]].map(function(p) {
+                    return <button key={p[0]} onClick={function(){ set("borne.cable", p[0]); }}
+                      style={{ ...chipSt(inst.borne.cable === p[0]), borderColor: inst.borne.cable === p[0] ? BR_BLUE : BORDER, background: inst.borne.cable === p[0] ? "#eaf4fd" : WHITE, color: inst.borne.cable === p[0] ? BR_BLUE : MUTED }}>{p[1]}</button>;
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Câblage AC — distance */}
+          <div>
+            <div style={{ ...SUBH }}>Distance câblage AC</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["< 5m", "5–10m", "10–20m", "20–50m", "50–100m", "100–200m", "> 200m"].map(function(d) {
+                return <button key={d} onClick={function(){ set("cablageAC.distance", d); }}
+                  style={{ ...chipSt(inst.cablageAC.distance === d), borderColor: inst.cablageAC.distance === d ? BR_BLUE : BORDER, background: inst.cablageAC.distance === d ? "#eaf4fd" : WHITE, color: inst.cablageAC.distance === d ? BR_BLUE : MUTED, fontSize: 12 }}>{d}</button>;
+              })}
+            </div>
+          </div>
+
+          {/* Câble de recharge type B */}
+          <div>
+            <div style={{ ...SUBH }}>Câble de recharge type B</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[["non_inclus","Non inclus — pas à prévoir"],["inclus","Inclus"],["a_prevoir","À prévoir séparément (+120€ HTVA)"]].map(function(p) {
+                return <button key={p[0]} onClick={function(){ set("cableRecharge", p[0]); }}
+                  style={{ ...chipSt(inst.cableRecharge === p[0]), borderColor: inst.cableRecharge === p[0] ? BR_BLUE : BORDER, background: inst.cableRecharge === p[0] ? "#eaf4fd" : WHITE, color: inst.cableRecharge === p[0] ? BR_BLUE : MUTED }}>{p[1]}</button>;
+              })}
+            </div>
+          </div>
+
+          {/* Coffret électrique */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ ...SUBH }}>Coffret électrique</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <Toggle value={inst.coffret.inclus} onChange={function(v){ set("coffret.inclus", v); }} />
+                {inst.coffret.inclus === "OUI" && (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {["Intérieur","Extérieur"].map(function(t) {
+                      return <button key={t} onClick={function(){ set("coffret.type", t.toLowerCase()); }}
+                        style={{ ...chipSt(inst.coffret.type === t.toLowerCase()), borderColor: inst.coffret.type === t.toLowerCase() ? BR_BLUE : BORDER, background: inst.coffret.type === t.toLowerCase() ? "#eaf4fd" : WHITE, color: inst.coffret.type === t.toLowerCase() ? BR_BLUE : MUTED }}>{t}</button>;
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Câble internet + Tube PVC */}
+          <div style={G2}>
+            <Field label="Câble internet" value={inst.cableInternet} onChange={function(v){ set("cableInternet", v); }} placeholder="Longueur, type…" />
+            <Field label="Tube PVC" value={inst.tubePVC} onChange={function(v){ set("tubePVC", v); }} placeholder="Longueur, diamètre…" />
+          </div>
+
+          {/* Toggles : RFID, Booster, Prises CPL */}
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Carte RFID</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <Toggle value={inst.rfid.inclus} onChange={function(v){ set("rfid.inclus", v); }} />
+                {inst.rfid.inclus === "OUI" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input type="number" min="1" value={inst.rfid.qty} onChange={function(e){ set("rfid.qty", e.target.value); }} style={{ width: 60, textAlign: "center" }} />
+                    <span style={{ fontSize: 12, color: MUTED }}>carte(s)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Booster / Load Balancing</div>
+              <Toggle value={inst.booster} onChange={function(v){ set("booster", v); }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Prises CPL</div>
+              <Toggle value={inst.prisesCPL} onChange={function(v){ set("prisesCPL", v); }} />
+            </div>
+          </div>
+
+          {/* Poteau / Piédestal */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Poteau / Piédestal</div>
+              <Toggle value={inst.poteau.inclus} onChange={function(v){ set("poteau.inclus", v); }} />
+            </div>
+            {inst.poteau.inclus === "OUI" && <Field label="Modèle / Référence" value={inst.poteau.modele} onChange={function(v){ set("poteau.modele", v); }} placeholder="Modèle…" />}
+          </div>
+
+          {/* Dalle de béton */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Dalle de béton</div>
+              <Toggle value={inst.dalle.inclus} onChange={function(v){ set("dalle.inclus", v); }} />
+            </div>
+            {inst.dalle.inclus === "OUI" && <Field label="Dimensions / Type" value={inst.dalle.modele} onChange={function(v){ set("dalle.modele", v); }} placeholder="Ex: 40×40 cm…" />}
+          </div>
+
+          {/* Tranchée */}
+          <div>
+            <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Tranchée</div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Toggle value={inst.tranchee.inclus} onChange={function(v){ set("tranchee.inclus", v); }} />
+              {inst.tranchee.inclus === "OUI" && (<>
+                <Field label="Mètres" value={inst.tranchee.metres} onChange={function(v){ set("tranchee.metres", v); }} type="number" unit="m" />
+                <div>
+                  <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Type de revêtement</div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {["Terre / Gazon","Clinkers","Béton","Autre"].map(function(r) {
+                      return <button key={r} onClick={function(){ set("tranchee.revetement", r); }}
+                        style={{ ...chipSt(inst.tranchee.revetement === r), borderColor: inst.tranchee.revetement === r ? BR_BLUE : BORDER, background: inst.tranchee.revetement === r ? "#eaf4fd" : WHITE, color: inst.tranchee.revetement === r ? BR_BLUE : MUTED, fontSize: 12 }}>{r}</button>;
+                    })}
+                  </div>
+                  {inst.tranchee.revetement === "Autre" && (
+                    <input value={inst.tranchee.autreRevetement || ""} onChange={function(e){ set("tranchee.autreRevetement", e.target.value); }} placeholder="Préciser…" style={{ marginTop: 6, fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER, width: "100%", boxSizing: "border-box" }} />
+                  )}
+                </div>
+              </>)}
+            </div>
+          </div>
+
+          {/* Fourreau flex rouge */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Fourreau flex rouge</div>
+              <Toggle value={inst.fourreau.inclus} onChange={function(v){ set("fourreau.inclus", v); }} />
+            </div>
+            {inst.fourreau.inclus === "OUI" && <Field label="Mètres" value={inst.fourreau.metres} onChange={function(v){ set("fourreau.metres", v); }} type="number" unit="m" />}
+          </div>
+
+          {/* Connexion alarme incendie */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Connexion alarme incendie</div>
+              <Toggle value={inst.alarme.inclus} onChange={function(v){ set("alarme.inclus", v); }} />
+            </div>
+            {inst.alarme.inclus === "OUI" && <Field label="Mètres" value={inst.alarme.metres} onChange={function(v){ set("alarme.metres", v); }} type="number" unit="m" />}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [mode, setMode] = useState("form");
   const [bcLoading, setBcLoading] = useState(false);
@@ -1767,7 +2082,7 @@ function App() {
   const [schemaNote, setSchemaNote] = useState("");
   const [pmNote, setPmNote] = useState("");
   const [date, setDate] = useState("");
-  const [installations, setInstallations] = useState([makeEmptyInst()]);
+  const [sites, setSites] = useState([makeEmptySite()]);
   const [comments, setComments] = useState("");
   const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON" });
 
@@ -1799,26 +2114,87 @@ function App() {
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
 
-  const data = { client, weGreen, entity, date, installations, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
+  const data = { client, weGreen, entity, date, sites, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
   latestDataRef.current = data; // always fresh — used in save timeouts to avoid stale closures
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
-  const setT = function(instIdx, path, val) {
-    setInstallations(function(prev) {
+  // ── Setters sites-aware ────────────────────────────────────────────────────
+  // Electrical setter
+  const setSiteE = function(siteIdx, path, val) {
+    setSites(function(prev) {
       var arr = JSON.parse(JSON.stringify(prev));
-      var parts = path.split(".");
-      var o = arr[instIdx].tech;
+      var parts = path.split("."); var o = arr[siteIdx].electrical;
       for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
-      o[parts[parts.length - 1]] = val;
-      return arr;
+      o[parts[parts.length - 1]] = val; return arr;
     });
   };
-  const setInstTech = function(instIdx, updater) {
-    setInstallations(function(prev) {
+  // PV tech deep setter (siteIdx, pvIdx, "panneaux.type", val)
+  const setT = function(siteIdx, pvIdx, path, val) {
+    setSites(function(prev) {
       var arr = JSON.parse(JSON.stringify(prev));
-      arr[instIdx].tech = updater(arr[instIdx].tech);
-      return arr;
+      var parts = path.split("."); var o = arr[siteIdx].pvInstallations[pvIdx].tech;
+      for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+      o[parts[parts.length - 1]] = val; return arr;
     });
+  };
+  const setInstTech = function(siteIdx, pvIdx, updater) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx].pvInstallations[pvIdx].tech = updater(arr[siteIdx].pvInstallations[pvIdx].tech); return arr;
+    });
+  };
+  // Strings
+  const addString = function(siteIdx, pvIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx].pvInstallations[pvIdx].strings.push({ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }); return arr;
+    });
+  };
+  const updString = function(siteIdx, pvIdx, strIdx, row) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx].pvInstallations[pvIdx].strings = arr[siteIdx].pvInstallations[pvIdx].strings.map(function(r, i){ return i === strIdx ? row : r; }); return arr;
+    });
+  };
+  const delString = function(siteIdx, pvIdx, strIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx].pvInstallations[pvIdx].strings = arr[siteIdx].pvInstallations[pvIdx].strings.filter(function(_, i){ return i !== strIdx; }); return arr;
+    });
+  };
+  // PV installs add/remove
+  const addPVInst = function(siteIdx) {
+    setSites(function(prev) { var arr = JSON.parse(JSON.stringify(prev)); arr[siteIdx].pvInstallations.push(makeEmptyPVInst()); return arr; });
+  };
+  const removePVInst = function(siteIdx, pvIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      if (arr[siteIdx].pvInstallations.length <= 1) return prev;
+      arr[siteIdx].pvInstallations = arr[siteIdx].pvInstallations.filter(function(_, i){ return i !== pvIdx; }); return arr;
+    });
+  };
+  // BR installs
+  const setBRInst = function(siteIdx, brIdx, path, val) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var parts = path.split("."); var o = arr[siteIdx].brInstallations[brIdx];
+      for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+      o[parts[parts.length - 1]] = val; return arr;
+    });
+  };
+  const addBRInst = function(siteIdx) {
+    setSites(function(prev) { var arr = JSON.parse(JSON.stringify(prev)); arr[siteIdx].brInstallations.push(makeEmptyBRInst()); return arr; });
+  };
+  const removeBRInst = function(siteIdx, brIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx].brInstallations = arr[siteIdx].brInstallations.filter(function(_, i){ return i !== brIdx; }); return arr;
+    });
+  };
+  // Sites add/remove
+  const addSite = function() { setSites(function(prev){ return prev.concat([makeEmptySite()]); }); };
+  const removeSite = function(siteIdx) {
+    setSites(function(prev){ if (prev.length <= 1) return prev; return prev.filter(function(_, i){ return i !== siteIdx; }); });
   };
 
   // ── Load from URL ?ref= on mount ──────────────────────────────────────────
@@ -1839,46 +2215,56 @@ function App() {
         if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
         if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
         if (typeof d.entity === "string" && ENTITIES[d.entity]) setEntity(d.entity);
-        else setEntity(detectEntity(urlRef)); // retrocompat
+        else setEntity(detectEntity(urlRef));
         if (typeof d.date === "string") setDate(d.date);
-        // Rétrocompatibilité: ancien format (tech+strings) → installations[0]
-        if (Array.isArray(d.installations) && d.installations.length > 0) {
-          var safeInsts = d.installations.map(function(inst) {
-            if (!inst || typeof inst !== "object") return makeEmptyInst();
-            var base = makeEmptyInst();
-            if (inst.tech && typeof inst.tech === "object") {
-              base.tech = Object.assign({}, base.tech, inst.tech);
-              if (inst.tech.panneaux) base.tech.panneaux = Object.assign({}, base.tech.panneaux, inst.tech.panneaux);
-              if (inst.tech.panneaux2) base.tech.panneaux2 = Object.assign({}, base.tech.panneaux2, inst.tech.panneaux2);
-              if (inst.tech.toiture) base.tech.toiture = Object.assign({}, base.tech.toiture, inst.tech.toiture);
-              if (inst.tech.toiture2) base.tech.toiture2 = Object.assign({}, base.tech.toiture2, inst.tech.toiture2);
-              if (inst.tech.batterie) base.tech.batterie = Object.assign({}, base.tech.batterie, inst.tech.batterie);
-              if (inst.tech.borne) base.tech.borne = Object.assign({}, base.tech.borne, inst.tech.borne);
-              if (inst.tech.ems) base.tech.ems = Object.assign({}, base.tech.ems, inst.tech.ems);
-              if (inst.tech.compteur) base.tech.compteur = Object.assign({}, base.tech.compteur, inst.tech.compteur);
-              if (inst.tech.distances) base.tech.distances = Object.assign({}, base.tech.distances, inst.tech.distances);
-              if (Array.isArray(inst.tech.onduleurs) && inst.tech.onduleurs.length > 0) base.tech.onduleurs = inst.tech.onduleurs;
-            }
-            if (Array.isArray(inst.strings) && inst.strings.length > 0) base.strings = inst.strings;
-            return base;
-          });
-          setInstallations(safeInsts);
+
+        // ── Migration vers sites[] ────────────────────────────────────────────
+        function safePVInst(inst) {
+          if (!inst || typeof inst !== "object") return makeEmptyPVInst();
+          var base = makeEmptyPVInst();
+          if (inst.tech && typeof inst.tech === "object") {
+            base.tech = Object.assign({}, base.tech, inst.tech);
+            ["panneaux","panneaux2","toiture","toiture2","batterie","borne","ems"].forEach(function(k){
+              if (inst.tech[k]) base.tech[k] = Object.assign({}, base.tech[k], inst.tech[k]);
+            });
+            if (Array.isArray(inst.tech.onduleurs) && inst.tech.onduleurs.length > 0) base.tech.onduleurs = inst.tech.onduleurs;
+          }
+          if (Array.isArray(inst.strings) && inst.strings.length > 0) base.strings = inst.strings;
+          return base;
+        }
+        function extractElectrical(tech) {
+          return {
+            reseau: tech.reseau || null,
+            amperageDisj: tech.amperageDisj || "",
+            compteur: Object.assign({ serie: "", ean: "" }, tech.compteur || {}),
+            branchementOnduleur: tech.branchementOnduleur || null,
+            distances: Object.assign({ onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }, tech.distances || {}),
+          };
+        }
+
+        if (Array.isArray(d.sites) && d.sites.length > 0) {
+          // New format: load directly
+          setSites(d.sites.map(function(s) {
+            return {
+              electrical: Object.assign(makeEmptyElectrical(), s.electrical || {}),
+              pvInstallations: Array.isArray(s.pvInstallations) ? s.pvInstallations.map(safePVInst) : [makeEmptyPVInst()],
+              brInstallations: Array.isArray(s.brInstallations) ? s.brInstallations : [],
+            };
+          }));
+        } else if (Array.isArray(d.installations) && d.installations.length > 0) {
+          // Old format v2: multiple installations → migrate to one site
+          var electrical = extractElectrical(d.installations[0].tech || {});
+          var pvInsts = d.installations.map(safePVInst);
+          setSites([{
+            electrical: electrical,
+            pvInstallations: pvInsts,
+            brInstallations: Array.isArray(d.brInstallations) ? d.brInstallations : [],
+          }]);
         } else if (d.tech && typeof d.tech === "object") {
-          // Migrate old format
-          var migratedInst = makeEmptyInst();
-          migratedInst.tech = Object.assign({}, migratedInst.tech, d.tech);
-          if (d.tech.panneaux) migratedInst.tech.panneaux = Object.assign({}, migratedInst.tech.panneaux, d.tech.panneaux);
-          if (d.tech.panneaux2) migratedInst.tech.panneaux2 = Object.assign({}, migratedInst.tech.panneaux2, d.tech.panneaux2);
-          if (d.tech.toiture) migratedInst.tech.toiture = Object.assign({}, migratedInst.tech.toiture, d.tech.toiture);
-          if (d.tech.toiture2) migratedInst.tech.toiture2 = Object.assign({}, migratedInst.tech.toiture2, d.tech.toiture2);
-          if (d.tech.batterie) migratedInst.tech.batterie = Object.assign({}, migratedInst.tech.batterie, d.tech.batterie);
-          if (d.tech.borne) migratedInst.tech.borne = Object.assign({}, migratedInst.tech.borne, d.tech.borne);
-          if (d.tech.ems) migratedInst.tech.ems = Object.assign({}, migratedInst.tech.ems, d.tech.ems);
-          if (d.tech.compteur) migratedInst.tech.compteur = Object.assign({}, migratedInst.tech.compteur, d.tech.compteur);
-          if (d.tech.distances) migratedInst.tech.distances = Object.assign({}, migratedInst.tech.distances, d.tech.distances);
-          if (Array.isArray(d.tech.onduleurs) && d.tech.onduleurs.length > 0) migratedInst.tech.onduleurs = d.tech.onduleurs;
-          if (Array.isArray(d.strings) && d.strings.length > 0) migratedInst.strings = d.strings;
-          setInstallations([migratedInst]);
+          // Old format v1: single tech object
+          var electrical = extractElectrical(d.tech);
+          var pvInst = safePVInst({ tech: d.tech, strings: d.strings });
+          setSites([{ electrical: electrical, pvInstallations: [pvInst], brInstallations: [] }]);
         }
         if (typeof d.comments === "string") setComments(d.comments);
         if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
@@ -1956,7 +2342,7 @@ function App() {
         }
       } else setSaveStatus("error");
     }, 1200);
-  }, [client, weGreen, entity, date, installations, comments, logistique, tdNote, schemaNote, pmNote]);
+  }, [client, weGreen, entity, date, sites, comments, logistique, tdNote, schemaNote, pmNote]);
 
   // ── Photos auto-save : upload Storage puis JSON léger ────────────────────
   useEffect(function() {
@@ -2260,9 +2646,9 @@ function App() {
         }
       }
 
-      setInstallations(function(prev) {
+      setSites(function(prev) {
         var arr = JSON.parse(JSON.stringify(prev));
-        var next = arr[0].tech;
+        var next = arr[0].pvInstallations[0].tech;
 
         // Panneaux: use first with highest qty
         var mainPan = null;
@@ -2314,7 +2700,7 @@ function App() {
         // Greenbox
         if (r.greenbox) next.greenbox = "OUI";
 
-        arr[0].tech = next;
+        arr[0].pvInstallations[0].tech = next;
         return arr;
       });
 
@@ -2456,39 +2842,6 @@ function App() {
       return next;
     });
   };
-  const addString = function(instIdx) {
-    setInstallations(function(prev) {
-      var arr = JSON.parse(JSON.stringify(prev));
-      arr[instIdx].strings.push({ onduleur: "1", count: "", orient: "Sud", orientLibre: "" });
-      return arr;
-    });
-  };
-  const updString = function(instIdx, i, row) {
-    setInstallations(function(prev) {
-      var arr = JSON.parse(JSON.stringify(prev));
-      arr[instIdx].strings = arr[instIdx].strings.map(function(r, idx) { return idx === i ? row : r; });
-      return arr;
-    });
-  };
-  const delString = function(instIdx, i) {
-    setInstallations(function(prev) {
-      var arr = JSON.parse(JSON.stringify(prev));
-      arr[instIdx].strings = arr[instIdx].strings.filter(function(_, idx) { return idx !== i; });
-      return arr;
-    });
-  };
-  const addInstallation = function() {
-    setInstallations(function(prev) { return prev.concat([makeEmptyInst()]); });
-  };
-  const removeInstallation = function(instIdx) {
-    setInstallations(function(prev) {
-      if (prev.length <= 1) return prev;
-      return prev.filter(function(_, i) { return i !== instIdx; });
-    });
-  };
-
-
-
   // ── Export / Import ───────────────────────────────────────────────────────
   const exportData = function() {
     try {
@@ -2508,7 +2861,7 @@ function App() {
         if (d.weGreen) setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
         if (typeof d.entity === "string" && ENTITIES[d.entity]) setEntity(d.entity);
         if (typeof d.date === "string") setDate(d.date);
-        if (Array.isArray(d.installations) && d.installations.length > 0) setInstallations(d.installations);
+        (Array.isArray(d.sites) && d.sites.length > 0) ? setSites(d.sites) : (Array.isArray(d.installations) && d.installations.length > 0) && setSites([{ electrical: d.installations[0].tech ? { reseau: d.installations[0].tech.reseau||null, amperageDisj: d.installations[0].tech.amperageDisj||"", compteur: Object.assign({serie:"",ean:""}, d.installations[0].tech.compteur||{}), branchementOnduleur: d.installations[0].tech.branchementOnduleur||null, distances: Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""}, d.installations[0].tech.distances||{}) } : makeEmptyElectrical(), pvInstallations: d.installations.map(function(inst){ return { tech: inst.tech, strings: inst.strings }; }), brInstallations: d.brInstallations || [] }]);
         if (typeof d.comments === "string") setComments(d.comments);
         if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
         if (d.photos && typeof d.photos === "object") {
@@ -2541,7 +2894,7 @@ function App() {
       if (vData.weGreen) setWeGreen(function(p){ return Object.assign({}, p, vData.weGreen); });
       if (typeof vData.entity === "string" && ENTITIES[vData.entity]) setEntity(vData.entity);
       if (typeof vData.date === "string") setDate(vData.date);
-      if (Array.isArray(vData.installations) && vData.installations.length > 0) setInstallations(vData.installations);
+      (Array.isArray(vData.sites) && vData.sites.length > 0) ? setSites(vData.sites) : (Array.isArray(vData.installations) && vData.installations.length > 0) && setSites([{ electrical: vData.installations[0].tech ? { reseau: vData.installations[0].tech.reseau||null, amperageDisj: vData.installations[0].tech.amperageDisj||"", compteur: Object.assign({serie:"",ean:""}, vData.installations[0].tech.compteur||{}), branchementOnduleur: vData.installations[0].tech.branchementOnduleur||null, distances: Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""}, vData.installations[0].tech.distances||{}) } : makeEmptyElectrical(), pvInstallations: vData.installations.map(function(inst){ return { tech: inst.tech, strings: inst.strings }; }), brInstallations: vData.brInstallations || [] }]);
       if (typeof vData.comments === "string") setComments(vData.comments);
       if (vData.logistique) setLogistique(function(p){ return Object.assign({}, p, vData.logistique); });
       if (typeof vData.tdNote === "string") setTdNote(vData.tdNote);
@@ -2571,7 +2924,7 @@ function App() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>We Green Energy</div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
-            Briefing de chantier PV
+            {sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "Briefing de chantier PV + BR" : "Briefing de chantier PV"}
             {client.nom && <span style={{ fontSize: 15, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {client.nom}</span>}
             {ref && <a href={(ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: (ENTITIES[entity] || ENTITIES.wge).color, textDecoration: "none", border: "1px solid " + (ENTITIES[entity] || ENTITIES.wge).color + "55", borderRadius: 5, padding: "2px 8px", background: (ENTITIES[entity] || ENTITIES.wge).color + "12", whiteSpace: "nowrap" }}>← Odoo</a>}
           </div>
@@ -2749,22 +3102,71 @@ function App() {
             </div>
           </div>
 
-          {/* ── 3. Technique ── */}
-          <div>
-            {installations.map(function(inst, instIdx) {
-              return React.createElement(InstallationBlock, {
-                key: instIdx, tech: inst.tech, strings: inst.strings,
-                instIdx: instIdx, total: installations.length,
-                onSetT: setT, onSetTech: setInstTech,
-                onAddString: addString, onUpdString: updString,
-                onDelString: delString, onRemove: removeInstallation
-              });
-            })}
-            <div style={{ display: "flex", justifyContent: "center", margin: "12px 0 4px" }}>
-              <button onClick={addInstallation} style={{ background: GREEN_LIGHT, color: GREEN, border: "1.5px dashed " + GREEN_MID, borderRadius: 8, padding: "8px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                ➕ Ajouter une installation
-              </button>
-            </div>
+          {/* ── 3. Sites (électrique + PV + BR) ── */}
+          {sites.map(function(site, siteIdx) {
+            return (
+              <div key={siteIdx}>
+                {/* Site banner (si plusieurs sites) */}
+                {sites.length > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "16px 0 8px" }}>
+                    <div style={{ background: "#555", color: "#fff", borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: 14 }}>
+                      📍 Site {siteIdx + 1}
+                    </div>
+                    {sites.length > 1 && (
+                      <button onClick={function(){ removeSite(siteIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>
+                        Supprimer ce site
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Bloc électrique — 1x par site */}
+                <SiteElectricalBlock
+                  electrical={site.electrical}
+                  onSet={function(path, val){ setSiteE(siteIdx, path, val); }}
+                />
+
+                {/* Installations PV du site */}
+                {site.pvInstallations.map(function(inst, pvIdx) {
+                  return React.createElement(InstallationBlock, {
+                    key: pvIdx, tech: inst.tech, strings: inst.strings,
+                    instIdx: pvIdx, total: site.pvInstallations.length,
+                    onSetT: function(pvIdx2, path, val){ setT(siteIdx, pvIdx2, path, val); },
+                    onSetTech: function(pvIdx2, upd){ setInstTech(siteIdx, pvIdx2, upd); },
+                    onAddString: function(pvIdx2){ addString(siteIdx, pvIdx2); },
+                    onUpdString: function(pvIdx2, si, row){ updString(siteIdx, pvIdx2, si, row); },
+                    onDelString: function(pvIdx2, si){ delString(siteIdx, pvIdx2, si); },
+                    onRemove: function(pvIdx2){ removePVInst(siteIdx, pvIdx2); }
+                  });
+                })}
+
+                {/* Installations BR du site */}
+                {site.brInstallations.map(function(brInst, brIdx) {
+                  return React.createElement(BRInstallationBlock, {
+                    key: brIdx, inst: brInst, instIdx: brIdx, total: site.brInstallations.length,
+                    onSet: function(brIdx2, path, val){ setBRInst(siteIdx, brIdx2, path, val); },
+                    onRemove: function(brIdx2){ removeBRInst(siteIdx, brIdx2); }
+                  });
+                })}
+
+                {/* Boutons ajouter PV / BR pour ce site */}
+                <div style={{ display: "flex", justifyContent: "center", gap: 12, margin: "12px 0 4px", flexWrap: "wrap" }}>
+                  <button onClick={function(){ addPVInst(siteIdx); }} style={{ background: GREEN_LIGHT, color: GREEN, border: "1.5px dashed " + GREEN_MID, borderRadius: 8, padding: "8px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    ➕ Ajouter une installation PV
+                  </button>
+                  <button onClick={function(){ addBRInst(siteIdx); }} style={{ background: "#eaf4fd", color: "#2980b9", border: "1.5px dashed #bde0f5", borderRadius: 8, padding: "8px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    🔌 Ajouter une installation BR
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Ajouter un site */}
+          <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 12px" }}>
+            <button onClick={addSite} style={{ background: "#f5f5f0", color: "#555", border: "1.5px dashed #bbb", borderRadius: 8, padding: "7px 24px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              📍 Ajouter un site (2ème installation électrique)
+            </button>
           </div>
 
           {/* ── 4. Calepinage ── */}
@@ -2816,8 +3218,8 @@ function App() {
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#2980b9", textTransform: "uppercase", letterSpacing: "0.07em" }}>Photos DC — qualité standard</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-                {PHOTO_CATS.filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                {getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return ["vue_generale","toiture","cablage","strings_design","onduleur"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -2830,8 +3232,8 @@ function App() {
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#c0392b", background: "#fdecea", padding: "1px 6px", borderRadius: 4 }}>HD</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-                {PHOTO_CATS.filter(function(c){ return ["compteur","tgbt","td","schema_elec"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                {getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return ["compteur","tgbt","td","schema_elec"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
@@ -2843,8 +3245,8 @@ function App() {
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em" }}>Photos supplémentaires / à reclasser</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
-                {PHOTO_CATS.filter(function(c){ return ["extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
-                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={PHOTO_CATS.filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
+                {getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return ["extra"].indexOf(c.key) >= 0; }).map(function({ key, label, hasNote, hiRes }) {
+                  return <PhotoZone key={key} catKey={key} label={label} items={photos[key] || []} onAdd={function(items) { return addPhotos(key, items); }} onDelete={function(idx) { return deletePhoto(key, idx); }} onUpdate={function(idx, url, dUrl, tObjs) { return updatePhoto(key, idx, url, dUrl, tObjs); }} onReorder={function(from, to) { return reorderPhoto(key, from, to); }} onReceiveCross={function(fromKey, fromIdx) { movePhoto(fromKey, fromIdx, key); }} onMoveTo={function(fromIdx, toKey) { movePhoto(key, fromIdx, toKey); }} allSections={getPhotoCats(sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "pvbr" : "pv").filter(function(c){ return c.key !== key && !c._legacy; }).map(function(c){ return { key: c.key, label: c.label }; })} hasNote={!!hasNote} note={key === "td" ? tdNote : key === "schema_elec" ? schemaNote : ""} onNoteChange={function(v) { return key === "td" ? setTdNote(v) : setSchemaNote(v); }} hiRes={!!hiRes} />;
                 })}
               </div>
             </div>
