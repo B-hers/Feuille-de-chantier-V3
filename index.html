@@ -2170,7 +2170,7 @@ function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
 }
 
 // ── SheetBar ──────────────────────────────────────────────────────────────────
-function SheetBar({ ref: refChantier, sheets, ordered, setOrdered, currentId, loadingSheets,
+function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loadingSheets,
                     orderId, setOrderId, onSwitch, onCreate, onRename, onDelete }) {
   var [menuId, setMenuId] = useState(null);
   var [renaming, setRenaming] = useState(null);
@@ -3466,7 +3466,7 @@ function App() {
       {/* ── SheetBar — multi-feuilles ── */}
       {ref && mode !== "preview" && (
         <SheetBar
-          ref={ref}
+          refChantier={ref}
           sheets={sheets}
           ordered={ordered}
           setOrdered={setOrdered}
