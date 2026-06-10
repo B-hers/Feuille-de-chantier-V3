@@ -2169,9 +2169,22 @@ function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
   );
 }
 
+
+// ── Détection migration SQL multi-feuilles ───────────────────────────────────
+async function checkMigration(ref) {
+  try {
+    var res = await fetch(
+      SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) +
+      "&select=id,label&limit=1",
+      { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+    );
+    return res.ok; // 400 = colonnes absentes, 200 = migration faite
+  } catch(e) { return false; }
+}
+
 // ── SheetBar ──────────────────────────────────────────────────────────────────
 function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loadingSheets,
-                    orderId, setOrderId, onSwitch, onCreate, onRename, onDelete }) {
+                    orderId, setOrderId, onSwitch, onCreate, onRename, onDelete, migrationReady }) {
   var [menuId, setMenuId] = useState(null);
   var [renaming, setRenaming] = useState(null);
   var [renameVal, setRenameVal] = useState("");
@@ -2181,6 +2194,7 @@ function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loading
   var [showAddSec, setShowAddSec] = useState(false);
   var [addSecLabel, setAddSecLabel] = useState("");
   var [headerMenu, setHeaderMenu] = useState(false);
+  var [createError, setCreateError] = useState("");
 
   function persistOrder(arr) {
     setOrdered(arr);
@@ -2200,12 +2214,15 @@ function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loading
   function handleCreate() {
     if (!newLabel.trim() || creating) return;
     setCreating(true);
-    supaCreateSheet(refChantier, newLabel.trim(), null).then(function(row) {
+    supaCreateSheet(refChantier, newLabel.trim(), {}).then(function(row) {
       if (row) {
         var newOrd = ordered.concat([{ type:"sheet", data:row }]);
         persistOrder(newOrd);
         onCreate(row);
         setShowNew(false); setNewLabel("");
+        setCreateError("");
+      } else {
+        setCreateError("Échec — vérifiez que la migration SQL a été exécutée dans Supabase.");
       }
       setCreating(false);
     });
@@ -2268,6 +2285,19 @@ function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loading
           </div>
         </div>
       </div>
+
+      {/* Bannière migration requise */}
+      {migrationReady === false && (
+        <div style={{ background:"#fff3cd",border:"1px solid #ffc107",borderRadius:7,padding:"8px 12px",marginBottom:6,fontSize:12,color:"#856404" }}>
+          ⚠ <strong>Migration Supabase requise</strong> pour créer plusieurs feuilles.
+          Exécutez le SQL fourni dans Supabase → SQL Editor.
+        </div>
+      )}
+      {createError && (
+        <div style={{ background:"#fdecea",border:"1px solid #e74c3c",borderRadius:7,padding:"6px 12px",marginBottom:6,fontSize:12,color:"#c0392b" }}>
+          {createError}
+        </div>
+      )}
 
       {/* Nouvelle feuille */}
       {showNew && (
@@ -2468,6 +2498,7 @@ function App() {
   const [sheetOrderId, setSheetOrderId] = useState(null);
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [showGear, setShowGear] = useState(false);
+  const [migrationReady, setMigrationReady] = useState(null); // null=inconnu, true/false
   const [user, setUser] = useState(function() {
     try {
       var stored = localStorage.getItem("wge_user");
@@ -2633,6 +2664,8 @@ function App() {
     setEntity(detectEntity(urlRef));
     setSaveStatus("loading");
     setLoadingSheets(true);
+    // Vérifie si la migration SQL a été faite
+    checkMigration(urlRef).then(function(ready) { setMigrationReady(ready); });
 
     // 1. Charge la liste des feuilles
     supaLoadSheetList(urlRef).then(async function(list) {
@@ -3546,6 +3579,7 @@ function App() {
                 setOrdered(function(prev){ return prev.filter(function(o){ return !(o.type==="sheet"&&o.data&&o.data.id===id); }); });
                 if (id === currentSheetId && remaining.length > 0) switchSheet(remaining[0].id);
               }}
+              migrationReady={migrationReady}
             />
           )}
 
