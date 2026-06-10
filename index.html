@@ -394,6 +394,127 @@ function rawRef(fullRef, entityKey) {
   return fullRef;
 }
 
+// ── Multi-feuilles : API Supabase ─────────────────────────────────────────────
+
+// Charge la liste des feuilles (sans data) pour une ref — exclut la ligne d'ordre
+async function supaLoadSheetList(ref) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) +
+      "&label=neq.__order__&select=id,ref,label,updated_at&order=updated_at.asc", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    if (!res.ok) return [];
+    var rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch(e) { return []; }
+}
+
+// Charge une feuille par id (avec data)
+async function supaLoadSheetById(id) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?id=eq." + id + "&select=id,ref,label,data,updated_at", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var rows = await res.json();
+    return (rows && rows.length > 0) ? rows[0] : null;
+  } catch(e) { return null; }
+}
+
+// Crée une nouvelle feuille — retourne la ligne créée (avec id)
+async function supaCreateSheet(ref, label, data) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+      method: "POST",
+      headers: {
+        "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY,
+        "Content-Type": "application/json", "Prefer": "return=representation"
+      },
+      body: JSON.stringify({ ref: ref, label: label || "", data: data, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) { console.error("supaCreateSheet failed:", res.status); return null; }
+    var rows = await res.json();
+    return (rows && rows.length > 0) ? rows[0] : null;
+  } catch(e) { console.error("supaCreateSheet:", e); return null; }
+}
+
+// Met à jour les données d'une feuille (PATCH par id)
+async function supaUpdateSheetById(id, data) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?id=eq." + id, {
+      method: "PATCH",
+      headers: {
+        "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY,
+        "Content-Type": "application/json",
+        "x-supabase-statement-timeout": "25000",
+        "Prefer": "return=representation"
+      },
+      body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) { console.error("supaUpdateSheet failed:", res.status, await res.text()); return false; }
+    return true;
+  } catch(e) { console.error("supaUpdateSheet:", e); return false; }
+}
+
+// Renomme une feuille
+async function supaRenameSheet(id, label) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?id=eq." + id, {
+      method: "PATCH",
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ label: label })
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+// Supprime une feuille
+async function supaDeleteSheet(id) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?id=eq." + id, {
+      method: "DELETE",
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+// Charge/sauvegarde l'ordre des feuilles + sections (ligne spéciale label="__order__")
+async function supaLoadSheetOrder(ref) {
+  try {
+    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) +
+      "&label=eq.__order__&select=id,data", {
+      headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY }
+    });
+    var rows = await res.json();
+    return (rows && rows.length > 0) ? rows[0] : null;
+  } catch(e) { return null; }
+}
+async function supaSaveSheetOrder(ref, orderData, existingId) {
+  try {
+    if (existingId) {
+      await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?id=eq." + existingId, {
+        method: "PATCH",
+        headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ data: orderData, updated_at: new Date().toISOString() })
+      });
+    } else {
+      await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+        method: "POST",
+        headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: ref, label: "__order__", data: orderData })
+      });
+    }
+  } catch(e) {}
+}
+
+// Import depuis une autre ref — charge la première feuille de cette ref
+async function supaImportFromRef(sourceRef) {
+  var list = await supaLoadSheetList(sourceRef);
+  if (!list || list.length === 0) return null;
+  return await supaLoadSheetById(list[0].id);
+}
+
+// Rétrocompat: ancien chargement par ref (pour migration)
 async function supaLoad(ref) {
   try {
     var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier?ref=eq." + encodeURIComponent(ref) + "&select=data,updated_at", {
@@ -405,29 +526,8 @@ async function supaLoad(ref) {
   return null;
 }
 
-async function supaSave(ref, data) {
-  try {
-    var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
-      method: "POST",
-      headers: {
-        "apikey": SUPA_KEY,
-        "Authorization": "Bearer " + SUPA_KEY,
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
-        "x-supabase-statement-timeout": "25000"
-      },
-      body: JSON.stringify({ ref: ref, data: data, updated_at: new Date().toISOString() })
-    });
-    if (!res.ok) {
-      console.error("Supabase save error:", res.status, await res.text());
-      return false;
-    }
-    return true;
-  } catch(e) {
-    console.error("Supabase network error:", e);
-    return false;
-  }
-}
+// ── Fin multi-feuilles ────────────────────────────────────────────────────────
+
 
 // ══════════════════════════════════════════════════════
 // AUTH + AUDIT
@@ -2069,6 +2169,255 @@ function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
   );
 }
 
+// ── SheetBar ──────────────────────────────────────────────────────────────────
+function SheetBar({ ref: refChantier, sheets, ordered, setOrdered, currentId, loadingSheets,
+                    orderId, setOrderId, onSwitch, onCreate, onRename, onDelete }) {
+  var [menuId, setMenuId] = useState(null);
+  var [renaming, setRenaming] = useState(null);
+  var [renameVal, setRenameVal] = useState("");
+  var [showNew, setShowNew] = useState(false);
+  var [newLabel, setNewLabel] = useState("");
+  var [creating, setCreating] = useState(false);
+  var [showAddSec, setShowAddSec] = useState(false);
+  var [addSecLabel, setAddSecLabel] = useState("");
+  var [headerMenu, setHeaderMenu] = useState(false);
+
+  function persistOrder(arr) {
+    setOrdered(arr);
+    var orderData = arr.map(function(o){ return o.type === "section" ? { type:"section", id:o.id, label:o.label } : { type:"sheet", id:o.data.id }; });
+    supaSaveSheetOrder(refChantier, orderData, orderId || null).then(function() {
+      if (!orderId) supaLoadSheetOrder(refChantier).then(function(row){ if (row) setOrderId(row.id); });
+    });
+  }
+
+  function addSection(label) {
+    if (!label.trim()) return;
+    var newOrd = ordered.concat([{ type:"section", id:"sec-"+Date.now(), label: label.trim() }]);
+    persistOrder(newOrd);
+    setShowAddSec(false); setAddSecLabel("");
+  }
+
+  function handleCreate() {
+    if (!newLabel.trim() || creating) return;
+    setCreating(true);
+    supaCreateSheet(refChantier, newLabel.trim(), null).then(function(row) {
+      if (row) {
+        var newOrd = ordered.concat([{ type:"sheet", data:row }]);
+        persistOrder(newOrd);
+        onCreate(row);
+        setShowNew(false); setNewLabel("");
+      }
+      setCreating(false);
+    });
+  }
+
+  function handleRename(id, val) {
+    var v = val.trim();
+    if (!v) { setRenaming(null); return; }
+    supaRenameSheet(id, v).then(function(ok) {
+      if (ok) {
+        onRename(id, v);
+        setOrdered(ordered.map(function(o){ return o.type==="sheet"&&o.data&&o.data.id===id ? Object.assign({},o,{data:Object.assign({},o.data,{label:v})}) : o; }));
+      }
+    });
+    setRenaming(null);
+  }
+
+  function handleDelete(id) {
+    if (!window.confirm("Supprimer cette feuille ? Les données seront perdues.")) return;
+    supaDeleteSheet(id).then(function(ok) {
+      if (ok) {
+        var newOrd = ordered.filter(function(o){ return !(o.type==="sheet" && o.data && o.data.id===id); });
+        persistOrder(newOrd);
+        onDelete(id);
+      }
+    });
+    setMenuId(null);
+  }
+
+  useEffect(function() {
+    function handler() { setMenuId(null); setHeaderMenu(false); }
+    document.addEventListener("click", handler);
+    return function(){ document.removeEventListener("click", handler); };
+  }, []);
+
+  if (!refChantier) return null;
+
+  return (
+    <div style={{ background: WHITE, borderBottom: "1.5px solid #e0e8e0", padding: "8px 14px 6px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          📋 Feuilles {loadingSheets ? "⏳" : sheets.length > 1 ? "(" + sheets.length + ")" : ""}
+        </div>
+        <div style={{ display: "flex", gap: 6 }} onClick={function(e){ e.stopPropagation(); }}>
+          <button onClick={function(){ setShowNew(function(v){return !v;}); setNewLabel(""); }}
+            style={{ background: GREEN, color: WHITE, border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            + Nouvelle feuille
+          </button>
+          <div style={{ position: "relative" }}>
+            <button onClick={function(e){ e.stopPropagation(); setHeaderMenu(function(v){return !v;}); }}
+              style={{ background: "#f0f0ec", border: "1px solid #e0e0d8", borderRadius: 6, padding: "4px 10px", fontSize: 14, cursor: "pointer", color: "#555" }}>⋯</button>
+            {headerMenu && (
+              <div style={{ position:"absolute", right:0, top:"110%", zIndex:200, background:WHITE, border:"1px solid "+BORDER, borderRadius:8, boxShadow:"0 4px 16px rgba(0,0,0,0.12)", minWidth:180, overflow:"hidden" }}>
+                <button onClick={function(){ setShowAddSec(true); setHeaderMenu(false); setAddSecLabel(""); }}
+                  style={{ display:"block",width:"100%",textAlign:"left",padding:"10px 14px",border:"none",background:"none",cursor:"pointer",fontSize:13 }}>
+                  📁 Ajouter une section
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Nouvelle feuille */}
+      {showNew && (
+        <div style={{ background:"#f0f7f2",borderRadius:8,padding:"8px 10px",marginBottom:6,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
+          <input value={newLabel} onChange={function(e){setNewLabel(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter")handleCreate();}}
+            placeholder="Nom de la feuille…" style={{ flex:1,minWidth:180,fontSize:13 }} autoFocus />
+          <button onClick={handleCreate} disabled={!newLabel.trim()||creating}
+            style={{ background:creating||!newLabel.trim()?"#aaa":GREEN,color:WHITE,border:"none",borderRadius:6,padding:"5px 14px",fontSize:13,fontWeight:700,cursor:"pointer" }}>
+            {creating?"⏳":"✓ Créer"}
+          </button>
+          <button onClick={function(){setShowNew(false);}} style={{ background:"#e8e8e4",border:"none",borderRadius:6,padding:"5px 10px",fontSize:13,cursor:"pointer" }}>Annuler</button>
+        </div>
+      )}
+
+      {/* Nouvelle section */}
+      {showAddSec && (
+        <div style={{ background:"#f5f0fa",borderRadius:8,padding:"8px 10px",marginBottom:6,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",border:"1px solid #d7bde2" }}>
+          <span style={{ fontSize:12,color:"#8e44ad",fontWeight:600 }}>📁</span>
+          <input value={addSecLabel} onChange={function(e){setAddSecLabel(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter")addSection(addSecLabel);}}
+            placeholder="Nom de la section…" style={{ flex:1,minWidth:160,fontSize:13 }} autoFocus />
+          <button onClick={function(){addSection(addSecLabel);}} disabled={!addSecLabel.trim()}
+            style={{ background:"#8e44ad",color:WHITE,border:"none",borderRadius:6,padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer" }}>✓</button>
+          <button onClick={function(){setShowAddSec(false);}} style={{ background:"#e8e8e4",border:"none",borderRadius:6,padding:"5px 10px",fontSize:13,cursor:"pointer" }}>Annuler</button>
+        </div>
+      )}
+
+      {/* Liste ordonnée */}
+      <div style={{ display:"flex",flexWrap:"wrap",gap:5,alignItems:"center" }}>
+        {ordered.map(function(item, idx) {
+          if (item.type === "section") {
+            return (
+              <div key={item.id} style={{ display:"flex",alignItems:"center",gap:4,width:"100%",marginTop:4,marginBottom:2 }}>
+                <div style={{ fontSize:10,fontWeight:700,color:"#8e44ad",textTransform:"uppercase",letterSpacing:"0.08em",padding:"2px 8px",background:"#f5f0fa",borderRadius:10,border:"1px solid #d7bde2" }}>
+                  📁 {item.label}
+                </div>
+                <div style={{ flex:1,height:1,background:"#d7bde2" }} />
+                <button onClick={function(){
+                  if (window.confirm("Supprimer la section \""+item.label+"\" ?")) {
+                    persistOrder(ordered.filter(function(_,i){return i!==idx;}));
+                  }
+                }} style={{ background:"none",border:"none",cursor:"pointer",color:"#c0c",fontSize:11,padding:"2px 4px",opacity:0.5 }}>✕</button>
+              </div>
+            );
+          }
+          // Sheet tab
+          var sheet = item.data;
+          if (!sheet) return null;
+          var isActive = sheet.id === currentId;
+          var label = sheet.label || "Fiche principale";
+          return (
+            <div key={sheet.id} style={{ position:"relative" }} onClick={function(e){e.stopPropagation();}}>
+              {renaming === sheet.id ? (
+                <input autoFocus value={renameVal} onChange={function(e){setRenameVal(e.target.value);}}
+                  onBlur={function(){handleRename(sheet.id,renameVal);}}
+                  onKeyDown={function(e){if(e.key==="Enter")handleRename(sheet.id,renameVal);if(e.key==="Escape")setRenaming(null);}}
+                  style={{ fontSize:13,padding:"4px 8px",border:"1.5px solid "+GREEN,borderRadius:6,width:140 }} />
+              ) : (
+                <button onClick={function(){onSwitch(sheet.id);}}
+                  style={{ padding:"5px 12px",borderRadius:20,border:"1.5px solid "+(isActive?GREEN:BORDER),
+                    background:isActive?"#f0f7f2":WHITE,color:isActive?GREEN:TEXT,
+                    fontSize:13,fontWeight:isActive?700:400,cursor:"pointer",
+                    display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap" }}>
+                  {label}
+                  <span onClick={function(e){e.stopPropagation();setMenuId(function(v){return v===sheet.id?null:sheet.id;});}}
+                    style={{ color:MUTED,fontSize:14,lineHeight:1,padding:"0 2px" }}>⋯</span>
+                </button>
+              )}
+              {menuId === sheet.id && (
+                <div style={{ position:"absolute",left:0,top:"110%",zIndex:200,background:WHITE,border:"1px solid "+BORDER,borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",minWidth:160,overflow:"hidden" }}>
+                  <button onClick={function(){setRenaming(sheet.id);setRenameVal(sheet.label||"");setMenuId(null);}}
+                    style={{ display:"block",width:"100%",textAlign:"left",padding:"9px 14px",border:"none",background:"none",cursor:"pointer",fontSize:13 }}>✏️ Renommer</button>
+                  {ordered.filter(function(o){return o.type==="sheet";}).length > 1 && (
+                    <button onClick={function(){handleDelete(sheet.id);}}
+                      style={{ display:"block",width:"100%",textAlign:"left",padding:"9px 14px",border:"none",background:"none",cursor:"pointer",fontSize:13,color:"#e74c3c" }}>🗑️ Supprimer</button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!loadingSheets && ordered.filter(function(o){return o.type==="sheet";}).length === 0 && (
+          <div style={{ fontSize:12,color:MUTED,fontStyle:"italic" }}>Aucune feuille — cliquez "+ Nouvelle feuille"</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── GearPanel (⚙️ — options avancées) ────────────────────────────────────────
+function GearPanel({ onClose, currentRef, onImport }) {
+  var [url, setUrl] = useState("");
+  var [loading, setLoading] = useState(false);
+  var [error, setError] = useState("");
+
+  function extractRef(input) {
+    try {
+      var u = new URL(input.trim());
+      return u.searchParams.get("ref") || "";
+    } catch(e) {
+      return input.trim();
+    }
+  }
+
+  async function handleImport() {
+    var sourceRef = extractRef(url);
+    if (!sourceRef) { setError("URL ou référence invalide."); return; }
+    if (sourceRef === currentRef) { setError("C'est la même référence que la feuille actuelle."); return; }
+    setLoading(true); setError("");
+    var row = await supaImportFromRef(sourceRef);
+    if (!row || !row.data) { setError("Aucune feuille trouvée pour la ref \"" + sourceRef + "\"."); setLoading(false); return; }
+    onImport(row.data, sourceRef);
+    setLoading(false); onClose();
+  }
+
+  return (
+    <div style={{ position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.35)",display:"flex",alignItems:"flex-start",justifyContent:"flex-end" }}
+      onClick={onClose}>
+      <div style={{ background:WHITE,borderRadius:"0 0 0 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.18)",padding:"20px 22px",minWidth:300,maxWidth:380,marginTop:60,marginRight:8 }}
+        onClick={function(e){e.stopPropagation();}}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+          <div style={{ fontWeight:700,fontSize:15,color:TEXT }}>⚙️ Options avancées</div>
+          <button onClick={onClose} style={{ background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED }}>×</button>
+        </div>
+
+        <div style={{ borderTop:"1px solid "+BORDER,paddingTop:14 }}>
+          <div style={{ fontWeight:600,fontSize:13,marginBottom:6,color:TEXT }}>📥 Importer depuis un autre briefing</div>
+          <div style={{ fontSize:12,color:MUTED,marginBottom:10 }}>
+            Collez l'URL ou la référence (ex: S05041) d'un autre briefing pour en importer les données dans la feuille actuelle.
+          </div>
+          <input value={url} onChange={function(e){setUrl(e.target.value);setError("");}}
+            placeholder="https://…?ref=S05041 ou S05041"
+            style={{ width:"100%",fontSize:13,padding:"7px 10px",border:"1.5px solid "+BORDER,borderRadius:7,boxSizing:"border-box",marginBottom:8 }} />
+          {error && <div style={{ color:"#e74c3c",fontSize:12,marginBottom:8 }}>⚠ {error}</div>}
+          <button onClick={handleImport} disabled={!url.trim()||loading}
+            style={{ background:!url.trim()||loading?"#aaa":GREEN,color:WHITE,border:"none",borderRadius:7,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%" }}>
+            {loading ? "⏳ Chargement…" : "📥 Importer les données"}
+          </button>
+          <div style={{ fontSize:11,color:MUTED,marginTop:6,fontStyle:"italic" }}>
+            ⚠ Remplace les données de la feuille actuelle. Photos non importées.
+          </div>
+        </div>
+
+        <div style={{ borderTop:"1px solid "+BORDER,marginTop:16,paddingTop:10,fontSize:11,color:MUTED }}>
+          D'autres options seront ajoutées ici.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [mode, setMode] = useState("form");
   const [bcLoading, setBcLoading] = useState(false);
@@ -2094,7 +2443,17 @@ function App() {
   const saveTimer = useRef(null);
   const photoSaveTimer = useRef(null);
   const isLoading = useRef(false);
-  const latestDataRef = useRef(null); // always points to latest data — fixes stale closure in timeouts
+  const latestDataRef = useRef(null);
+  const currentSheetIdRef = useRef(null); // toujours à jour — évite les stale closures
+  const refRef = useRef(null); // ref de la fiche courante
+
+  // ── État multi-feuilles ────────────────────────────────────────────────────
+  const [sheets, setSheets] = useState([]);           // [{id, ref, label, updated_at}]
+  const [ordered, setOrdered] = useState([]);          // [{type:"sheet"|"section", data?, id?, label?}]
+  const [currentSheetId, setCurrentSheetId] = useState(null);
+  const [sheetOrderId, setSheetOrderId] = useState(null);
+  const [loadingSheets, setLoadingSheets] = useState(false);
+  const [showGear, setShowGear] = useState(false);
   const [user, setUser] = useState(function() {
     try {
       var stored = localStorage.getItem("wge_user");
@@ -2115,7 +2474,9 @@ function App() {
   const prevDataRef = useRef(null);
 
   const data = { client, weGreen, entity, date, sites, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
-  latestDataRef.current = data; // always fresh — used in save timeouts to avoid stale closures
+  latestDataRef.current = data;
+  currentSheetIdRef.current = currentSheetId;
+  refRef.current = ref;
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
   // ── Setters sites-aware ────────────────────────────────────────────────────
@@ -2193,24 +2554,115 @@ function App() {
   };
   // Sites add/remove
   const addSite = function() { setSites(function(prev){ return prev.concat([makeEmptySite()]); }); };
+
+  // ── Changer de feuille ────────────────────────────────────────────────────
+  const switchSheet = function(sheetId) {
+    if (sheetId === currentSheetId) return;
+    setSaveStatus("loading");
+    supaLoadSheetById(sheetId).then(function(row) {
+      if (!row || !row.data) { setSaveStatus(""); return; }
+      isLoading.current = true;
+      try {
+        var d = row.data;
+        if (d.client) setClient(function(p){ return Object.assign({}, p, d.client); });
+        if (d.weGreen) setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+        if (typeof d.entity === "string" && ENTITIES[d.entity]) setEntity(d.entity);
+        if (typeof d.date === "string") setDate(d.date);
+        if (Array.isArray(d.sites) && d.sites.length > 0) setSites(d.sites.map(function(s){ return Object.assign({electrical:makeEmptyElectrical(),pvInstallations:[makeEmptyPVInst()],brInstallations:[]},s); }));
+        else if (Array.isArray(d.installations) && d.installations.length > 0) setSites([{electrical:{reseau:d.installations[0].tech.reseau||null,amperageDisj:d.installations[0].tech.amperageDisj||"",compteur:Object.assign({serie:"",ean:""},d.installations[0].tech.compteur||{}),branchementOnduleur:d.installations[0].tech.branchementOnduleur||null,distances:Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""},d.installations[0].tech.distances||{})},pvInstallations:d.installations.map(function(inst){return {tech:inst.tech,strings:inst.strings};}),brInstallations:d.brInstallations||[]}]);
+        if (typeof d.comments === "string") setComments(d.comments);
+        if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (d.photos && typeof d.photos === "object") setPhotos(Object.fromEntries(PHOTO_CATS.map(function(cat){ var arr = d.photos[cat.key]; return [cat.key, Array.isArray(arr)?arr:[]]; })));
+        if (typeof d.tdNote === "string") setTdNote(d.tdNote);
+        if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
+        if (typeof d.pmNote === "string") setPmNote(d.pmNote);
+        if (d.calepinage) setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
+        setCurrentSheetId(sheetId);
+        currentSheetIdRef.current = sheetId;
+        setLastSaved(row.updated_at);
+        setSaveStatus("saved");
+        setTimeout(function() { isLoading.current = false; }, 100);
+      } catch(e) { console.error(e); isLoading.current = false; setSaveStatus(""); }
+    });
+  };
+
+  // ── Import depuis un autre briefing ───────────────────────────────────────
+  const handleGearImport = function(sourceData) {
+    isLoading.current = true;
+    try {
+      var d = sourceData;
+      if (d.client) setClient(function(p){ return Object.assign({}, p, d.client); });
+      if (d.weGreen) setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
+      if (typeof d.date === "string") setDate(d.date);
+      if (Array.isArray(d.sites) && d.sites.length > 0) setSites(d.sites);
+      else if (Array.isArray(d.installations) && d.installations.length > 0) setSites([{electrical:{reseau:d.installations[0].tech.reseau||null,amperageDisj:d.installations[0].tech.amperageDisj||"",compteur:Object.assign({serie:"",ean:""},d.installations[0].tech.compteur||{}),branchementOnduleur:d.installations[0].tech.branchementOnduleur||null,distances:Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""},d.installations[0].tech.distances||{})},pvInstallations:d.installations.map(function(inst){return {tech:inst.tech,strings:inst.strings};}),brInstallations:d.brInstallations||[]}]);
+      if (typeof d.comments === "string") setComments(d.comments);
+      if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+      if (typeof d.tdNote === "string") setTdNote(d.tdNote);
+      if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
+      if (typeof d.pmNote === "string") setPmNote(d.pmNote);
+      alert("✓ Données importées depuis l'autre briefing. Photos non importées.");
+    } catch(e) { alert("Erreur import: " + e.message); }
+    setTimeout(function() { isLoading.current = false; }, 100);
+  };
   const removeSite = function(siteIdx) {
     setSites(function(prev){ if (prev.length <= 1) return prev; return prev.filter(function(_, i){ return i !== siteIdx; }); });
   };
 
-  // ── Load from URL ?ref= on mount ──────────────────────────────────────────
+  // ── Load from URL ?ref= on mount (multi-feuilles) ────────────────────────
   useEffect(function() {
     var params = new URLSearchParams(window.location.search);
     var urlRef = params.get("ref");
     if (!urlRef) return;
     setRef(urlRef);
-    // Auto-detect entity from ref prefix (retrocompat: no prefix = wge)
     setEntity(detectEntity(urlRef));
     setSaveStatus("loading");
-    supaLoad(urlRef).then(function(row) {
-      if (!row || !row.data) { setSaveStatus(""); return; }
-      try {
-        var d = row.data;
-        isLoading.current = true;
+    setLoadingSheets(true);
+
+    // 1. Charge la liste des feuilles
+    supaLoadSheetList(urlRef).then(async function(list) {
+      // Charge aussi l'ordre
+      var orderRow = await supaLoadSheetOrder(urlRef);
+      if (orderRow) setSheetOrderId(orderRow.id);
+
+      if (!list || list.length === 0) { setSaveStatus(""); setLoadingSheets(false); return; }
+
+      setSheets(list);
+
+      // Reconstruit l'ordre ordonné à partir de la liste + orderRow
+      var ordered;
+      if (orderRow && Array.isArray(orderRow.data) && orderRow.data.length > 0) {
+        var orderArr = orderRow.data;
+        var result = [];
+        orderArr.forEach(function(item) {
+          if (item.type === "section") {
+            result.push({ type:"section", id:item.id, label:item.label });
+          } else if (item.type === "sheet" && item.id) {
+            var s = list.find(function(sh){ return sh.id === item.id; });
+            if (s) result.push({ type:"sheet", data:s });
+          }
+        });
+        // Ajouter les feuilles non encore dans l'ordre
+        list.forEach(function(s) {
+          if (!result.find(function(o){ return o.type==="sheet" && o.data && o.data.id===s.id; }))
+            result.push({ type:"sheet", data:s });
+        });
+        ordered = result;
+      } else {
+        ordered = list.map(function(s){ return { type:"sheet", data:s }; });
+      }
+      setOrdered(ordered);
+
+      // 2. Charge la première feuille
+      var firstSheet = list[0];
+      setCurrentSheetId(firstSheet.id);
+      currentSheetIdRef.current = firstSheet.id;
+
+      supaLoadSheetById(firstSheet.id).then(function(row) {
+        if (!row || !row.data) { setSaveStatus(""); setLoadingSheets(false); return; }
+        try {
+          var d = row.data;
+          isLoading.current = true;
         // Each field validated before applying - crash-safe
         if (d.client && typeof d.client === "object") setClient(function(p){ return Object.assign({}, p, d.client); });
         if (d.weGreen && typeof d.weGreen === "object") setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
@@ -2285,6 +2737,7 @@ function App() {
         if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
         setLastSaved(row.updated_at);
         setSaveStatus("saved");
+        setLoadingSheets(false);
         setTimeout(function() {
           isLoading.current = false;
           prevDataRef.current = makeSlimData(row.data);
@@ -2294,8 +2747,10 @@ function App() {
         console.error("Erreur chargement Supabase:", loadErr);
         isLoading.current = false;
         setSaveStatus("");
+        setLoadingSheets(false);
       }
-    });
+      }); // end supaLoadSheetById
+    }); // end supaLoadSheetList
   }, []);
 
   // ── Auth: restore session from localStorage ─────────────────────────────
@@ -2318,15 +2773,29 @@ function App() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus("saving");
     saveTimer.current = setTimeout(async function() {
+      // Utilise supaUpdateSheetById si on a un id, sinon crée la feuille
+      async function smartSave(data) {
+        var sid = currentSheetIdRef.current;
+        if (sid) return await supaUpdateSheetById(sid, data);
+        // Première sauvegarde (nouvelle ref sans feuille existante)
+        var row = await supaCreateSheet(refRef.current, "", data);
+        if (row) {
+          currentSheetIdRef.current = row.id;
+          setCurrentSheetId(row.id);
+          setSheets(function(prev){ return prev.concat([row]); });
+          setOrdered(function(prev){ return prev.concat([{type:"sheet",data:row}]); });
+          return true;
+        }
+        return false;
+      }
       var currentData = latestDataRef.current;
-      // Upload base64 photos to storage first (no-op si déjà des URLs)
-      var result = await uploadBase64PhotosToStorage(ref, currentData);
+      var result = await uploadBase64PhotosToStorage(refRef.current || "", currentData);
       if (result.changed) {
         setPhotos(result.data.photos);
         if (result.data.calepinage !== currentData.calepinage) setCalepinage(result.data.calepinage);
         currentData = result.data;
       }
-      var ok = await supaSave(ref, currentData);
+      var ok = await smartSave(currentData);
       if (ok) {
         setLastSaved(new Date().toISOString()); setSaveStatus("saved");
         if (userRef.current) {
@@ -2976,6 +3445,13 @@ function App() {
             }} title="Se déconnecter" style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 1px" }}>×</button>
           </div>
           )}
+          {/* Bouton ⚙️ options avancées */}
+          {ref && (
+            <button onClick={function(){ setShowGear(function(v){return !v;}); }} title="Options avancées"
+              style={{ background: showGear ? "#e8e8e4" : "none", border: "1px solid " + (showGear ? "#bbb" : "transparent"), borderRadius: 7, padding: "5px 9px", fontSize: 15, cursor: "pointer", color: showGear ? "#333" : MUTED, lineHeight: 1 }}>
+              ⚙️
+            </button>
+          )}
         </div>
       </div>
 
@@ -2985,6 +3461,45 @@ function App() {
           <div onClick={function(){ setShowHistory(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", zIndex: 9989 }} />
           <HistoryPanel refChantier={ref} onRestore={restoreVersion} onClose={function(){ setShowHistory(false); }} />
         </>
+      )}
+
+      {/* ── SheetBar — multi-feuilles ── */}
+      {ref && mode !== "preview" && (
+        <SheetBar
+          ref={ref}
+          sheets={sheets}
+          ordered={ordered}
+          setOrdered={setOrdered}
+          currentId={currentSheetId}
+          loadingSheets={loadingSheets}
+          orderId={sheetOrderId}
+          setOrderId={setSheetOrderId}
+          onSwitch={switchSheet}
+          onCreate={function(row){
+            setSheets(function(prev){ return prev.concat([row]); });
+            switchSheet(row.id);
+          }}
+          onRename={function(id, label){
+            setSheets(function(prev){ return prev.map(function(s){ return s.id===id?Object.assign({},s,{label:label}):s; }); });
+          }}
+          onDelete={function(id){
+            setSheets(function(prev){ return prev.filter(function(s){ return s.id!==id; }); });
+            setOrdered(function(prev){ return prev.filter(function(o){ return !(o.type==="sheet"&&o.data&&o.data.id===id); }); });
+            if (id === currentSheetId) {
+              var remaining = sheets.filter(function(s){ return s.id !== id; });
+              if (remaining.length > 0) switchSheet(remaining[0].id);
+            }
+          }}
+        />
+      )}
+
+      {/* ── GearPanel ── */}
+      {showGear && (
+        <GearPanel
+          onClose={function(){ setShowGear(false); }}
+          currentRef={ref}
+          onImport={handleGearImport}
+        />
       )}
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
