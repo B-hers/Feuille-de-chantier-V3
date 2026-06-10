@@ -2357,7 +2357,7 @@ function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loading
 }
 
 // ── GearPanel (⚙️ — options avancées) ────────────────────────────────────────
-function GearPanel({ onClose, currentRef, onImport }) {
+function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
   var [url, setUrl] = useState("");
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
@@ -2410,7 +2410,21 @@ function GearPanel({ onClose, currentRef, onImport }) {
           </div>
         </div>
 
-        <div style={{ borderTop:"1px solid "+BORDER,marginTop:16,paddingTop:10,fontSize:11,color:MUTED }}>
+        <div style={{ borderTop:"1px solid "+BORDER,paddingTop:14,marginTop:16 }}>
+          <div style={{ fontWeight:600,fontSize:13,marginBottom:10,color:TEXT }}>💾 Sauvegarde locale (JSON)</div>
+          <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+            <button onClick={function(){ onExport(); onClose(); }}
+              style={{ background:"#fffbe6",border:"1px solid #e0c800",color:"#7a6000",borderRadius:7,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",flex:1 }}>
+              💾 Exporter JSON
+            </button>
+            <label style={{ background:GREEN_LIGHT,border:"1px solid "+GREEN_MID,color:GREEN,borderRadius:7,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",flex:1,textAlign:"center" }}>
+              📂 Importer JSON
+              <input type="file" accept=".json" style={{ display:"none" }} onChange={function(e){ if(e.target.files&&e.target.files[0]){ onImportJSON(e.target.files[0]); e.target.value=""; onClose(); } }} />
+            </label>
+          </div>
+          <div style={{ fontSize:11,color:MUTED,marginTop:6,fontStyle:"italic" }}>Sauvegarde/restauration locale du formulaire complet.</div>
+        </div>
+        <div style={{ borderTop:"1px solid "+BORDER,marginTop:14,paddingTop:10,fontSize:11,color:MUTED }}>
           D'autres options seront ajoutées ici.
         </div>
       </div>
@@ -2614,6 +2628,7 @@ function App() {
     var params = new URLSearchParams(window.location.search);
     var urlRef = params.get("ref");
     if (!urlRef) return;
+    isLoading.current = true; // empêche les save effects pendant le chargement
     setRef(urlRef);
     setEntity(detectEntity(urlRef));
     setSaveStatus("loading");
@@ -2625,7 +2640,7 @@ function App() {
       var orderRow = await supaLoadSheetOrder(urlRef);
       if (orderRow) setSheetOrderId(orderRow.id);
 
-      if (!list || list.length === 0) { setSaveStatus(""); setLoadingSheets(false); return; }
+      if (!list || list.length === 0) { isLoading.current = false; setSaveStatus(""); setLoadingSheets(false); return; }
 
       setSheets(list);
 
@@ -2777,16 +2792,30 @@ function App() {
       async function smartSave(data) {
         var sid = currentSheetIdRef.current;
         if (sid) return await supaUpdateSheetById(sid, data);
-        // Première sauvegarde (nouvelle ref sans feuille existante)
+        // Pas de sheet id — essaie de créer. Si la migration SQL n'est pas faite,
+        // tombe en fallback sur l'ancien upsert par ref.
+        if (!refRef.current) return false;
         var row = await supaCreateSheet(refRef.current, "", data);
         if (row) {
           currentSheetIdRef.current = row.id;
           setCurrentSheetId(row.id);
-          setSheets(function(prev){ return prev.concat([row]); });
-          setOrdered(function(prev){ return prev.concat([{type:"sheet",data:row}]); });
+          setSheets(function(prev){ return prev.length ? prev : [row]; });
+          setOrdered(function(prev){ return prev.length ? prev : [{type:"sheet",data:row}]; });
           return true;
         }
-        return false;
+        // Fallback : colonnes id/label absentes (migration SQL pas encore faite)
+        // → ancien upsert par ref
+        try {
+          var res = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+            method: "POST",
+            headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY,
+              "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates",
+              "x-supabase-statement-timeout": "25000" },
+            body: JSON.stringify({ ref: refRef.current, data: data, updated_at: new Date().toISOString() })
+          });
+          if (!res.ok) { console.error("Fallback save failed:", res.status); return false; }
+          return true;
+        } catch(e) { console.error("Fallback save:", e); return false; }
       }
       var currentData = latestDataRef.current;
       var result = await uploadBase64PhotosToStorage(refRef.current || "", currentData);
@@ -3411,10 +3440,7 @@ function App() {
             <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
           </div>
           {mode === "preview" && <button onClick={() => window.print()} style={btnSt(false)}>⬇ PDF</button>}
-          <button onClick={exportData} title="Sauvegarde JSON locale" style={{ ...btnSt(false), background: "#fffbe6", borderColor: "#e0c800", color: "#7a6000", fontSize: 12 }}>💾 Export</button>
-          <label title="Restaurer depuis JSON" style={{ ...btnSt(false), background: GREEN_LIGHT, borderColor: GREEN_MID, color: GREEN, fontSize: 12, cursor: "pointer", margin: 0 }}>
-            📂 Import<input type="file" accept=".json" style={{ display: "none" }} onChange={function(e) { if (e.target.files && e.target.files[0]) { importData(e.target.files[0]); e.target.value = ""; } }} />
-          </label>
+
           {ref && (
             <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
           )}
@@ -3448,7 +3474,7 @@ function App() {
           {/* Bouton ⚙️ options avancées */}
           {ref && (
             <button onClick={function(){ setShowGear(function(v){return !v;}); }} title="Options avancées"
-              style={{ background: showGear ? "#e8e8e4" : "none", border: "1px solid " + (showGear ? "#bbb" : "transparent"), borderRadius: 7, padding: "5px 9px", fontSize: 15, cursor: "pointer", color: showGear ? "#333" : MUTED, lineHeight: 1 }}>
+              style={{ background: showGear ? "#e8e8e4" : "#f5f5f0", border: "1.5px solid " + (showGear ? "#888" : BORDER), borderRadius: 8, padding: "7px 12px", fontSize: 19, cursor: "pointer", color: showGear ? "#222" : "#555", lineHeight: 1 }}>
               ⚙️
             </button>
           )}
@@ -3463,42 +3489,14 @@ function App() {
         </>
       )}
 
-      {/* ── SheetBar — multi-feuilles ── */}
-      {ref && mode !== "preview" && (
-        <SheetBar
-          refChantier={ref}
-          sheets={sheets}
-          ordered={ordered}
-          setOrdered={setOrdered}
-          currentId={currentSheetId}
-          loadingSheets={loadingSheets}
-          orderId={sheetOrderId}
-          setOrderId={setSheetOrderId}
-          onSwitch={switchSheet}
-          onCreate={function(row){
-            setSheets(function(prev){ return prev.concat([row]); });
-            switchSheet(row.id);
-          }}
-          onRename={function(id, label){
-            setSheets(function(prev){ return prev.map(function(s){ return s.id===id?Object.assign({},s,{label:label}):s; }); });
-          }}
-          onDelete={function(id){
-            setSheets(function(prev){ return prev.filter(function(s){ return s.id!==id; }); });
-            setOrdered(function(prev){ return prev.filter(function(o){ return !(o.type==="sheet"&&o.data&&o.data.id===id); }); });
-            if (id === currentSheetId) {
-              var remaining = sheets.filter(function(s){ return s.id !== id; });
-              if (remaining.length > 0) switchSheet(remaining[0].id);
-            }
-          }}
-        />
-      )}
-
       {/* ── GearPanel ── */}
       {showGear && (
         <GearPanel
           onClose={function(){ setShowGear(false); }}
           currentRef={ref}
           onImport={handleGearImport}
+          onExport={exportData}
+          onImportJSON={importData}
         />
       )}
 
@@ -3521,6 +3519,35 @@ function App() {
                 </>
             }
           </div>
+
+          {/* ── SheetBar — multi-feuilles ── */}
+          {ref && (
+            <SheetBar
+              refChantier={ref}
+              sheets={sheets}
+              ordered={ordered}
+              setOrdered={setOrdered}
+              currentId={currentSheetId}
+              loadingSheets={loadingSheets}
+              orderId={sheetOrderId}
+              setOrderId={setSheetOrderId}
+              onSwitch={switchSheet}
+              onCreate={function(row){
+                setSheets(function(prev){ return prev.concat([row]); });
+                setOrdered(function(prev){ return prev.concat([{type:"sheet",data:row}]); });
+                switchSheet(row.id);
+              }}
+              onRename={function(id, label){
+                setSheets(function(prev){ return prev.map(function(s){ return s.id===id?Object.assign({},s,{label:label}):s; }); });
+              }}
+              onDelete={function(id){
+                var remaining = sheets.filter(function(s){ return s.id !== id; });
+                setSheets(remaining);
+                setOrdered(function(prev){ return prev.filter(function(o){ return !(o.type==="sheet"&&o.data&&o.data.id===id); }); });
+                if (id === currentSheetId && remaining.length > 0) switchSheet(remaining[0].id);
+              }}
+            />
+          )}
 
           {/* ── 1. Client + WGE ── */}
           <div style={G2}>
