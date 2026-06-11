@@ -507,8 +507,73 @@ async function supaSaveSheetOrder(ref, orderData, existingId) {
   } catch(e) {}
 }
 
-// Import depuis une autre ref — charge la première feuille de cette ref
-async function supaImportFromRef(sourceRef) {
+// Copie un fichier Storage d'une source URL vers un nouveau chemin (pour l'import avec duplication)
+async function copyStorageFile(sourceUrl, targetRef, catKey, filename) {
+  try {
+    var res = await fetch(sourceUrl);
+    if (!res.ok) return null;
+    var blob = await res.blob();
+    var base64 = await new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.onerror = function() { resolve(null); };
+      reader.readAsDataURL(blob);
+    });
+    if (!base64) return null;
+    return await uploadPhotoToStorage(targetRef, catKey, base64, filename || "photo");
+  } catch(e) {
+    console.warn("copyStorageFile failed:", sourceUrl, e);
+    return null;
+  }
+}
+
+// Duplique toutes les photos d'un briefing source vers un nouveau ref
+// onProgress(done, total) appelé à chaque photo traitée
+async function duplicateAllPhotos(sourcePhotos, sourceCalepinage, targetRef, onProgress) {
+  var cats = Object.keys(sourcePhotos || {});
+  // Compter le total
+  var total = 0;
+  cats.forEach(function(k) { total += (sourcePhotos[k] || []).length; });
+  if (sourceCalepinage && sourceCalepinage.image && sourceCalepinage.image.startsWith("http")) total++;
+  var done = 0;
+  onProgress && onProgress(0, total);
+
+  var newPhotos = {};
+  for (var ci = 0; ci < cats.length; ci++) {
+    var catKey = cats[ci];
+    var arr = sourcePhotos[catKey] || [];
+    newPhotos[catKey] = [];
+    for (var pi = 0; pi < arr.length; pi++) {
+      var photo = arr[pi];
+      var np = Object.assign({}, photo);
+      // Dupliquer url
+      if (photo.url && photo.url.startsWith("http")) {
+        var newUrl = await copyStorageFile(photo.url, targetRef, catKey, photo.name);
+        if (newUrl) np.url = newUrl;
+      }
+      // Dupliquer drawingUrl (dessin sans texte)
+      if (photo.drawingUrl && photo.drawingUrl.startsWith("http") && photo.drawingUrl !== photo.url) {
+        var newDUrl = await copyStorageFile(photo.drawingUrl, targetRef, catKey, "draw-" + (photo.name || "photo"));
+        if (newDUrl) np.drawingUrl = newDUrl;
+      }
+      // textObjects : copiés tels quels (pas de fichier)
+      newPhotos[catKey].push(np);
+      done++;
+      onProgress && onProgress(done, total);
+    }
+  }
+
+  // Calepinage
+  var newCalepinage = sourceCalepinage;
+  if (sourceCalepinage && sourceCalepinage.image && sourceCalepinage.image.startsWith("http")) {
+    var newCalUrl = await copyStorageFile(sourceCalepinage.image, targetRef, "calepinage", "calepinage.jpg");
+    if (newCalUrl) newCalepinage = Object.assign({}, sourceCalepinage, { image: newCalUrl });
+    done++;
+    onProgress && onProgress(done, total);
+  }
+
+  return { photos: newPhotos, calepinage: newCalepinage };
+}
   var list = await supaLoadSheetList(sourceRef);
   if (!list || list.length === 0) return null;
   return await supaLoadSheetById(list[0].id);
@@ -2391,55 +2456,106 @@ function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
   var [url, setUrl] = useState("");
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
+  var [withPhotos, setWithPhotos] = useState(true);
+  var [duplicateMode, setDuplicateMode] = useState(false);
+  var [progress, setProgress] = useState(null);
 
   function extractRef(input) {
-    try {
-      var u = new URL(input.trim());
-      return u.searchParams.get("ref") || "";
-    } catch(e) {
-      return input.trim();
-    }
+    try { var u = new URL(input.trim()); return u.searchParams.get("ref") || ""; }
+    catch(e) { return input.trim(); }
   }
 
   async function handleImport() {
     var sourceRef = extractRef(url);
     if (!sourceRef) { setError("URL ou référence invalide."); return; }
-    if (sourceRef === currentRef) { setError("C'est la même référence que la feuille actuelle."); return; }
-    setLoading(true); setError("");
+    if (sourceRef === currentRef) { setError("C\'est la même référence que la feuille actuelle."); return; }
+    setLoading(true); setError(""); setProgress(null);
     var row = await supaImportFromRef(sourceRef);
-    if (!row || !row.data) { setError("Aucune feuille trouvée pour la ref \"" + sourceRef + "\"."); setLoading(false); return; }
-    onImport(row.data, sourceRef);
+    if (!row || !row.data) { setError("Aucune feuille trouvée pour \"" + sourceRef + "\""); setLoading(false); return; }
+
+    var payload = { data: row.data };
+    if (withPhotos && row.data.photos) {
+      if (duplicateMode && currentRef) {
+        var result = await duplicateAllPhotos(row.data.photos, row.data.calepinage, currentRef,
+          function(done, total) { setProgress({ done: done, total: total }); });
+        payload.photos = result.photos;
+        payload.calepinage = result.calepinage;
+      } else {
+        payload.photos = row.data.photos;
+        payload.calepinage = row.data.calepinage;
+      }
+    }
+    setProgress(null);
+    onImport(payload, sourceRef);
     setLoading(false); onClose();
   }
 
   return (
     <div style={{ position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.35)",display:"flex",alignItems:"flex-start",justifyContent:"flex-end" }}
-      onClick={onClose}>
-      <div style={{ background:WHITE,borderRadius:"0 0 0 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.18)",padding:"20px 22px",minWidth:300,maxWidth:380,marginTop:60,marginRight:8 }}
+      onClick={loading ? undefined : onClose}>
+      <div style={{ background:WHITE,borderRadius:"0 0 0 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.18)",padding:"20px 22px",minWidth:310,maxWidth:400,marginTop:60,marginRight:8,maxHeight:"90vh",overflowY:"auto" }}
         onClick={function(e){e.stopPropagation();}}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div style={{ fontWeight:700,fontSize:15,color:TEXT }}>⚙️ Options avancées</div>
-          <button onClick={onClose} style={{ background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED }}>×</button>
+          {!loading && <button onClick={onClose} style={{ background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED }}>×</button>}
         </div>
 
+        {/* ── Import depuis un autre briefing ── */}
         <div style={{ borderTop:"1px solid "+BORDER,paddingTop:14 }}>
           <div style={{ fontWeight:600,fontSize:13,marginBottom:6,color:TEXT }}>📥 Importer depuis un autre briefing</div>
-          <div style={{ fontSize:12,color:MUTED,marginBottom:10 }}>
-            Collez l'URL ou la référence (ex: S05041) d'un autre briefing pour en importer les données dans la feuille actuelle.
-          </div>
-          <input value={url} onChange={function(e){setUrl(e.target.value);setError("");}}
+          <div style={{ fontSize:12,color:MUTED,marginBottom:10 }}>URL ou référence du briefing source (ex: S05041)</div>
+          <input value={url} onChange={function(e){setUrl(e.target.value);setError("");}} disabled={loading}
             placeholder="https://…?ref=S05041 ou S05041"
-            style={{ width:"100%",fontSize:13,padding:"7px 10px",border:"1.5px solid "+BORDER,borderRadius:7,boxSizing:"border-box",marginBottom:8 }} />
+            style={{ width:"100%",fontSize:13,padding:"7px 10px",border:"1.5px solid "+BORDER,borderRadius:7,boxSizing:"border-box",marginBottom:10 }} />
+
+          {/* Options photos */}
+          <div style={{ background:"#f8f8f4",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid #e8e8e0" }}>
+            <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:6 }}>
+              <input type="checkbox" checked={withPhotos} onChange={function(e){setWithPhotos(e.target.checked);}} disabled={loading} />
+              <span style={{ fontSize:13,fontWeight:600,color:TEXT }}>📷 Inclure les photos</span>
+            </label>
+            {withPhotos && (
+              <div style={{ paddingLeft:22,display:"flex",flexDirection:"column",gap:8,marginTop:2 }}>
+                <label style={{ display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer" }}>
+                  <input type="radio" checked={!duplicateMode} onChange={function(){setDuplicateMode(false);}} disabled={loading} style={{ marginTop:2 }} />
+                  <div>
+                    <div style={{ fontSize:12,fontWeight:600 }}>⚡ Référencer les URLs</div>
+                    <div style={{ fontSize:11,color:MUTED }}>Immédiat — les fichiers restent dans le Storage du briefing source.</div>
+                  </div>
+                </label>
+                <label style={{ display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer" }}>
+                  <input type="radio" checked={duplicateMode} onChange={function(){setDuplicateMode(true);}} disabled={loading} style={{ marginTop:2 }} />
+                  <div>
+                    <div style={{ fontSize:12,fontWeight:600 }}>🔁 Dupliquer les fichiers</div>
+                    <div style={{ fontSize:11,color:MUTED }}>Copie chaque photo dans Storage sous ce briefing. Indépendant mais plus lent.</div>
+                  </div>
+                </label>
+                <div style={{ fontSize:11,color:"#8e44ad",background:"#f5eefb",borderRadius:5,padding:"4px 8px" }}>
+                  ℹ Dessins et annotations (textObjects) inclus dans les deux cas.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Barre de progression */}
+          {progress && (
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:12,color:MUTED,marginBottom:4 }}>Copie des photos… {progress.done}/{progress.total}</div>
+              <div style={{ background:"#e8e8e4",borderRadius:20,height:6,overflow:"hidden" }}>
+                <div style={{ background:GREEN,height:"100%",width:(progress.total>0?Math.round(progress.done/progress.total*100):0)+"%",transition:"width 0.2s",borderRadius:20 }} />
+              </div>
+            </div>
+          )}
+
           {error && <div style={{ color:"#e74c3c",fontSize:12,marginBottom:8 }}>⚠ {error}</div>}
           <button onClick={handleImport} disabled={!url.trim()||loading}
             style={{ background:!url.trim()||loading?"#aaa":GREEN,color:WHITE,border:"none",borderRadius:7,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%" }}>
-            {loading ? "⏳ Chargement…" : "📥 Importer les données"}
+            {loading ? (progress?"⏳ Copie…":"⏳ Chargement…") : "📥 Importer"}
           </button>
-          <div style={{ fontSize:11,color:MUTED,marginTop:6,fontStyle:"italic" }}>
-            ⚠ Remplace les données de la feuille actuelle. Photos non importées.
-          </div>
+          <div style={{ fontSize:11,color:MUTED,marginTop:6,fontStyle:"italic" }}>⚠ Remplace les données de la feuille actuelle.</div>
         </div>
 
+        {/* ── Sauvegarde locale ── */}
         <div style={{ borderTop:"1px solid "+BORDER,paddingTop:14,marginTop:16 }}>
           <div style={{ fontWeight:600,fontSize:13,marginBottom:10,color:TEXT }}>💾 Sauvegarde locale (JSON)</div>
           <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
@@ -2461,7 +2577,6 @@ function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
     </div>
   );
 }
-
 function App() {
   const [mode, setMode] = useState("form");
   const [bcLoading, setBcLoading] = useState(false);
@@ -2632,10 +2747,10 @@ function App() {
   };
 
   // ── Import depuis un autre briefing ───────────────────────────────────────
-  const handleGearImport = function(sourceData) {
+  const handleGearImport = function(payload, sourceRef) {
+    var d = payload.data;
     isLoading.current = true;
     try {
-      var d = sourceData;
       if (d.client) setClient(function(p){ return Object.assign({}, p, d.client); });
       if (d.weGreen) setWeGreen(function(p){ return Object.assign({}, p, d.weGreen); });
       if (typeof d.date === "string") setDate(d.date);
@@ -2646,7 +2761,18 @@ function App() {
       if (typeof d.tdNote === "string") setTdNote(d.tdNote);
       if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
       if (typeof d.pmNote === "string") setPmNote(d.pmNote);
-      alert("✓ Données importées depuis l'autre briefing. Photos non importées.");
+      // Photos (si incluses dans le payload)
+      if (payload.photos && typeof payload.photos === "object") {
+        setPhotos(Object.fromEntries(PHOTO_CATS.map(function(cat){
+          var arr = payload.photos[cat.key];
+          return [cat.key, Array.isArray(arr) ? arr : []];
+        })));
+      }
+      if (payload.calepinage && payload.calepinage.image) {
+        setCalepinage(function(p){ return Object.assign({}, p, payload.calepinage); });
+      }
+      var photoMsg = payload.photos ? " + photos importées ✓" : " (sans photos)";
+      alert("✓ Import depuis " + sourceRef + photoMsg);
     } catch(e) { alert("Erreur import: " + e.message); }
     setTimeout(function() { isLoading.current = false; }, 100);
   };
