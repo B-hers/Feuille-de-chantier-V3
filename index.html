@@ -574,6 +574,9 @@ async function duplicateAllPhotos(sourcePhotos, sourceCalepinage, targetRef, onP
 
   return { photos: newPhotos, calepinage: newCalepinage };
 }
+
+// Import depuis une autre ref — charge la première feuille de cette ref
+async function supaImportFromRef(sourceRef) {
   var list = await supaLoadSheetList(sourceRef);
   if (!list || list.length === 0) return null;
   return await supaLoadSheetById(list[0].id);
