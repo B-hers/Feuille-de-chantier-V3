@@ -298,6 +298,9 @@ const ORIENTS = ["Nord","Sud","Est","Ouest"];
 
 const SUPA_URL = "https://brodjywccrirlzplovxg.supabase.co";
 const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
+// Projet Supabase du rapport de chantier (projet séparé)
+const RAPPORT_SUPA_URL = "https://qdepdtwrokazceyecege.supabase.co";
+const RAPPORT_SUPA_KEY = "sb_publishable_U6PddofdvgpD5IgU4ZsPdg_wqB-5Scw";
 const SUPA_STORAGE_BUCKET = "chantier-photos";
 
 // Upload a base64 data URL to Supabase Storage → returns storage URL or original base64 on failure
@@ -2002,13 +2005,13 @@ function InstallationBlock(props) {
 
 // ── Écarts Rapport vs Briefing ────────────────────────────────────────────────
 
-// Charge la première feuille du rapport pour ce ref (table feuilles_controle)
+// Charge la première feuille du rapport pour ce ref (projet Supabase séparé)
 async function supaFetchRapport(ref) {
   try {
     var res = await fetch(
-      SUPA_URL + "/rest/v1/feuilles_controle?ref=eq." + encodeURIComponent(ref) +
+      RAPPORT_SUPA_URL + "/rest/v1/feuilles_controle?ref=eq." + encodeURIComponent(ref) +
       "&label=neq.__sheet_order__&select=id,data,updated_at&order=updated_at.desc&limit=1",
-      { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+      { headers: { "apikey": RAPPORT_SUPA_KEY, "Authorization": "Bearer " + RAPPORT_SUPA_KEY } }
     );
     if (!res.ok) return null;
     var rows = await res.json();
