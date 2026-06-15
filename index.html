@@ -2000,6 +2000,206 @@ function InstallationBlock(props) {
 }
 
 
+// ── Écarts Rapport vs Briefing ────────────────────────────────────────────────
+
+// Charge la première feuille du rapport pour ce ref (table feuilles_controle)
+async function supaFetchRapport(ref) {
+  try {
+    var res = await fetch(
+      SUPA_URL + "/rest/v1/feuilles_controle?ref=eq." + encodeURIComponent(ref) +
+      "&label=neq.__sheet_order__&select=id,data,updated_at&order=updated_at.desc&limit=1",
+      { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+    );
+    if (!res.ok) return null;
+    var rows = await res.json();
+    return (rows && rows.length > 0) ? rows[0] : null;
+  } catch(e) { return null; }
+}
+
+// Compare les données du briefing avec celles du rapport → retourne un tableau d'écarts
+function compareWithRapport(briefingData, rapportData) {
+  var ecarts = [];
+  if (!rapportData || !briefingData) return ecarts;
+  var rd = rapportData; // raccourci
+
+  // Récupérer le premier site + première installation PV du briefing
+  var site  = (briefingData.sites && briefingData.sites[0]) || {};
+  var pvInst = (site.pvInstallations && site.pvInstallations[0]) || {};
+  var tech   = pvInst.tech || {};
+
+  // ── 1. Nombre de panneaux ─────────────────────────────────────────────────
+  var nbrPrevu   = parseInt((tech.panneaux || {}).nbr)                                      || 0;
+  var nbrRealise = parseInt(rd.dc && rd.dc.placement_pv && rd.dc.placement_pv.nbPV || "0") || 0;
+  if (nbrPrevu > 0 && nbrRealise > 0 && nbrPrevu !== nbrRealise) {
+    var diff = nbrRealise - nbrPrevu;
+    ecarts.push({
+      type: "panneaux_nbr", icon: "☀️", label: "Panneaux",
+      prevu:   nbrPrevu   + " × " + ((tech.panneaux||{}).type || "?"),
+      realise: nbrRealise + " × " + ((tech.panneaux||{}).type || "?"),
+      diff: (diff > 0 ? "+" : "") + diff,
+      severity: Math.abs(diff) > 2 ? "high" : "medium"
+    });
+  }
+
+  // ── 2. Nombre de strings ──────────────────────────────────────────────────
+  var strPrevu   = (pvInst.strings || []).length;
+  var strRealise = parseInt(rd.dc && rd.dc.strings && rd.dc.strings.nbStrings || "0") || 0;
+  if (strPrevu > 0 && strRealise > 0 && strPrevu !== strRealise) {
+    ecarts.push({
+      type: "strings_nbr", icon: "🔢", label: "Strings",
+      prevu: strPrevu + " string(s) planifié(s)",
+      realise: strRealise + " string(s) réalisé(s)",
+      diff: (strRealise - strPrevu > 0 ? "+" : "") + (strRealise - strPrevu),
+      severity: "medium"
+    });
+  }
+
+  // ── 3. Onduleurs — nombre ─────────────────────────────────────────────────
+  var ondPrevu   = (tech.onduleurs || []).filter(function(o) { return o.type; });
+  var ondRealise = (rd.ac && rd.ac.onduleurs) || [];
+  if (ondPrevu.length > 0 && ondRealise.length > 0 && ondPrevu.length !== ondRealise.length) {
+    ecarts.push({
+      type: "onduleurs_nbr", icon: "⚡", label: "Onduleurs",
+      prevu: ondPrevu.length + " onduleur(s)",
+      realise: ondRealise.length + " onduleur(s)",
+      diff: (ondRealise.length - ondPrevu.length > 0 ? "+" : "") + (ondRealise.length - ondPrevu.length),
+      severity: "medium"
+    });
+  }
+
+  // ── 4. Onduleurs — type/marque (par position) ─────────────────────────────
+  ondPrevu.forEach(function(oP, i) {
+    var oR = ondRealise[i];
+    if (!oP.type || !oR || !oR.marque) return;
+    var pNorm = oP.type.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    var rNorm = oR.marque.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    // Vérifier si l'un contient les premiers mots de l'autre (évite faux positifs sur les variantes)
+    var pWords = pNorm.slice(0, 6);
+    var rWords = rNorm.slice(0, 6);
+    if (pWords && rWords && pWords !== rWords && !rNorm.startsWith(pWords) && !pNorm.startsWith(rWords)) {
+      ecarts.push({
+        type: "onduleur_type_" + i, icon: "⚡", label: "Onduleur " + (i + 1),
+        prevu: oP.type,
+        realise: oR.marque,
+        diff: "type différent",
+        severity: "medium"
+      });
+    }
+  });
+
+  // ── 5. Batterie ───────────────────────────────────────────────────────────
+  var batPrevu   = tech.batterie || {};
+  var batRealise = (rd.ac && rd.ac.batteries) || [];
+  if (batPrevu.inclus === "OUI" && batRealise.length === 0) {
+    ecarts.push({
+      type: "batterie_absente", icon: "🔋", label: "Batterie",
+      prevu:   (batPrevu.qty || "1") + "×" + (batPrevu.kwh ? " " + batPrevu.kwh + " kWh" : "") + (batPrevu.type ? " " + batPrevu.type : ""),
+      realise: "Aucune installée",
+      diff: "manquante",
+      severity: "high"
+    });
+  } else if (batPrevu.inclus !== "OUI" && batRealise.length > 0) {
+    ecarts.push({
+      type: "batterie_non_prevue", icon: "🔋", label: "Batterie",
+      prevu: "Non prévue",
+      realise: batRealise.length + " installée(s)" + (batRealise[0].marque ? " (" + batRealise[0].marque + ")" : ""),
+      diff: "+" + batRealise.length,
+      severity: "medium"
+    });
+  } else if (batPrevu.inclus === "OUI" && batRealise.length > 0) {
+    var qtyPrevu = parseInt(batPrevu.qty || "1") || 1;
+    if (qtyPrevu !== batRealise.length) {
+      ecarts.push({
+        type: "batterie_qty", icon: "🔋", label: "Batterie",
+        prevu: qtyPrevu + " unité(s) prévue(s)",
+        realise: batRealise.length + " installée(s)",
+        diff: (batRealise.length - qtyPrevu > 0 ? "+" : "") + (batRealise.length - qtyPrevu),
+        severity: "medium"
+      });
+    }
+  }
+
+  // ── 6. Borne(s) de recharge ───────────────────────────────────────────────
+  var brPrevu   = (site.brInstallations || []).length;
+  var brRealise = (rd.ac && rd.ac.bornes) || [];
+  if (brPrevu > 0 && brRealise.length === 0) {
+    ecarts.push({
+      type: "borne_absente", icon: "🔌", label: "Borne(s) de recharge",
+      prevu: brPrevu + " borne(s) prévue(s)",
+      realise: "Aucune installée",
+      diff: "manquante",
+      severity: "high"
+    });
+  } else if (brPrevu === 0 && brRealise.length > 0) {
+    ecarts.push({
+      type: "borne_non_prevue", icon: "🔌", label: "Borne(s) de recharge",
+      prevu: "Non prévue",
+      realise: brRealise.length + " installée(s)" + (brRealise[0].marque ? " (" + brRealise[0].marque + ")" : ""),
+      diff: "+" + brRealise.length,
+      severity: "medium"
+    });
+  }
+
+  return ecarts;
+}
+
+// ── Composant EcartsAlert ─────────────────────────────────────────────────────
+function EcartsAlert({ ecarts, rapportUpdatedAt, onDismiss }) {
+  if (!ecarts || ecarts.length === 0) return null;
+  var highCount = ecarts.filter(function(e) { return e.severity === "high"; }).length;
+  var accentColor = highCount > 0 ? "#e67e22" : "#f39c12";
+  var bgColor     = highCount > 0 ? "#fff3cd" : "#fff8f0";
+
+  return (
+    <div style={{ background: bgColor, border: "2px solid " + accentColor, borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#7a4800" }}>
+            ⚠️ {ecarts.length} écart{ecarts.length > 1 ? "s" : ""} détecté{ecarts.length > 1 ? "s" : ""} — Rapport vs Briefing
+          </div>
+          {rapportUpdatedAt && (
+            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+              Rapport mis à jour le {new Date(rapportUpdatedAt).toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" })}
+            </div>
+          )}
+        </div>
+        <button onClick={onDismiss} title="Ignorer pour cette session"
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: MUTED, lineHeight: 1, padding: "0 2px" }}>×</button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+        {ecarts.map(function(e) {
+          return (
+            <div key={e.type} style={{
+              background: WHITE, borderRadius: 7, padding: "8px 12px",
+              border: "1px solid " + (e.severity === "high" ? accentColor : BORDER),
+              display: "flex", alignItems: "center", gap: 10, fontSize: 13, flexWrap: "wrap"
+            }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{e.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontWeight: 700, color: TEXT }}>{e.label}</span>
+                <span style={{ color: MUTED }}> — prévu : </span>
+                <span style={{ color: "#7a4800" }}>{e.prevu}</span>
+                <span style={{ color: MUTED }}> → réalisé : </span>
+                <span style={{ color: "#1B6B3A", fontWeight: 600 }}>{e.realise}</span>
+              </div>
+              <span style={{
+                background: e.severity === "high" ? accentColor : "#f0f0ec",
+                color: e.severity === "high" ? WHITE : "#555",
+                borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0
+              }}>{e.diff}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 11, color: MUTED, fontStyle: "italic" }}>
+        Ces écarts sont calculés automatiquement à partir du rapport de chantier. Adaptez le briefing si nécessaire.
+      </div>
+    </div>
+  );
+}
+
 function SiteElectricalBlock({ electrical, onSet }) {
   function setE(path, val) {
     onSet(path, val);
@@ -2616,7 +2816,10 @@ function App() {
   const [sheetOrderId, setSheetOrderId] = useState(null);
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [showGear, setShowGear] = useState(false);
-  const [migrationReady, setMigrationReady] = useState(null); // null=inconnu, true/false
+  const [migrationReady, setMigrationReady] = useState(null);
+  const [ecarts, setEcarts] = useState([]);
+  const [ecartsUpdatedAt, setEcartsUpdatedAt] = useState(null);
+  const [showEcarts, setShowEcarts] = useState(true);
   const [user, setUser] = useState(function() {
     try {
       var stored = localStorage.getItem("wge_user");
@@ -2919,6 +3122,16 @@ function App() {
           isLoading.current = false;
           prevDataRef.current = makeSlimData(row.data);
           if (userRef.current) supaLogAudit(urlRef, userRef.current, "load", {});
+          // Charger le rapport pour détecter les écarts (après que le briefing est chargé)
+          supaFetchRapport(urlRef).then(function(rapportRow) {
+            if (!rapportRow || !rapportRow.data) return;
+            var ecartsList = compareWithRapport(row.data, rapportRow.data);
+            if (ecartsList.length > 0) {
+              setEcarts(ecartsList);
+              setEcartsUpdatedAt(rapportRow.updated_at);
+              setShowEcarts(true);
+            }
+          });
         }, 100);
       } catch(loadErr) {
         console.error("Erreur chargement Supabase:", loadErr);
@@ -3726,6 +3939,15 @@ function App() {
                 if (id === currentSheetId && remaining.length > 0) switchSheet(remaining[0].id);
               }}
               migrationReady={migrationReady}
+            />
+          )}
+
+          {/* ── Écarts Rapport vs Briefing ── */}
+          {showEcarts && ecarts.length > 0 && (
+            <EcartsAlert
+              ecarts={ecarts}
+              rapportUpdatedAt={ecartsUpdatedAt}
+              onDismiss={function(){ setShowEcarts(false); }}
             />
           )}
 
