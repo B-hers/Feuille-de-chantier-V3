@@ -3012,14 +3012,31 @@ function App() {
     photoSaveTimer.current = setTimeout(async function() {
       var currentData = latestDataRef.current;
       // Upload base64 photos to Supabase Storage → JSON n'aura que des URLs
-      var result = await uploadBase64PhotosToStorage(ref, currentData);
+      var result = await uploadBase64PhotosToStorage(refRef.current || "", currentData);
       if (result.changed) {
-        // Mettre à jour le state avec les URLs storage (évite re-upload au prochain save)
         setPhotos(result.data.photos);
         if (result.data.calepinage !== currentData.calepinage) setCalepinage(result.data.calepinage);
         currentData = result.data;
       }
-      var ok = await supaSave(ref, currentData);
+      var sid = currentSheetIdRef.current;
+      var ok;
+      if (sid) {
+        ok = await supaUpdateSheetById(sid, currentData);
+      } else if (refRef.current) {
+        var row = await supaCreateSheet(refRef.current, "", currentData);
+        if (row) { currentSheetIdRef.current = row.id; setCurrentSheetId(row.id); ok = true; }
+        else {
+          // Fallback : colonnes id/label absentes — ancien upsert par ref
+          var res2 = await fetch(SUPA_URL + "/rest/v1/feuilles_chantier", {
+            method: "POST",
+            headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY,
+              "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates",
+              "x-supabase-statement-timeout": "25000" },
+            body: JSON.stringify({ ref: refRef.current, data: currentData, updated_at: new Date().toISOString() })
+          });
+          ok = res2.ok;
+        }
+      }
       if (ok) { setLastSaved(new Date().toISOString()); setSaveStatus("saved"); }
       else setSaveStatus("error");
     }, 2000);
