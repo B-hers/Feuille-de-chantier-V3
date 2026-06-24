@@ -306,8 +306,9 @@ const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
 // Projet Supabase du rapport de chantier (projet séparé)
 const RAPPORT_SUPA_URL = "https://qdepdtwrokazceyecege.supabase.co";
 const RAPPORT_SUPA_KEY = "sb_publishable_U6PddofdvgpD5IgU4ZsPdg_wqB-5Scw";
-// OpenAI — Whisper transcription + résumé
-const OPENAI_KEY = "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";
+// Structuration IA des notes vocales via Edge Function Supabase.
+// La clé OpenAI vit côté serveur (secret Supabase), jamais dans ce fichier.
+const STRUCTURE_FN_URL = SUPA_URL + "/functions/v1/structure-note";
 const AUDIO_BUCKET = "chantier-audio";
 const SUPA_STORAGE_BUCKET = "chantier-photos";
 
@@ -2279,55 +2280,55 @@ async function uploadAudioToStorage(ref, audioBlob) {
 
 // transcribeAudio supprimé — remplacé par Web Speech API (pas de CORS)
 
-// Structuration + traduction en français via GPT-4o-mini
+// Structuration + traduction en français via l'Edge Function Supabase (proxy OpenAI).
+// Le prompt et le modèle vivent désormais côté serveur ; ici on envoie juste le texte.
 async function structureNote(rawTranscript, entity) {
   if (!rawTranscript || rawTranscript.trim().length < 10) return rawTranscript;
   try {
-    var res = await fetch("https://api.openai.com/v1/chat/completions", {
+    var res = await fetch(STRUCTURE_FN_URL, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + OPENAI_KEY,
+        "apikey": SUPA_KEY,
+        "Authorization": "Bearer " + SUPA_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        max_tokens: 400,
-        messages: [
-          {
-            role: "system",
-            content: (function() {
-              var base = "Un technicien vient de dicter une note vocale sur un chantier. Ton rôle :\n1. Traduire en français si la note est dans une autre langue (anglais, espagnol, néerlandais, etc.)\n2. Structurer avec UNIQUEMENT les sections pertinentes parmi : ✅ Ce qui a été fait / 🔧 Ce qu'il reste à faire / ⚠️ Points d'attention / 💬 Demandes ou envies du client / 📦 Matériel à prévoir — et toute autre section pertinente si nécessaire\n3. Ne génère QUE les sections qui ont du contenu réel dans la note\n4. Sois concis et professionnel — une note courte et claire reste courte\n5. Si la note mentionne des quantités, modèles ou références, conserve-les exactement\n6. Réponse en texte brut uniquement, pas de markdown lourd";
-              if (entity === "wcover") return "Tu es assistant Project Manager pour We Cover, une entreprise spécialisée dans l'isolation de façades et de toitures en Belgique. " + base;
-              return "Tu es assistant Project Manager pour We Green Energy, une entreprise d'installation de panneaux solaires et bornes de recharge en Belgique. " + base;
-            })()
-          },
-          {
-            role: "user",
-            content: "Note vocale à structurer :\n\n" + rawTranscript
-          }
-        ]
-      })
+      body: JSON.stringify({ rawTranscript: rawTranscript, entity: entity })
     });
-    if (!res.ok) { console.error("GPT structure error:", res.status); return rawTranscript; }
+    if (!res.ok) {
+      var errText = await res.text().catch(function(){ return res.status; });
+      console.error("Structure note error:", res.status, errText);
+      // Retourner un message d'erreur visible plutôt que le transcript brut
+      if (res.status === 401 || res.status === 403) return "⚠ Edge Function non autorisée (clé OpenAI absente côté serveur ?). Transcription brute :\n\n" + rawTranscript;
+      if (res.status === 404) return "⚠ Edge Function 'structure-note' introuvable (pas encore déployée ?). Transcription brute :\n\n" + rawTranscript;
+      if (res.status === 429) return "⚠ Limite API atteinte, réessayez dans quelques instants.\n\n" + rawTranscript;
+      return "⚠ Erreur structuration (" + res.status + "). Transcription brute :\n\n" + rawTranscript;
+    }
     var data = await res.json();
-    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || rawTranscript;
-  } catch(e) { console.error("GPT structure:", e); return rawTranscript; }
+    // L'Edge Function renvoie { content }. Fallback sur le format OpenAI brut au cas où.
+    var content = (data && data.content) || (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content);
+    console.log("Structure note OK:", content ? content.slice(0,80) : "empty");
+    return content || rawTranscript;
+  } catch(e) {
+    console.error("Structure note fetch error:", e);
+    return "⚠ Erreur réseau structuration. Transcription brute :\n\n" + rawTranscript;
+  }
 }
 
 // ── VoiceNoteBlock ─────────────────────────────────────────────────────────────
 function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
-  var [recording, setRecording]     = useState(false);
-  var [processing, setProcessing]   = useState(false);
-  var [timer, setTimer]             = useState(0);
-  var [error, setError]             = useState("");
-  var [liveText, setLiveText]       = useState("");  // transcription temps réel
-  var [procStep, setProcStep]       = useState(""); // étape affichée
+  var [recording, setRecording]   = useState(false);
+  var [processing, setProcessing] = useState(false);
+  var [procStep, setProcStep]     = useState("");
+  var [liveText, setLiveText]     = useState("");
+  var [error, setError]           = useState("");
+  var [timer, setTimer]           = useState(0);
 
   var mediaRecRef    = useRef(null);
   var chunksRef      = useRef([]);
   var recognitionRef = useRef(null);
   var liveTextRef    = useRef("");
   var isRecRef       = useRef(false);
+  var stoppingRef    = useRef(false); // attend les derniers résultats avant de traiter
   var timerRef       = useRef(null);
   var durationRef    = useRef(0);
 
@@ -2336,11 +2337,9 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
   function startRecording() {
     setError("");
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setError("Reconnaissance vocale non disponible. Utilisez Chrome (mobile ou desktop).");
-      return;
-    }
-    // MediaRecorder pour la lecture audio ultérieure
+    if (!SR) { setError("Utilisez Chrome pour la reconnaissance vocale."); return; }
+
+    // MediaRecorder pour lecture audio
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
         var mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
@@ -2352,63 +2351,76 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
         mediaRecRef.current = mr;
       }).catch(function(e){ console.warn("MediaRecorder:", e); });
     }
-    // Web Speech API — transcription native, pas de CORS
+
     var recognition = new SR();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "fr-FR"; // FR par défaut, GPT traduira si autre langue
+    recognition.lang = "fr-FR";
+
     recognition.onresult = function(event) {
-      var interim = "";
-      var final = liveTextRef.current;
+      var interim = ""; var final = liveTextRef.current;
       for (var i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript + " ";
-          liveTextRef.current = final;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
+        if (event.results[i].isFinal) { final += event.results[i][0].transcript + " "; liveTextRef.current = final; }
+        else { interim += event.results[i][0].transcript; }
       }
       setLiveText(final + interim);
     };
+
     recognition.onerror = function(e) {
-      if (e.error === "not-allowed") setError("Accès microphone refusé. Autorisez le micro dans votre navigateur.");
-      else if (e.error !== "no-speech") console.warn("SpeechRecognition:", e.error);
+      if (e.error === "not-allowed") setError("Accès microphone refusé.");
+      else if (e.error !== "no-speech") console.warn("SR error:", e.error);
     };
+
     recognition.onend = function() {
-      // Chrome s'arrête parfois après le silence — redémarrage automatique
-      if (isRecRef.current) { try { recognition.start(); } catch(e) {} }
+      if (stoppingRef.current) {
+        // Arrêt intentionnel — traiter le texte maintenant (résultats finaux disponibles)
+        stoppingRef.current = false;
+        var txt = liveTextRef.current.trim();
+        if (txt) { processNote(txt); }
+        else { setError("Aucune parole détectée — réessayez."); setProcessing(false); }
+      } else if (isRecRef.current) {
+        // Chrome s'arrête après silence — redémarrer
+        try { recognition.start(); } catch(e) {}
+      }
     };
+
     recognitionRef.current = recognition;
     liveTextRef.current = "";
     isRecRef.current = true;
+    stoppingRef.current = false;
     durationRef.current = 0;
+
     try {
       recognition.start();
-      setRecording(true);
-      setLiveText("");
-      setTimer(0);
+      setRecording(true); setLiveText(""); setTimer(0);
       timerRef.current = setInterval(function(){
         setTimer(function(t){ durationRef.current = t+1; return t+1; });
       }, 1000);
-    } catch(e) {
-      setError("Impossible de démarrer : " + e.message);
-    }
+    } catch(e) { setError("Impossible de démarrer : " + e.message); }
   }
 
   function stopRecording() {
     isRecRef.current = false;
+    stoppingRef.current = true; // signale que onend doit lancer le traitement
     clearInterval(timerRef.current);
     setRecording(false);
-    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch(e) {} }
+    setProcessing(true);
+    setProcStep("Finalisation…");
     if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
-    var transcript = liveTextRef.current.trim();
-    if (!transcript) { setError("Aucune parole détectée — réessayez."); return; }
-    handleStop(transcript);
+    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch(e) {} }
+    // Fallback si onend ne se déclenche pas dans les 2s
+    setTimeout(function() {
+      if (stoppingRef.current) {
+        stoppingRef.current = false;
+        var txt = liveTextRef.current.trim();
+        if (txt) processNote(txt);
+        else { setError("Aucune parole détectée."); setProcessing(false); }
+      }
+    }, 2000);
   }
 
-  async function handleStop(rawTranscript) {
-    setProcessing(true);
-    // Upload audio pour lecture
+  async function processNote(rawTranscript) {
+    // Upload audio
     var audioUrl = null;
     if (chunksRef.current.length > 0 && chantierRef) {
       setProcStep("Upload audio…");
@@ -2416,114 +2428,88 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
       var blob = new Blob(chunksRef.current, { type: mime });
       if (blob.size > 500) audioUrl = await uploadAudioToStorage(chantierRef, blob);
     }
-    // Structuration + traduction via GPT-4o-mini (/v1/chat/completions — CORS OK)
+    // Structuration GPT-4o-mini
     setProcStep("Structuration IA…");
-    var structured = rawTranscript ? await structureNote(rawTranscript, chantierEntity) : "";
+    console.log("processNote: sending to GPT, length=", rawTranscript.length, "entity=", chantierEntity);
+    var structured = await structureNote(rawTranscript, chantierEntity);
+    console.log("processNote: GPT result=", structured ? structured.slice(0,80) : "empty");
     var newNote = {
-      id: Date.now(),
-      audioUrl: audioUrl,
+      id: Date.now(), audioUrl: audioUrl,
       rawTranscript: rawTranscript,
       transcript: structured || rawTranscript,
       duration: durationRef.current,
       createdAt: new Date().toISOString()
     };
     onChange(function(prev){ return prev.concat([newNote]); });
-    setProcessing(false);
-    setProcStep("");
-    setLiveText("");
-    setTimer(0);
+    setProcessing(false); setProcStep(""); setLiveText(""); setTimer(0);
   }
 
   function deleteNote(id) {
     if (!window.confirm("Supprimer cette note vocale ?")) return;
-    onChange(function(prev){ return prev.filter(function(n){ return n.id !== id; }); });
+    onChange(function(prev){ return prev.filter(function(n){ return n.id!==id; }); });
   }
   function updateTranscript(id, val) {
-    onChange(function(prev){ return prev.map(function(n){ return n.id===id ? Object.assign({},n,{transcript:val}) : n; }); });
+    onChange(function(prev){ return prev.map(function(n){ return n.id===id?Object.assign({},n,{transcript:val}):n; }); });
   }
 
   return (
-    <div style={CARD}>
-      <div style={SH}><span>🎙</span> Notes vocales</div>
-      <div style={{ fontSize:12, color:MUTED, marginBottom:12 }}>
-        Enregistrez une observation vocale — transcrite et structurée automatiquement en français.
-        <span style={{ color:"#e67e22", marginLeft:6 }}>Chrome recommandé.</span>
-      </div>
-
-      {/* Bouton enregistrement */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+    <div>
+      {/* Bouton compact + états */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:8 }}>
         {!recording && !processing && (
-          <button onClick={startRecording}
-            style={{ display:"flex", alignItems:"center", gap:8, background:"#e74c3c", color:WHITE,
-              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-            🎙 Commencer l'enregistrement
+          <button onClick={startRecording} title="Ajouter une note vocale"
+            style={{ display:"flex", alignItems:"center", gap:6, background:"#fdecea", color:"#c0392b",
+              border:"1.5px solid #e74c3c", borderRadius:8, padding:"5px 12px",
+              fontSize:12, fontWeight:700, cursor:"pointer" }}>
+            🎙 Note vocale
           </button>
         )}
         {recording && (
           <button onClick={stopRecording}
-            style={{ display:"flex", alignItems:"center", gap:8, background:"#c0392b", color:WHITE,
-              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-            ⏹ Arrêter — <span style={{ fontFamily:"monospace", fontSize:16 }}>{fmtTime(timer)}</span>
+            style={{ display:"flex", alignItems:"center", gap:6, background:"#e74c3c", color:WHITE,
+              border:"none", borderRadius:8, padding:"5px 14px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:WHITE, display:"inline-block", animation:"pulse 0.8s infinite" }} />
+            Arrêter — {fmtTime(timer)}
           </button>
         )}
         {processing && (
-          <div style={{ display:"flex", alignItems:"center", gap:10, color:GREEN, fontWeight:600, fontSize:13 }}>
-            <span style={{ fontSize:20 }}>⏳</span>
-            <div>
-              <div>{procStep || "Traitement…"}</div>
-              <div style={{ fontSize:11, color:MUTED, fontWeight:400 }}>Traduction + structuration GPT</div>
-            </div>
-          </div>
+          <span style={{ fontSize:12, color:GREEN, fontWeight:600 }}>⏳ {procStep || "Traitement…"}</span>
         )}
+        {error && <span style={{ fontSize:11, color:"#e74c3c" }}>⚠ {error}</span>}
       </div>
 
-      {/* Transcription temps réel */}
+      {/* Texte live */}
       {recording && liveText && (
-        <div style={{ background:"#fff3cd", border:"1px solid #ffc107", borderRadius:7,
-          padding:"8px 12px", fontSize:13, color:"#7a4800", marginBottom:8,
-          fontStyle:"italic", minHeight:40, lineHeight:1.5 }}>
-          <span style={{ fontSize:10, fontWeight:700, display:"block", marginBottom:4, color:MUTED }}>TRANSCRIPTION EN COURS</span>
+        <div style={{ background:"#fff3cd", borderRadius:6, padding:"6px 10px", fontSize:12,
+          color:"#7a4800", marginTop:6, fontStyle:"italic", lineHeight:1.5 }}>
           {liveText}
         </div>
       )}
-      {recording && !liveText && (
-        <div style={{ fontSize:12, color:"#e74c3c", display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-          <span style={{ width:8, height:8, borderRadius:"50%", background:"#e74c3c", display:"inline-block", animation:"pulse 1s infinite" }} />
-          En écoute… parlez maintenant — {fmtTime(timer)}
-        </div>
-      )}
-      {error && <div style={{ color:"#e74c3c", fontSize:12, marginBottom:8 }}>⚠ {error}</div>}
 
-      {/* Liste des notes */}
-      {notes.length === 0 && !recording && !processing && (
-        <div style={{ fontSize:12, color:MUTED, fontStyle:"italic" }}>Aucune note vocale pour l'instant.</div>
-      )}
+      {/* Notes structurées */}
       {notes.map(function(note) {
         return (
-          <div key={note.id} style={{ background:"#f8f8f4", borderRadius:8, padding:"12px 14px", marginBottom:10, border:"1px solid "+BORDER }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-              <span style={{ fontSize:11, color:MUTED }}>
-                {new Date(note.createdAt).toLocaleDateString("fr-BE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+          <div key={note.id} style={{ marginTop:10, background:"#f0f7f2", borderRadius:8,
+            padding:"10px 12px", border:"1px solid #d4ead9" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <span style={{ fontSize:11, color:MUTED, fontWeight:600 }}>
+                🎙 {new Date(note.createdAt).toLocaleDateString("fr-BE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
                 {note.duration ? " · " + fmtTime(note.duration) : ""}
               </span>
-              <button onClick={function(){ deleteNote(note.id); }}
-                style={{ background:"none", border:"none", color:"#e74c3c", cursor:"pointer", fontSize:14, padding:"0 4px" }}>🗑</button>
-            </div>
-            {note.audioUrl && (
-              <audio controls src={note.audioUrl} style={{ width:"100%", height:36, marginBottom:8, borderRadius:6 }} />
-            )}
-            <div style={{ fontSize:11, fontWeight:700, color:MUTED, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-              Note structurée
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                {note.audioUrl && <audio controls src={note.audioUrl} style={{ height:28, maxWidth:180 }} />}
+                <button onClick={function(){ deleteNote(note.id); }}
+                  style={{ background:"none", border:"none", color:"#e74c3c", cursor:"pointer", fontSize:13 }}>🗑</button>
+              </div>
             </div>
             <textarea value={note.transcript} onChange={function(e){ updateTranscript(note.id, e.target.value); }}
-              placeholder="Résumé structuré — généré automatiquement ou saisi manuellement…"
-              style={{ width:"100%", minHeight:80, resize:"vertical", fontSize:13, padding:"8px 10px",
-                border:"1px solid "+BORDER, borderRadius:7, boxSizing:"border-box", background:WHITE,
+              style={{ width:"100%", minHeight:70, resize:"vertical", fontSize:13, padding:"7px 10px",
+                border:"1px solid #d4ead9", borderRadius:6, boxSizing:"border-box", background:WHITE,
                 lineHeight:1.6, whiteSpace:"pre-wrap", fontFamily:"inherit" }} />
             {note.rawTranscript && note.rawTranscript !== note.transcript && (
-              <details style={{ marginTop:6 }}>
-                <summary style={{ fontSize:11, color:MUTED, cursor:"pointer", userSelect:"none" }}>🎙 Voir transcription brute</summary>
-                <div style={{ fontSize:12, color:MUTED, background:"#f5f5f0", borderRadius:6, padding:"7px 10px", marginTop:4, lineHeight:1.5, fontStyle:"italic" }}>
+              <details style={{ marginTop:4 }}>
+                <summary style={{ fontSize:10, color:MUTED, cursor:"pointer" }}>Transcription brute</summary>
+                <div style={{ fontSize:11, color:MUTED, fontStyle:"italic", marginTop:3, padding:"4px 8px", background:"#f5f5f0", borderRadius:5 }}>
                   {note.rawTranscript}
                 </div>
               </details>
@@ -4477,7 +4463,7 @@ function App() {
             </div>
           </div>
 
-          {/* ── 5. Note PM ── */}
+          {/* ── 5. Note PM + Notes vocales ── */}
           <div style={CARD}>
             <div style={SH}><span>📝</span> Note du Project Manager</div>
             <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Remarques internes, instructions pour les monteurs, observations de visite…</div>
@@ -4488,17 +4474,15 @@ function App() {
               rows={4}
               style={{ width: "100%", fontSize: 13, resize: "vertical", boxSizing: "border-box", borderRadius: 6, border: "1px solid " + BORDER, padding: "8px 10px", fontFamily: "inherit" }}
             />
+            <VoiceNoteBlock
+              notes={voiceNotes}
+              onChange={setVoiceNotes}
+              chantierRef={ref}
+              chantierEntity={entity}
+            />
           </div>
 
-          {/* ── 6. Notes vocales ── */}
-          <VoiceNoteBlock
-            notes={voiceNotes}
-            onChange={setVoiceNotes}
-            chantierRef={ref}
-            chantierEntity={entity}
-          />
-
-          {/* ── 7. Photos ── */}
+          {/* ── 6. Photos ── */}
           <div style={CARD}>
             <div style={SH}><span>📷</span> Photos de chantier</div>
 
