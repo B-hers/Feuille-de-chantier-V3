@@ -2277,22 +2277,7 @@ async function uploadAudioToStorage(ref, audioBlob) {
   } catch(e) { console.error("Audio upload:", e); return null; }
 }
 
-async function transcribeAudio(audioBlob, filename) {
-  try {
-    var fd = new FormData();
-    fd.append("file", audioBlob, filename || "note.webm");
-    fd.append("model", "whisper-1");
-    // Pas de langue fixe — Whisper détecte automatiquement (FR, EN, ES, NL...)
-    var res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + OPENAI_KEY },
-      body: fd
-    });
-    if (!res.ok) { console.error("Whisper error:", res.status); return null; }
-    var data = await res.json();
-    return data.text || null;
-  } catch(e) { console.error("Whisper:", e); return null; }
-}
+// transcribeAudio supprimé — remplacé par Web Speech API (pas de CORS)
 
 // Structuration + traduction en français via GPT-4o-mini
 async function structureNote(rawTranscript, entity) {
@@ -2331,74 +2316,121 @@ async function structureNote(rawTranscript, entity) {
 
 // ── VoiceNoteBlock ─────────────────────────────────────────────────────────────
 function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
-  var [recording, setRecording] = useState(false);
-  var [processing, setProcessing] = useState(false);
-  var [timer, setTimer] = useState(0);
-  var [error, setError] = useState("");
-  var mediaRecRef = useRef(null);
-  var chunksRef   = useRef([]);
-  var timerRef    = useRef(null);
+  var [recording, setRecording]     = useState(false);
+  var [processing, setProcessing]   = useState(false);
+  var [timer, setTimer]             = useState(0);
+  var [error, setError]             = useState("");
+  var [liveText, setLiveText]       = useState("");  // transcription temps réel
+  var [procStep, setProcStep]       = useState(""); // étape affichée
 
-  function fmtTime(s) { return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+  var mediaRecRef    = useRef(null);
+  var chunksRef      = useRef([]);
+  var recognitionRef = useRef(null);
+  var liveTextRef    = useRef("");
+  var isRecRef       = useRef(false);
+  var timerRef       = useRef(null);
+  var durationRef    = useRef(0);
+
+  function fmtTime(s) { return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 
   function startRecording() {
     setError("");
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError("Microphone non accessible sur ce navigateur."); return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setError("Reconnaissance vocale non disponible. Utilisez Chrome (mobile ou desktop).");
+      return;
     }
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-      var mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      var mr = new MediaRecorder(stream, { mimeType: mimeType });
-      chunksRef.current = [];
-      mr.ondataavailable = function(e){ if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = function() {
-        stream.getTracks().forEach(function(t){ t.stop(); });
-        var blob = new Blob(chunksRef.current, { type: mimeType });
-        handleStop(blob, mimeType);
-      };
-      mr.start(200);
-      mediaRecRef.current = mr;
+    // MediaRecorder pour la lecture audio ultérieure
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        var mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+        var mr = new MediaRecorder(stream, { mimeType: mime });
+        chunksRef.current = [];
+        mr.ondataavailable = function(e){ if (e.data.size>0) chunksRef.current.push(e.data); };
+        mr.onstop = function(){ stream.getTracks().forEach(function(t){ t.stop(); }); };
+        mr.start(200);
+        mediaRecRef.current = mr;
+      }).catch(function(e){ console.warn("MediaRecorder:", e); });
+    }
+    // Web Speech API — transcription native, pas de CORS
+    var recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "fr-FR"; // FR par défaut, GPT traduira si autre langue
+    recognition.onresult = function(event) {
+      var interim = "";
+      var final = liveTextRef.current;
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript + " ";
+          liveTextRef.current = final;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setLiveText(final + interim);
+    };
+    recognition.onerror = function(e) {
+      if (e.error === "not-allowed") setError("Accès microphone refusé. Autorisez le micro dans votre navigateur.");
+      else if (e.error !== "no-speech") console.warn("SpeechRecognition:", e.error);
+    };
+    recognition.onend = function() {
+      // Chrome s'arrête parfois après le silence — redémarrage automatique
+      if (isRecRef.current) { try { recognition.start(); } catch(e) {} }
+    };
+    recognitionRef.current = recognition;
+    liveTextRef.current = "";
+    isRecRef.current = true;
+    durationRef.current = 0;
+    try {
+      recognition.start();
       setRecording(true);
+      setLiveText("");
       setTimer(0);
-      timerRef.current = setInterval(function(){ setTimer(function(t){ return t+1; }); }, 1000);
-    }).catch(function(e) {
-      setError("Accès microphone refusé : " + e.message);
-    });
+      timerRef.current = setInterval(function(){
+        setTimer(function(t){ durationRef.current = t+1; return t+1; });
+      }, 1000);
+    } catch(e) {
+      setError("Impossible de démarrer : " + e.message);
+    }
   }
 
   function stopRecording() {
+    isRecRef.current = false;
     clearInterval(timerRef.current);
     setRecording(false);
-    if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") {
-      mediaRecRef.current.stop();
-    }
+    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch(e) {} }
+    if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
+    var transcript = liveTextRef.current.trim();
+    if (!transcript) { setError("Aucune parole détectée — réessayez."); return; }
+    handleStop(transcript);
   }
 
-  async function handleStop(blob, mimeType) {
-    if (blob.size < 1000) { setError("Enregistrement trop court."); return; }
+  async function handleStop(rawTranscript) {
     setProcessing(true);
-    var duration = timer;
-    // 1. Upload audio vers Storage
+    // Upload audio pour lecture
     var audioUrl = null;
-    if (chantierRef) {
-      audioUrl = await uploadAudioToStorage(chantierRef, blob);
+    if (chunksRef.current.length > 0 && chantierRef) {
+      setProcStep("Upload audio…");
+      var mime = (chunksRef.current[0] && chunksRef.current[0].type) || "audio/webm";
+      var blob = new Blob(chunksRef.current, { type: mime });
+      if (blob.size > 500) audioUrl = await uploadAudioToStorage(chantierRef, blob);
     }
-    // 2. Transcription Whisper (détection langue auto)
-    var ext = mimeType.includes("webm") ? "webm" : "mp4";
-    var rawTranscript = await transcribeAudio(blob, "note-" + Date.now() + "." + ext);
-    // 3. Structuration + traduction GPT-4o-mini
+    // Structuration + traduction via GPT-4o-mini (/v1/chat/completions — CORS OK)
+    setProcStep("Structuration IA…");
     var structured = rawTranscript ? await structureNote(rawTranscript, chantierEntity) : "";
-    // 4. Ajouter la note
     var newNote = {
       id: Date.now(),
       audioUrl: audioUrl,
-      rawTranscript: rawTranscript || "",   // transcription brute conservée
-      transcript: structured || rawTranscript || "", // version structurée affichée
-      duration: duration,
+      rawTranscript: rawTranscript,
+      transcript: structured || rawTranscript,
+      duration: durationRef.current,
       createdAt: new Date().toISOString()
     };
     onChange(function(prev){ return prev.concat([newNote]); });
     setProcessing(false);
+    setProcStep("");
+    setLiveText("");
     setTimer(0);
   }
 
@@ -2406,7 +2438,6 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
     if (!window.confirm("Supprimer cette note vocale ?")) return;
     onChange(function(prev){ return prev.filter(function(n){ return n.id !== id; }); });
   }
-
   function updateTranscript(id, val) {
     onChange(function(prev){ return prev.map(function(n){ return n.id===id ? Object.assign({},n,{transcript:val}) : n; }); });
   }
@@ -2414,42 +2445,51 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
   return (
     <div style={CARD}>
       <div style={SH}><span>🎙</span> Notes vocales</div>
-      <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>
-        Enregistrez une observation verbale — transcrite automatiquement par IA (Whisper).
+      <div style={{ fontSize:12, color:MUTED, marginBottom:12 }}>
+        Enregistrez une observation vocale — transcrite et structurée automatiquement en français.
+        <span style={{ color:"#e67e22", marginLeft:6 }}>Chrome recommandé.</span>
       </div>
 
       {/* Bouton enregistrement */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
         {!recording && !processing && (
           <button onClick={startRecording}
-            style={{ display:"flex", alignItems:"center", gap:8, background:"#e74c3c", color:"#fff",
+            style={{ display:"flex", alignItems:"center", gap:8, background:"#e74c3c", color:WHITE,
               border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
             🎙 Commencer l'enregistrement
           </button>
         )}
         {recording && (
           <button onClick={stopRecording}
-            style={{ display:"flex", alignItems:"center", gap:8, background:"#c0392b", color:"#fff",
-              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer",
-              animation:"pulse 1s infinite" }}>
+            style={{ display:"flex", alignItems:"center", gap:8, background:"#c0392b", color:WHITE,
+              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
             ⏹ Arrêter — <span style={{ fontFamily:"monospace", fontSize:16 }}>{fmtTime(timer)}</span>
           </button>
         )}
         {processing && (
-          <div style={{ display:"flex", alignItems:"center", gap:10, color:GREEN, fontWeight:600, fontSize:13, marginBottom:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, color:GREEN, fontWeight:600, fontSize:13 }}>
             <span style={{ fontSize:20 }}>⏳</span>
             <div>
-              <div>Transcription Whisper + structuration GPT…</div>
-              <div style={{ fontSize:11, color:MUTED, fontWeight:400 }}>Détection automatique de la langue</div>
+              <div>{procStep || "Traitement…"}</div>
+              <div style={{ fontSize:11, color:MUTED, fontWeight:400 }}>Traduction + structuration GPT</div>
             </div>
           </div>
         )}
       </div>
-      {recording && (
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, color:"#e74c3c", fontSize:12 }}>
-          <span style={{ width:8, height:8, borderRadius:"50%", background:"#e74c3c", display:"inline-block",
-            animation:"pulse 1s infinite" }} />
-          Enregistrement en cours — {fmtTime(timer)}
+
+      {/* Transcription temps réel */}
+      {recording && liveText && (
+        <div style={{ background:"#fff3cd", border:"1px solid #ffc107", borderRadius:7,
+          padding:"8px 12px", fontSize:13, color:"#7a4800", marginBottom:8,
+          fontStyle:"italic", minHeight:40, lineHeight:1.5 }}>
+          <span style={{ fontSize:10, fontWeight:700, display:"block", marginBottom:4, color:MUTED }}>TRANSCRIPTION EN COURS</span>
+          {liveText}
+        </div>
+      )}
+      {recording && !liveText && (
+        <div style={{ fontSize:12, color:"#e74c3c", display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+          <span style={{ width:8, height:8, borderRadius:"50%", background:"#e74c3c", display:"inline-block", animation:"pulse 1s infinite" }} />
+          En écoute… parlez maintenant — {fmtTime(timer)}
         </div>
       )}
       {error && <div style={{ color:"#e74c3c", fontSize:12, marginBottom:8 }}>⚠ {error}</div>}
@@ -2462,38 +2502,28 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
         return (
           <div key={note.id} style={{ background:"#f8f8f4", borderRadius:8, padding:"12px 14px", marginBottom:10, border:"1px solid "+BORDER }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11, color:MUTED }}>
-                  {new Date(note.createdAt).toLocaleDateString("fr-BE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
-                  {note.duration ? " · " + fmtTime(note.duration) : ""}
-                </span>
-              </div>
+              <span style={{ fontSize:11, color:MUTED }}>
+                {new Date(note.createdAt).toLocaleDateString("fr-BE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                {note.duration ? " · " + fmtTime(note.duration) : ""}
+              </span>
               <button onClick={function(){ deleteNote(note.id); }}
                 style={{ background:"none", border:"none", color:"#e74c3c", cursor:"pointer", fontSize:14, padding:"0 4px" }}>🗑</button>
             </div>
-            {/* Lecteur audio */}
             {note.audioUrl && (
-              <audio controls src={note.audioUrl}
-                style={{ width:"100%", height:36, marginBottom:8, borderRadius:6 }} />
+              <audio controls src={note.audioUrl} style={{ width:"100%", height:36, marginBottom:8, borderRadius:6 }} />
             )}
-            {/* Note structurée (éditable) */}
             <div style={{ fontSize:11, fontWeight:700, color:MUTED, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>
               Note structurée
             </div>
-            <textarea value={note.transcript}
-              onChange={function(e){ updateTranscript(note.id, e.target.value); }}
-              placeholder="Résumé structuré — généré automatiquement par IA ou saisi manuellement…"
+            <textarea value={note.transcript} onChange={function(e){ updateTranscript(note.id, e.target.value); }}
+              placeholder="Résumé structuré — généré automatiquement ou saisi manuellement…"
               style={{ width:"100%", minHeight:80, resize:"vertical", fontSize:13, padding:"8px 10px",
                 border:"1px solid "+BORDER, borderRadius:7, boxSizing:"border-box", background:WHITE,
                 lineHeight:1.6, whiteSpace:"pre-wrap", fontFamily:"inherit" }} />
-            {/* Transcription brute (masquée par défaut) */}
             {note.rawTranscript && note.rawTranscript !== note.transcript && (
               <details style={{ marginTop:6 }}>
-                <summary style={{ fontSize:11, color:MUTED, cursor:"pointer", userSelect:"none" }}>
-                  🎙 Voir transcription brute
-                </summary>
-                <div style={{ fontSize:12, color:MUTED, background:"#f5f5f0", borderRadius:6,
-                  padding:"7px 10px", marginTop:4, lineHeight:1.5, fontStyle:"italic" }}>
+                <summary style={{ fontSize:11, color:MUTED, cursor:"pointer", userSelect:"none" }}>🎙 Voir transcription brute</summary>
+                <div style={{ fontSize:12, color:MUTED, background:"#f5f5f0", borderRadius:6, padding:"7px 10px", marginTop:4, lineHeight:1.5, fontStyle:"italic" }}>
                   {note.rawTranscript}
                 </div>
               </details>
