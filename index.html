@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -47,6 +48,10 @@ button { font-family: inherit; cursor: pointer; }
   /* Prevent bounce scrolling issues */
   * { -webkit-tap-highlight-color: transparent; }
 }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 </style>
 </head>
 <body>
@@ -301,6 +306,9 @@ const SUPA_KEY = "sb_publishable_T4Syy3Nq5mLK0yqOUNgtEg_od2WUXEY";
 // Projet Supabase du rapport de chantier (projet séparé)
 const RAPPORT_SUPA_URL = "https://qdepdtwrokazceyecege.supabase.co";
 const RAPPORT_SUPA_KEY = "sb_publishable_U6PddofdvgpD5IgU4ZsPdg_wqB-5Scw";
+// OpenAI — Whisper transcription + résumé
+const OPENAI_KEY = "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";
+const AUDIO_BUCKET = "chantier-audio";
 const SUPA_STORAGE_BUCKET = "chantier-photos";
 
 // Upload a base64 data URL to Supabase Storage → returns storage URL or original base64 on failure
@@ -726,6 +734,52 @@ function LoginScreen({ onSignIn }) {
     }
     tryRender();
   }, []);
+  // ── Génération PDF (html2pdf.js — fonctionne sur mobile) ─────────────────
+  const generatePDF = async function() {
+    // Basculer en mode aperçu si nécessaire
+    var wasForm = mode !== "preview";
+    if (wasForm) {
+      setMode("preview");
+      await new Promise(function(r){ setTimeout(r, 400); }); // attendre le rendu
+    }
+    setPdfLoading(true);
+    try {
+      var el = document.getElementById("preview-doc-root");
+      if (!el) { window.print(); return; }
+      // Pré-convertir les images cross-origin en base64 pour éviter les erreurs CORS
+      var imgs = Array.from(el.querySelectorAll("img"));
+      await Promise.all(imgs.map(async function(img) {
+        var src = img.src;
+        if (!src || src.startsWith("data:")) return;
+        try {
+          var res = await fetch(src);
+          var blob = await res.blob();
+          var b64 = await new Promise(function(resolve) {
+            var reader = new FileReader();
+            reader.onload = function(e){ resolve(e.target.result); };
+            reader.onerror = function(){ resolve(null); };
+            reader.readAsDataURL(blob);
+          });
+          if (b64) img.src = b64;
+        } catch(e) { /* garder l'URL originale si fetch échoue */ }
+      }));
+      var filename = "briefing-" + (ref || "chantier") + ".pdf";
+      await html2pdf().set({
+        margin: [8, 8, 8, 8],
+        filename: filename,
+        image: { type: "jpeg", quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      }).from(el).save();
+    } catch(e) {
+      console.error("html2pdf error:", e);
+      window.print(); // fallback
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f4f0" }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "40px 48px", boxShadow: "0 4px 32px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center", gap: 22, maxWidth: 360, width: "90%", boxSizing: "border-box" }}>
@@ -1563,7 +1617,7 @@ function PreviewDoc({ data }) {
   const strLabel = s => `${s.count || "?"} × PV ${s.orient === "Libre" ? (s.orientLibre || "?") : s.orient || "?"}`;
   // groupedStrings moved into installations.map in preview
   return (
-    <div id="preview-doc" style={{ maxWidth: 700, margin: "0 auto", padding: "1rem 0.75rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
+    <div id="preview-doc-root" style={{ maxWidth: 700, margin: "0 auto", padding: "1rem 0.75rem", fontSize: 14, lineHeight: 1.6, color: TEXT }}>
       {data.calepinage && data.calepinage.image && (
         <div style={{ marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fafaf8" }}>
           <img src={data.calepinage.image} alt="Calepinage" style={{ width: "100%", maxHeight: "420px", objectFit: "contain", display: "block", padding: "8px" }} />
@@ -2203,6 +2257,254 @@ function EcartsAlert({ ecarts, rapportUpdatedAt, onDismiss }) {
   );
 }
 
+// ── Notes vocales — upload audio + transcription Whisper ─────────────────────
+
+async function uploadAudioToStorage(ref, audioBlob) {
+  try {
+    var ext = (audioBlob.type || "").includes("webm") ? "webm" : "mp4";
+    var path = ref + "/" + Date.now() + "." + ext;
+    var res = await fetch(SUPA_URL + "/storage/v1/object/" + AUDIO_BUCKET + "/" + path, {
+      method: "POST",
+      headers: {
+        "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY,
+        "Content-Type": audioBlob.type || "audio/webm", "x-upsert": "true"
+      },
+      body: audioBlob
+    });
+    if (res.ok) return SUPA_URL + "/storage/v1/object/public/" + AUDIO_BUCKET + "/" + path;
+    console.error("Audio upload failed:", res.status);
+    return null;
+  } catch(e) { console.error("Audio upload:", e); return null; }
+}
+
+async function transcribeAudio(audioBlob, filename) {
+  try {
+    var fd = new FormData();
+    fd.append("file", audioBlob, filename || "note.webm");
+    fd.append("model", "whisper-1");
+    // Pas de langue fixe — Whisper détecte automatiquement (FR, EN, ES, NL...)
+    var res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + OPENAI_KEY },
+      body: fd
+    });
+    if (!res.ok) { console.error("Whisper error:", res.status); return null; }
+    var data = await res.json();
+    return data.text || null;
+  } catch(e) { console.error("Whisper:", e); return null; }
+}
+
+// Structuration + traduction en français via GPT-4o-mini
+async function structureNote(rawTranscript, entity) {
+  if (!rawTranscript || rawTranscript.trim().length < 10) return rawTranscript;
+  try {
+    var res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + OPENAI_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 400,
+        messages: [
+          {
+            role: "system",
+            content: (function() {
+              var base = "Un technicien vient de dicter une note vocale sur un chantier. Ton rôle :\n1. Traduire en français si la note est dans une autre langue (anglais, espagnol, néerlandais, etc.)\n2. Structurer avec UNIQUEMENT les sections pertinentes parmi : ✅ Ce qui a été fait / 🔧 Ce qu'il reste à faire / ⚠️ Points d'attention / 💬 Demandes ou envies du client / 📦 Matériel à prévoir — et toute autre section pertinente si nécessaire\n3. Ne génère QUE les sections qui ont du contenu réel dans la note\n4. Sois concis et professionnel — une note courte et claire reste courte\n5. Si la note mentionne des quantités, modèles ou références, conserve-les exactement\n6. Réponse en texte brut uniquement, pas de markdown lourd";
+              if (entity === "wcover") return "Tu es assistant Project Manager pour We Cover, une entreprise spécialisée dans l'isolation de façades et de toitures en Belgique. " + base;
+              return "Tu es assistant Project Manager pour We Green Energy, une entreprise d'installation de panneaux solaires et bornes de recharge en Belgique. " + base;
+            })()
+          },
+          {
+            role: "user",
+            content: "Note vocale à structurer :\n\n" + rawTranscript
+          }
+        ]
+      })
+    });
+    if (!res.ok) { console.error("GPT structure error:", res.status); return rawTranscript; }
+    var data = await res.json();
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || rawTranscript;
+  } catch(e) { console.error("GPT structure:", e); return rawTranscript; }
+}
+
+// ── VoiceNoteBlock ─────────────────────────────────────────────────────────────
+function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
+  var [recording, setRecording] = useState(false);
+  var [processing, setProcessing] = useState(false);
+  var [timer, setTimer] = useState(0);
+  var [error, setError] = useState("");
+  var mediaRecRef = useRef(null);
+  var chunksRef   = useRef([]);
+  var timerRef    = useRef(null);
+
+  function fmtTime(s) { return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+
+  function startRecording() {
+    setError("");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError("Microphone non accessible sur ce navigateur."); return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+      var mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      var mr = new MediaRecorder(stream, { mimeType: mimeType });
+      chunksRef.current = [];
+      mr.ondataavailable = function(e){ if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = function() {
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        var blob = new Blob(chunksRef.current, { type: mimeType });
+        handleStop(blob, mimeType);
+      };
+      mr.start(200);
+      mediaRecRef.current = mr;
+      setRecording(true);
+      setTimer(0);
+      timerRef.current = setInterval(function(){ setTimer(function(t){ return t+1; }); }, 1000);
+    }).catch(function(e) {
+      setError("Accès microphone refusé : " + e.message);
+    });
+  }
+
+  function stopRecording() {
+    clearInterval(timerRef.current);
+    setRecording(false);
+    if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") {
+      mediaRecRef.current.stop();
+    }
+  }
+
+  async function handleStop(blob, mimeType) {
+    if (blob.size < 1000) { setError("Enregistrement trop court."); return; }
+    setProcessing(true);
+    var duration = timer;
+    // 1. Upload audio vers Storage
+    var audioUrl = null;
+    if (chantierRef) {
+      audioUrl = await uploadAudioToStorage(chantierRef, blob);
+    }
+    // 2. Transcription Whisper (détection langue auto)
+    var ext = mimeType.includes("webm") ? "webm" : "mp4";
+    var rawTranscript = await transcribeAudio(blob, "note-" + Date.now() + "." + ext);
+    // 3. Structuration + traduction GPT-4o-mini
+    var structured = rawTranscript ? await structureNote(rawTranscript, chantierEntity) : "";
+    // 4. Ajouter la note
+    var newNote = {
+      id: Date.now(),
+      audioUrl: audioUrl,
+      rawTranscript: rawTranscript || "",   // transcription brute conservée
+      transcript: structured || rawTranscript || "", // version structurée affichée
+      duration: duration,
+      createdAt: new Date().toISOString()
+    };
+    onChange(function(prev){ return prev.concat([newNote]); });
+    setProcessing(false);
+    setTimer(0);
+  }
+
+  function deleteNote(id) {
+    if (!window.confirm("Supprimer cette note vocale ?")) return;
+    onChange(function(prev){ return prev.filter(function(n){ return n.id !== id; }); });
+  }
+
+  function updateTranscript(id, val) {
+    onChange(function(prev){ return prev.map(function(n){ return n.id===id ? Object.assign({},n,{transcript:val}) : n; }); });
+  }
+
+  return (
+    <div style={CARD}>
+      <div style={SH}><span>🎙</span> Notes vocales</div>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>
+        Enregistrez une observation verbale — transcrite automatiquement par IA (Whisper).
+      </div>
+
+      {/* Bouton enregistrement */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        {!recording && !processing && (
+          <button onClick={startRecording}
+            style={{ display:"flex", alignItems:"center", gap:8, background:"#e74c3c", color:"#fff",
+              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+            🎙 Commencer l'enregistrement
+          </button>
+        )}
+        {recording && (
+          <button onClick={stopRecording}
+            style={{ display:"flex", alignItems:"center", gap:8, background:"#c0392b", color:"#fff",
+              border:"none", borderRadius:10, padding:"10px 22px", fontSize:14, fontWeight:700, cursor:"pointer",
+              animation:"pulse 1s infinite" }}>
+            ⏹ Arrêter — <span style={{ fontFamily:"monospace", fontSize:16 }}>{fmtTime(timer)}</span>
+          </button>
+        )}
+        {processing && (
+          <div style={{ display:"flex", alignItems:"center", gap:10, color:GREEN, fontWeight:600, fontSize:13, marginBottom:10 }}>
+            <span style={{ fontSize:20 }}>⏳</span>
+            <div>
+              <div>Transcription Whisper + structuration GPT…</div>
+              <div style={{ fontSize:11, color:MUTED, fontWeight:400 }}>Détection automatique de la langue</div>
+            </div>
+          </div>
+        )}
+      </div>
+      {recording && (
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, color:"#e74c3c", fontSize:12 }}>
+          <span style={{ width:8, height:8, borderRadius:"50%", background:"#e74c3c", display:"inline-block",
+            animation:"pulse 1s infinite" }} />
+          Enregistrement en cours — {fmtTime(timer)}
+        </div>
+      )}
+      {error && <div style={{ color:"#e74c3c", fontSize:12, marginBottom:8 }}>⚠ {error}</div>}
+
+      {/* Liste des notes */}
+      {notes.length === 0 && !recording && !processing && (
+        <div style={{ fontSize:12, color:MUTED, fontStyle:"italic" }}>Aucune note vocale pour l'instant.</div>
+      )}
+      {notes.map(function(note) {
+        return (
+          <div key={note.id} style={{ background:"#f8f8f4", borderRadius:8, padding:"12px 14px", marginBottom:10, border:"1px solid "+BORDER }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:11, color:MUTED }}>
+                  {new Date(note.createdAt).toLocaleDateString("fr-BE",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                  {note.duration ? " · " + fmtTime(note.duration) : ""}
+                </span>
+              </div>
+              <button onClick={function(){ deleteNote(note.id); }}
+                style={{ background:"none", border:"none", color:"#e74c3c", cursor:"pointer", fontSize:14, padding:"0 4px" }}>🗑</button>
+            </div>
+            {/* Lecteur audio */}
+            {note.audioUrl && (
+              <audio controls src={note.audioUrl}
+                style={{ width:"100%", height:36, marginBottom:8, borderRadius:6 }} />
+            )}
+            {/* Note structurée (éditable) */}
+            <div style={{ fontSize:11, fontWeight:700, color:MUTED, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+              Note structurée
+            </div>
+            <textarea value={note.transcript}
+              onChange={function(e){ updateTranscript(note.id, e.target.value); }}
+              placeholder="Résumé structuré — généré automatiquement par IA ou saisi manuellement…"
+              style={{ width:"100%", minHeight:80, resize:"vertical", fontSize:13, padding:"8px 10px",
+                border:"1px solid "+BORDER, borderRadius:7, boxSizing:"border-box", background:WHITE,
+                lineHeight:1.6, whiteSpace:"pre-wrap", fontFamily:"inherit" }} />
+            {/* Transcription brute (masquée par défaut) */}
+            {note.rawTranscript && note.rawTranscript !== note.transcript && (
+              <details style={{ marginTop:6 }}>
+                <summary style={{ fontSize:11, color:MUTED, cursor:"pointer", userSelect:"none" }}>
+                  🎙 Voir transcription brute
+                </summary>
+                <div style={{ fontSize:12, color:MUTED, background:"#f5f5f0", borderRadius:6,
+                  padding:"7px 10px", marginTop:4, lineHeight:1.5, fontStyle:"italic" }}>
+                  {note.rawTranscript}
+                </div>
+              </details>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SiteElectricalBlock({ electrical, onSet }) {
   function setE(path, val) {
     onSet(path, val);
@@ -2785,6 +3087,7 @@ function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
 }
 function App() {
   const [mode, setMode] = useState("form");
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcDrag, setBcDrag] = useState(false);
   const [bcMsg, setBcMsg] = useState("");
@@ -2795,6 +3098,7 @@ function App() {
   const [tdNote, setTdNote] = useState("");
   const [schemaNote, setSchemaNote] = useState("");
   const [pmNote, setPmNote] = useState("");
+  const [voiceNotes, setVoiceNotes] = useState([]);
   const [date, setDate] = useState("");
   const [sites, setSites] = useState([makeEmptySite()]);
   const [comments, setComments] = useState("");
@@ -2842,7 +3146,7 @@ function App() {
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
 
-  const data = { client, weGreen, entity, date, sites, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote };
+  const data = { client, weGreen, entity, date, sites, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote, voiceNotes };
   latestDataRef.current = data;
   currentSheetIdRef.current = currentSheetId;
   refRef.current = ref;
@@ -2945,6 +3249,7 @@ function App() {
         if (typeof d.tdNote === "string") setTdNote(d.tdNote);
         if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
         if (typeof d.pmNote === "string") setPmNote(d.pmNote);
+        if (Array.isArray(d.voiceNotes)) setVoiceNotes(d.voiceNotes);
         if (d.calepinage) setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
         setCurrentSheetId(sheetId);
         currentSheetIdRef.current = sheetId;
@@ -3117,6 +3422,7 @@ function App() {
         if (typeof d.tdNote === "string") setTdNote(d.tdNote);
         if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
         if (typeof d.pmNote === "string") setPmNote(d.pmNote);
+        if (Array.isArray(d.voiceNotes)) setVoiceNotes(d.voiceNotes);
         if (d.calepinage && typeof d.calepinage === "object") setCalepinage(function(p){ return Object.assign({}, p, d.calepinage); });
         setLastSaved(row.updated_at);
         setSaveStatus("saved");
@@ -3218,7 +3524,7 @@ function App() {
         }
       } else setSaveStatus("error");
     }, 1200);
-  }, [client, weGreen, entity, date, sites, comments, logistique, tdNote, schemaNote, pmNote]);
+  }, [client, weGreen, entity, date, sites, comments, logistique, tdNote, schemaNote, pmNote, voiceNotes]);
 
   // ── Photos auto-save : upload Storage puis JSON léger ────────────────────
   useEffect(function() {
@@ -3834,7 +4140,7 @@ function App() {
             <button onClick={() => setMode("form")} style={{ ...btnSt(mode === "form"), borderRadius: 0, border: "none", borderRight: "1px solid " + BORDER }}>Formulaire</button>
             <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
           </div>
-          {mode === "preview" && <button onClick={() => window.print()} style={btnSt(false)}>⬇ PDF</button>}
+          {mode === "preview" && <button onClick={generatePDF} disabled={pdfLoading} style={{ ...btnSt(false), opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "⏳ PDF…" : "⬇ PDF"}</button>}
 
           {ref && (
             <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
@@ -4154,7 +4460,15 @@ function App() {
             />
           </div>
 
-          {/* ── 6. Photos ── */}
+          {/* ── 6. Notes vocales ── */}
+          <VoiceNoteBlock
+            notes={voiceNotes}
+            onChange={setVoiceNotes}
+            chantierRef={ref}
+            chantierEntity={entity}
+          />
+
+          {/* ── 7. Photos ── */}
           <div style={CARD}>
             <div style={SH}><span>📷</span> Photos de chantier</div>
 
