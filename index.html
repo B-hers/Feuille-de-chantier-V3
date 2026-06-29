@@ -735,52 +735,6 @@ function LoginScreen({ onSignIn }) {
     }
     tryRender();
   }, []);
-  // ── Génération PDF (html2pdf.js — fonctionne sur mobile) ─────────────────
-  const generatePDF = async function() {
-    // Basculer en mode aperçu si nécessaire
-    var wasForm = mode !== "preview";
-    if (wasForm) {
-      setMode("preview");
-      await new Promise(function(r){ setTimeout(r, 400); }); // attendre le rendu
-    }
-    setPdfLoading(true);
-    try {
-      var el = document.getElementById("preview-doc-root");
-      if (!el) { window.print(); return; }
-      // Pré-convertir les images cross-origin en base64 pour éviter les erreurs CORS
-      var imgs = Array.from(el.querySelectorAll("img"));
-      await Promise.all(imgs.map(async function(img) {
-        var src = img.src;
-        if (!src || src.startsWith("data:")) return;
-        try {
-          var res = await fetch(src);
-          var blob = await res.blob();
-          var b64 = await new Promise(function(resolve) {
-            var reader = new FileReader();
-            reader.onload = function(e){ resolve(e.target.result); };
-            reader.onerror = function(){ resolve(null); };
-            reader.readAsDataURL(blob);
-          });
-          if (b64) img.src = b64;
-        } catch(e) { /* garder l'URL originale si fetch échoue */ }
-      }));
-      var filename = "briefing-" + (ref || "chantier") + ".pdf";
-      await html2pdf().set({
-        margin: [8, 8, 8, 8],
-        filename: filename,
-        image: { type: "jpeg", quality: 0.92 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      }).from(el).save();
-    } catch(e) {
-      console.error("html2pdf error:", e);
-      window.print(); // fallback
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f4f0" }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "40px 48px", boxShadow: "0 4px 32px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center", gap: 22, maxWidth: 360, width: "90%", boxSizing: "border-box" }}>
@@ -3166,6 +3120,51 @@ function App() {
   latestDataRef.current = data;
   currentSheetIdRef.current = currentSheetId;
   refRef.current = ref;
+
+  // ── Génération PDF (html2pdf.js, fonctionne sur mobile) ─────────────────
+  const generatePDF = async function() {
+    // Basculer en mode aperçu si nécessaire
+    var wasForm = mode !== "preview";
+    if (wasForm) {
+      setMode("preview");
+      await new Promise(function(r){ setTimeout(r, 400); }); // attendre le rendu
+    }
+    setPdfLoading(true);
+    try {
+      var el = document.getElementById("preview-doc-root");
+      if (!el) { window.print(); return; }
+      // Pré-convertir les images cross-origin en base64 pour éviter les erreurs CORS
+      var imgs = Array.from(el.querySelectorAll("img"));
+      await Promise.all(imgs.map(async function(img) {
+        var src = img.src;
+        if (!src || src.startsWith("data:")) return;
+        try {
+          var res = await fetch(src);
+          var blob = await res.blob();
+          var b64 = await new Promise(function(resolve) {
+            var reader = new FileReader();
+            reader.onload = function(e){ resolve(e.target.result); };
+            reader.onerror = function(){ resolve(null); };
+            reader.readAsDataURL(blob);
+          });
+          if (b64) img.src = b64;
+        } catch(e) { /* garder l'URL originale si fetch échoue */ }
+      }));
+      var filename = "briefing-" + (ref || "chantier") + ".pdf";
+      await html2pdf().set({
+        margin: [8, 8, 8, 8],
+        filename: filename,
+        image: { type: "jpeg", quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      }).from(el).save();
+    } catch(e) {
+      console.error("html2pdf error:", e);
+      window.print(); // fallback
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   // setT(instIdx, path, val) — updates tech field in installation instIdx
   // ── Setters sites-aware ────────────────────────────────────────────────────
