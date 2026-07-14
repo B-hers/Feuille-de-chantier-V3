@@ -309,6 +309,9 @@ const RAPPORT_SUPA_KEY = "sb_publishable_U6PddofdvgpD5IgU4ZsPdg_wqB-5Scw";
 // Structuration IA des notes vocales via Edge Function Supabase.
 // La clé OpenAI vit côté serveur (secret Supabase), jamais dans ce fichier.
 const STRUCTURE_FN_URL = SUPA_URL + "/functions/v1/structure-note";
+// Import direct des commandes Odoo via Edge Function Supabase.
+// Identifiants Odoo (URL, base, login, clé API) côté serveur, jamais dans ce fichier.
+const ODOO_FN_URL = SUPA_URL + "/functions/v1/fetch-odoo-order";
 const AUDIO_BUCKET = "chantier-audio";
 const SUPA_STORAGE_BUCKET = "chantier-photos";
 
@@ -3061,6 +3064,8 @@ function App() {
   const [bcLoading, setBcLoading] = useState(false);
   const [bcDrag, setBcDrag] = useState(false);
   const [bcMsg, setBcMsg] = useState("");
+  const [odooLoading, setOdooLoading] = useState(false);
+  const [odooMsg, setOdooMsg] = useState("");
   const [client, setClient] = useState({ nom: "", adresse: "", tel: "", email: "" });
   const [weGreen, setWeGreen] = useState({ manager: "", tel: "", email: "" });
   const [entity, setEntity] = useState("wge"); // wge | wcover | wgies | wgbdx
@@ -3938,6 +3943,92 @@ function App() {
     setBcLoading(false);
   };
 
+  // ── Actualiser depuis Odoo : import direct de la commande via Edge Function ──
+  // Réutilise exactement la même logique d'application au state que le drag-drop PDF.
+  const refreshFromOdoo = async function() {
+    if (!ref) { setOdooMsg("Aucune référence chantier (ajoutez ?ref=... dans l'URL)."); return; }
+    setOdooLoading(true); setOdooMsg("");
+    try {
+      var res = await fetch(ODOO_FN_URL, {
+        method: "POST",
+        headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: rawRef(ref, entity), entity: entity })
+      });
+      if (!res.ok) {
+        var errText = await res.text().catch(function(){ return String(res.status); });
+        console.error("Odoo fetch error:", res.status, errText);
+        if (res.status === 404) setOdooMsg("Fonction Odoo introuvable (pas encore déployée ?).");
+        else if (res.status === 401 || res.status === 403) setOdooMsg("Identifiants Odoo refusés côté serveur.");
+        else setOdooMsg("Erreur Odoo (" + res.status + ").");
+        setOdooLoading(false); return;
+      }
+      var out = await res.json();
+      if (!out || out.ok === false) {
+        setOdooMsg(out && out.error === "not_found"
+          ? ("Commande " + rawRef(ref, entity) + " introuvable dans Odoo.")
+          : ("Réponse Odoo invalide" + (out && out.error ? " : " + out.error : "")));
+        setOdooLoading(false); return;
+      }
+      var r = out.order || out;
+
+      // Client + adresse chantier
+      if (r.client && (r.client.nom || r.client.adresse)) {
+        setClient(function(p){ return Object.assign({}, p, { nom: r.client.nom || p.nom, adresse: r.client.adresse || p.adresse }); });
+      }
+      // Project Manager (mappé via PM_DATA si connu)
+      if (r.manager) {
+        if (PM_DATA[r.manager]) setWeGreen(function(p){ return Object.assign({}, p, { manager: r.manager, tel: PM_DATA[r.manager].tel, email: PM_DATA[r.manager].email }); });
+        else setWeGreen(function(p){ return Object.assign({}, p, { manager: r.manager }); });
+      }
+      // Produits → 1er site, 1ère installation PV
+      setSites(function(prev) {
+        var arr = JSON.parse(JSON.stringify(prev));
+        var next = arr[0].pvInstallations[0].tech;
+        var mainPan = null;
+        (r.panneaux || []).forEach(function(p){ if (!mainPan || (p.qty||0) > (mainPan.qty||0)) mainPan = p; });
+        if (mainPan) {
+          next.panneaux.type = mainPan.name || next.panneaux.type;
+          next.panneaux.nbr = String(mainPan.qty || "");
+          if (mainPan.wc && mainPan.qty) next.panneaux.kWc = (parseFloat(mainPan.qty) * parseFloat(mainPan.wc) / 1000).toFixed(2);
+        }
+        if ((r.onduleurs || []).length > 0) next.onduleurs = r.onduleurs.map(function(o){ return { type: o.type, kva: "" }; });
+        var batts = r.batts || [];
+        if (batts.some(function(b){ return (b.qty||0) > 0; })) {
+          var mainBatt = batts[0];
+          for (var i = 0; i < batts.length; i++) { if (batts[i].kwh) { mainBatt = batts[i]; break; } }
+          next.batterie.inclus = "OUI";
+          if (mainBatt.kwh) next.batterie.kwh = mainBatt.kwh;
+          if (mainBatt.name) next.batterie.type = mainBatt.name;
+          for (var j = 0; j < batts.length; j++) { if (batts[j].qty > 0) { next.batterie.qty = String(batts[j].qty); break; } }
+        }
+        if ((r.bornes || []).length > 0) {
+          next.borne.inclus = "OUI";
+          next.borne.type = r.bornes[0].type;
+          next.borne.qty = String(r.bornes[0].qty || "1");
+        }
+        if (r.greenbox) next.greenbox = "OUI";
+        arr[0].pvInstallations[0].tech = next;
+        return arr;
+      });
+
+      var found = [
+        (r.client && r.client.nom) && "client",
+        (r.client && r.client.adresse) && "adresse",
+        (r.panneaux || []).some(function(p){ return p.qty > 0; }) && ("panneaux (" + (r.panneaux||[]).reduce(function(s,p){ return s + (p.qty||0); }, 0) + " pcs)"),
+        (r.onduleurs || []).length && "onduleurs",
+        (r.batts || []).some(function(b){ return b.kwh; }) && "batterie",
+        (r.bornes || []).length && "borne",
+        r.greenbox && "greenbox",
+        r.manager && "PM"
+      ].filter(Boolean);
+      setOdooMsg(found.length > 0 ? ("✓ Odoo : " + found.join(" · ") + (r.name ? "  [" + r.name + "]" : "")) : "Commande trouvée mais aucune donnée exploitable.");
+    } catch(e) {
+      console.error("refreshFromOdoo:", e);
+      setOdooMsg("Erreur réseau lors de l'appel Odoo.");
+    }
+    setOdooLoading(false);
+  };
+
 
         const extractCalepinage = async (file) => {
     setCalepinage({ image: null, loading: true, msg: "" });
@@ -4218,6 +4309,18 @@ function App() {
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
         <>
+          {/* Actualiser depuis Odoo — import direct de la commande */}
+          {ref && (
+            <div id="no-print" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#f0f7f2", border: "1px solid " + GREEN_MID, borderRadius: 12, padding: "10px 14px" }}>
+              <button onClick={refreshFromOdoo} disabled={odooLoading}
+                style={{ display: "flex", alignItems: "center", gap: 7, background: odooLoading ? "#8fbf9f" : GREEN, color: WHITE, border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: odooLoading ? "wait" : "pointer" }}>
+                {odooLoading ? "⏳ Import Odoo…" : "🔄 Actualiser depuis Odoo"}
+              </button>
+              <span style={{ fontSize: 12, color: MUTED }}>Récupère client, adresse, PM et matériel directement depuis la commande {rawRef(ref, entity)}.</span>
+              {odooMsg && <span style={{ fontSize: 12, fontWeight: 600, color: odooMsg.charAt(0) === "✓" ? GREEN : "#c0392b", background: odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "4px 10px", borderRadius: 6, marginLeft: "auto" }}>{odooMsg}</span>}
+            </div>
+          )}
+
           {/* BDC drop zone */}
           <div id="no-print"
             onDragOver={e => { e.preventDefault(); setBcDrag(true); }}
