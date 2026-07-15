@@ -1607,13 +1607,14 @@ function PreviewDoc({ data }) {
           <table className="preview-table"><tbody>
             <tr><th>Nom</th><td>{tv(data.client.nom)}</td></tr>
             <tr><th>Adresse</th><td>{tv(data.client.adresse)}{data.client.adresse && data.client.adresse.trim() && (
-              <span id="no-print" data-html2canvas-ignore="true" style={{ display: "inline-flex", gap: 6, marginLeft: 8, flexWrap: "wrap", verticalAlign: "middle" }}>
+              <span style={{ display: "inline-flex", gap: 6, marginLeft: 8, flexWrap: "wrap", verticalAlign: "middle" }}>
+                <span style={{ fontSize: 11 }}>🧭</span>
                 {[
                   { label: "Maps", url: "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(data.client.adresse) },
                   { label: "Waze", url: "https://waze.com/ul?q=" + encodeURIComponent(data.client.adresse) + "&navigate=yes" },
                   { label: "Plans", url: "https://maps.apple.com/?daddr=" + encodeURIComponent(data.client.adresse) }
                 ].map(function(it){ return (
-                  <a key={it.label} href={it.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "1px 6px", fontWeight: 600 }}>{it.label}</a>
+                  <a key={it.label} className="itin-pdf-link" href={it.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "1px 6px", fontWeight: 600 }}>{it.label}</a>
                 ); })}
               </span>
             )}</td></tr>
@@ -3076,7 +3077,13 @@ function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
   );
 }
 function App() {
-  const [mode, setMode] = useState("form");
+  const [mode, setMode] = useState(function() {
+    try {
+      var s = localStorage.getItem("wge_user");
+      if (s) { var u = JSON.parse(s); if (u && u.type === "contractor") return "preview"; }
+    } catch(e) {}
+    return "form";
+  });
   const [pdfLoading, setPdfLoading] = useState(false);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcDrag, setBcDrag] = useState(false);
@@ -3139,6 +3146,10 @@ function App() {
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
 
+  // Sous-traitant : acces en lecture seule (vue Apercu uniquement). Les liens d'itineraire restent cliquables.
+  const isContractor = !!(user && user.type === "contractor");
+  useEffect(function(){ if (isContractor && mode !== "preview") setMode("preview"); }, [isContractor, mode]);
+
   const data = { client, weGreen, entity, date, sites, comments, logistique, photos, calepinage, tdNote, schemaNote, pmNote, voiceNotes };
   latestDataRef.current = data;
   currentSheetIdRef.current = currentSheetId;
@@ -3174,13 +3185,38 @@ function App() {
         } catch(e) { /* garder l'URL originale si fetch échoue */ }
       }));
       var filename = "briefing-" + (ref || "chantier") + ".pdf";
-      await html2pdf().set({
-        margin: [8, 8, 8, 8],
+      var margin = 8;
+      var opt = {
+        margin: [margin, margin, margin, margin],
         filename: filename,
         image: { type: "jpeg", quality: 0.92 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      }).from(el).save();
+      };
+      // Genere le PDF puis superpose des liens cliquables sur les boutons d'itineraire.
+      await html2pdf().set(opt).from(el).toPdf().get("pdf", function(pdf){
+        try {
+          var pageW = 210, pageH = 297;
+          var contentW = pageW - margin * 2;      // largeur utile en mm
+          var contentH = pageH - margin * 2;      // hauteur utile par page en mm
+          var ratio = contentW / el.offsetWidth;  // conversion px -> mm
+          var elRect = el.getBoundingClientRect();
+          var links = Array.prototype.slice.call(el.querySelectorAll("a.itin-pdf-link"));
+          links.forEach(function(a){
+            var url = a.getAttribute("href");
+            if (!url) return;
+            var r = a.getBoundingClientRect();
+            var xpx = r.left - elRect.left;
+            var ypx = r.top - elRect.top;
+            var contentY = ypx * ratio;
+            var page = Math.floor(contentY / contentH);
+            var yOnPage = margin + (contentY - page * contentH);
+            var x = margin + xpx * ratio;
+            pdf.setPage(page + 1);
+            pdf.link(x, yOnPage, r.width * ratio, r.height * ratio, { url: url });
+          });
+        } catch(err) { console.error("Liens PDF itineraire:", err); }
+      }).save();
     } catch(e) {
       console.error("html2pdf error:", e);
       window.print(); // fallback
@@ -4263,10 +4299,12 @@ function App() {
           </div>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {!isContractor && (
           <div style={{ display: "flex", border: "1px solid " + BORDER, borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setMode("form")} style={{ ...btnSt(mode === "form"), borderRadius: 0, border: "none", borderRight: "1px solid " + BORDER }}>Formulaire</button>
             <button onClick={() => setMode("preview")} style={{ ...btnSt(mode === "preview"), borderRadius: 0, border: "none" }}>Aperçu</button>
           </div>
+          )}
           {mode === "preview" && <button onClick={generatePDF} disabled={pdfLoading} style={{ ...btnSt(false), opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "⏳ PDF…" : "⬇ PDF"}</button>}
 
           {ref && (
