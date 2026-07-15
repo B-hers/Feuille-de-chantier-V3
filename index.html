@@ -4309,34 +4309,41 @@ function App() {
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
         <>
-          {/* Actualiser depuis Odoo — import direct de la commande */}
-          {ref && (
-            <div id="no-print" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#f0f7f2", border: "1px solid " + GREEN_MID, borderRadius: 12, padding: "10px 14px" }}>
-              <button onClick={refreshFromOdoo} disabled={odooLoading}
-                style={{ display: "flex", alignItems: "center", gap: 7, background: odooLoading ? "#8fbf9f" : GREEN, color: WHITE, border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: odooLoading ? "wait" : "pointer" }}>
-                {odooLoading ? "⏳ Import Odoo…" : "🔄 Actualiser depuis Odoo"}
-              </button>
-              <span style={{ fontSize: 12, color: MUTED }}>Récupère client, adresse, PM et matériel directement depuis la commande {rawRef(ref, entity)}.</span>
-              {odooMsg && <span style={{ fontSize: 12, fontWeight: 600, color: odooMsg.charAt(0) === "✓" ? GREEN : "#c0392b", background: odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "4px 10px", borderRadius: 6, marginLeft: "auto" }}>{odooMsg}</span>}
-            </div>
-          )}
+          {/* Actualiser depuis Odoo + bon de commande — deux cases cote a cote */}
+          <div id="no-print" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch" }}>
 
-          {/* BDC drop zone */}
-          <div id="no-print"
-            onDragOver={e => { e.preventDefault(); setBcDrag(true); }}
-            onDragLeave={() => setBcDrag(false)}
-            onDrop={e => { e.preventDefault(); setBcDrag(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) parseBDC(f); }}
-            onClick={() => { const i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,image/*"; i.onchange = e => e.target.files && e.target.files[0] && parseBDC(e.target.files[0]); i.click(); }}
-            style={{ border: `2px dashed ${bcDrag ? GREEN : "#c8c8c0"}`, background: bcDrag ? GREEN_LIGHT : "#fafaf8", borderRadius: 12, padding: "1rem 1.5rem", textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}>
-            {bcLoading
-              ? <div style={{ color: GREEN, fontSize: 14, fontWeight: 600 }}>⏳ Extraction en cours…</div>
-              : <>
-                  <div style={{ fontSize: 22, marginBottom: 4 }}>📋</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>Déposer le bon de commande client ici</div>
-                  <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>PDF ou image — client, adresse chantier et PM extraits automatiquement</div>
-                  {bcMsg && <div style={{ fontSize: 12, color: GREEN, marginTop: 6, fontWeight: 600, background: GREEN_LIGHT, padding: "4px 10px", borderRadius: 6, display: "inline-block" }}>{bcMsg}</div>}
-                </>
-            }
+            {/* Actualiser depuis Odoo — import direct de la commande (si reference) */}
+            {ref && (
+              <div style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, background: "#f0f7f2", border: "1px solid " + GREEN_MID, borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <button onClick={refreshFromOdoo} disabled={odooLoading}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: odooLoading ? "#8fbf9f" : GREEN, color: WHITE, border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: odooLoading ? "wait" : "pointer" }}>
+                    {odooLoading ? "⏳ Import Odoo…" : "🔄 Actualiser depuis Odoo"}
+                  </button>
+                  {odooMsg && <span style={{ fontSize: 12, fontWeight: 600, color: odooMsg.charAt(0) === "✓" ? GREEN : "#c0392b", background: odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "4px 10px", borderRadius: 6 }}>{odooMsg}</span>}
+                </div>
+                <span style={{ fontSize: 12, color: MUTED }}>Récupère client, adresse, PM et matériel directement depuis la commande {rawRef(ref, entity)}.</span>
+              </div>
+            )}
+
+            {/* BDC drop zone */}
+            <div
+              onDragOver={e => { e.preventDefault(); setBcDrag(true); }}
+              onDragLeave={() => setBcDrag(false)}
+              onDrop={e => { e.preventDefault(); setBcDrag(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) parseBDC(f); }}
+              onClick={() => { const i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,image/*"; i.onchange = e => e.target.files && e.target.files[0] && parseBDC(e.target.files[0]); i.click(); }}
+              style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", border: `2px dashed ${bcDrag ? GREEN : "#c8c8c0"}`, background: bcDrag ? GREEN_LIGHT : "#fafaf8", borderRadius: 12, padding: "1rem 1.5rem", textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}>
+              {bcLoading
+                ? <div style={{ color: GREEN, fontSize: 14, fontWeight: 600 }}>⏳ Extraction en cours…</div>
+                : <>
+                    <div style={{ fontSize: 22, marginBottom: 4 }}>📋</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>Déposer le bon de commande client ici</div>
+                    <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>PDF ou image — client, adresse chantier et PM extraits automatiquement</div>
+                    {bcMsg && <div style={{ fontSize: 12, color: GREEN, marginTop: 6, fontWeight: 600, background: GREEN_LIGHT, padding: "4px 10px", borderRadius: 6, display: "inline-block" }}>{bcMsg}</div>}
+                  </>
+              }
+            </div>
+
           </div>
 
           {/* ── SheetBar — multi-feuilles ── */}
