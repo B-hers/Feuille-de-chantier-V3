@@ -3972,8 +3972,8 @@ function App() {
       var r = out.order || out;
 
       // Client + adresse chantier
-      if (r.client && (r.client.nom || r.client.adresse)) {
-        setClient(function(p){ return Object.assign({}, p, { nom: r.client.nom || p.nom, adresse: r.client.adresse || p.adresse }); });
+      if (r.client && (r.client.nom || r.client.adresse || r.client.tel || r.client.email)) {
+        setClient(function(p){ return Object.assign({}, p, { nom: r.client.nom || p.nom, adresse: r.client.adresse || p.adresse, tel: r.client.tel || p.tel, email: r.client.email || p.email }); });
       }
       // Project Manager (mappé via PM_DATA si connu)
       if (r.manager) {
@@ -4014,6 +4014,8 @@ function App() {
       var found = [
         (r.client && r.client.nom) && "client",
         (r.client && r.client.adresse) && "adresse",
+        (r.client && r.client.tel) && "tél",
+        (r.client && r.client.email) && "email",
         (r.panneaux || []).some(function(p){ return p.qty > 0; }) && ("panneaux (" + (r.panneaux||[]).reduce(function(s,p){ return s + (p.qty||0); }, 0) + " pcs)"),
         (r.onduleurs || []).length && "onduleurs",
         (r.batts || []).some(function(b){ return b.kwh; }) && "batterie",
