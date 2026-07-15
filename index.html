@@ -400,6 +400,13 @@ function detectEntity(ref) {
   return "wge";
 }
 
+// Construit l'URL directe vers une commande de vente Odoo (fiche form) a partir de son id technique.
+function odooOrderUrl(entity, id) {
+  var base = ((ENTITIES[entity] || ENTITIES.wge).odooUrl || "").match(/^https?:\/\/[^\/]+/);
+  base = base ? base[0] : "https://me-green.odoo.com";
+  return base + "/web#id=" + id + "&model=sale.order&view_type=form";
+}
+
 // Extrait la ref Odoo brute depuis une ref complète (ex: "WC-S05041" → "S05041")
 function rawRef(fullRef, entityKey) {
   var prefix = (ENTITIES[entityKey] || ENTITIES.wge).prefix;
@@ -1599,7 +1606,17 @@ function PreviewDoc({ data }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Client</div>
           <table className="preview-table"><tbody>
             <tr><th>Nom</th><td>{tv(data.client.nom)}</td></tr>
-            <tr><th>Adresse</th><td>{tv(data.client.adresse)}</td></tr>
+            <tr><th>Adresse</th><td>{tv(data.client.adresse)}{data.client.adresse && data.client.adresse.trim() && (
+              <span id="no-print" data-html2canvas-ignore="true" style={{ display: "inline-flex", gap: 6, marginLeft: 8, flexWrap: "wrap", verticalAlign: "middle" }}>
+                {[
+                  { label: "Maps", url: "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(data.client.adresse) },
+                  { label: "Waze", url: "https://waze.com/ul?q=" + encodeURIComponent(data.client.adresse) + "&navigate=yes" },
+                  { label: "Plans", url: "https://maps.apple.com/?daddr=" + encodeURIComponent(data.client.adresse) }
+                ].map(function(it){ return (
+                  <a key={it.label} href={it.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 5, padding: "1px 6px", fontWeight: 600 }}>{it.label}</a>
+                ); })}
+              </span>
+            )}</td></tr>
             <tr><th>Téléphone</th><td>{tv(data.client.tel)}</td></tr>
             <tr><th>Email</th><td>{tv(data.client.email)}</td></tr>
           </tbody></table>
@@ -3066,6 +3083,7 @@ function App() {
   const [bcMsg, setBcMsg] = useState("");
   const [odooLoading, setOdooLoading] = useState(false);
   const [odooMsg, setOdooMsg] = useState("");
+  const [odooOrderId, setOdooOrderId] = useState(null);
   const [client, setClient] = useState({ nom: "", adresse: "", tel: "", email: "" });
   const [weGreen, setWeGreen] = useState({ manager: "", tel: "", email: "" });
   const [entity, setEntity] = useState("wge"); // wge | wcover | wgies | wgbdx
@@ -3970,6 +3988,7 @@ function App() {
         setOdooLoading(false); return;
       }
       var r = out.order || out;
+      if (r.id) setOdooOrderId(r.id);
 
       // Client + adresse chantier
       if (r.client && (r.client.nom || r.client.adresse || r.client.tel || r.client.email)) {
@@ -4233,7 +4252,7 @@ function App() {
           <div style={{ fontSize: 22, fontWeight: 600 }}>
             {sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; }) ? "Briefing de chantier PV + BR" : "Briefing de chantier PV"}
             {client.nom && <span style={{ fontSize: 15, fontWeight: 400, color: MUTED, marginLeft: 10 }}>— {client.nom}</span>}
-            {ref && <a href={(ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: (ENTITIES[entity] || ENTITIES.wge).color, textDecoration: "none", border: "1px solid " + (ENTITIES[entity] || ENTITIES.wge).color + "55", borderRadius: 5, padding: "2px 8px", background: (ENTITIES[entity] || ENTITIES.wge).color + "12", whiteSpace: "nowrap" }}>← Odoo</a>}
+            {ref && <a href={odooOrderId ? odooOrderUrl(entity, odooOrderId) : (ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" title={odooOrderId ? ("Ouvrir la commande " + rawRef(ref, entity) + " dans Odoo") : "Ouvrir Odoo"} style={{ marginLeft: 10, fontSize: 12, color: (ENTITIES[entity] || ENTITIES.wge).color, textDecoration: "none", border: "1px solid " + (ENTITIES[entity] || ENTITIES.wge).color + "55", borderRadius: 5, padding: "2px 8px", background: (ENTITIES[entity] || ENTITIES.wge).color + "12", whiteSpace: "nowrap" }}>{odooOrderId ? "← Voir dans Odoo" : "← Odoo"}</a>}
           </div>
           {!ref && <div style={{ fontSize: 11, color: "#e07b00", marginTop: 2 }}>⚠ Pas de référence — ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</div>}
           {ref && <div style={{ fontSize: 11, marginTop: 2, color: saveStatus === "saving" ? "#e07b00" : saveStatus === "error" ? "#c0392b" : saveStatus === "loading" ? MUTED : GREEN }}>
@@ -4394,6 +4413,18 @@ function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Field label="Nom du client" value={client.nom} onChange={v => setClient(p => ({ ...p, nom: v }))} placeholder="Société ou particulier" />
                 <Field label="📍 Adresse de chantier" value={client.adresse} onChange={v => setClient(p => ({ ...p, adresse: v }))} placeholder="Rue, numéro, CP, ville" />
+                {client.adresse && client.adresse.trim() && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: -3, fontSize: 12, flexWrap: "wrap" }}>
+                    <span style={{ color: MUTED }}>🧭 Itinéraire</span>
+                    {[
+                      { label: "Google Maps", url: "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(client.adresse) },
+                      { label: "Waze", url: "https://waze.com/ul?q=" + encodeURIComponent(client.adresse) + "&navigate=yes" },
+                      { label: "Plans", url: "https://maps.apple.com/?daddr=" + encodeURIComponent(client.adresse) }
+                    ].map(function(it){ return (
+                      <a key={it.label} href={it.url} target="_blank" rel="noreferrer" style={{ color: GREEN, textDecoration: "none", border: "1px solid " + GREEN_MID, borderRadius: 6, padding: "2px 8px", background: GREEN_LIGHT, fontWeight: 600 }}>{it.label}</a>
+                    ); })}
+                  </div>
+                )}
                 <div style={G2}>
                   <Field label="Téléphone" value={client.tel} onChange={v => setClient(p => ({ ...p, tel: v }))} type="tel" />
                   <Field label="Email" value={client.email} onChange={v => setClient(p => ({ ...p, email: v }))} type="email" />
