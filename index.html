@@ -1551,8 +1551,11 @@ function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder,
 function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, minWidth: 52, paddingTop: 26 }}>STR {idx + 1}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr", gap: 8, flex: 1, alignItems: "end" }}>
+      <div style={{ minWidth: 96 }}>
+        <label style={LBL}>Nom</label>
+        <input value={row.name || ""} onChange={e => onChange({ ...row, name: e.target.value })} placeholder={"String " + (idx + 1)} style={{ width: "100%", fontWeight: 700, color: GREEN }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "84px 62px 78px 1fr", gap: 8, flex: 1, alignItems: "end" }}>
         <div>
           <label style={LBL}>Onduleur</label>
           <select value={row.onduleur} onChange={e => onChange({ ...row, onduleur: e.target.value })} style={{ width: "100%" }}>
@@ -1562,6 +1565,10 @@ function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
         <div>
           <label style={LBL}>Nbr PV</label>
           <input type="number" min="1" value={row.count} onChange={e => onChange({ ...row, count: e.target.value })} style={{ width: "100%" }} placeholder="10" />
+        </div>
+        <div>
+          <label style={LBL}>Tension (V)</label>
+          <input value={row.tension || ""} onChange={e => onChange({ ...row, tension: e.target.value })} style={{ width: "100%" }} placeholder="ex: 600" />
         </div>
         <div>
           <label style={LBL}>Orientation</label>
@@ -1690,9 +1697,9 @@ function PreviewDoc({ data }) {
                     <div style={{ marginTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
                       <table className="preview-table">
-                        <thead><tr>{["String","Onduleur","Panneaux","Orientation"].map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
+                        <thead><tr>{["String","Onduleur","Panneaux","Tension","Orientation"].map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
                         <tbody>
-                          {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>STR {i+1}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
+                          {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>{s.name && s.name.trim() ? s.name : ("String " + (i+1))}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.tension ? (String(s.tension).match(/[a-zA-Z]/) ? s.tension : s.tension + " V") : "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
                         </tbody>
                       </table>
                     </div>
@@ -1786,7 +1793,7 @@ function makeEmptyInst() {
       branchementOnduleur: null,
       distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
     },
-    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "" }]
   };
 }
 
@@ -1815,7 +1822,7 @@ function makeEmptyPVInst() {
       ems: { inclus: null, modele: "" },
       compteurVert: null, greenbox: null, accessoires: "",
     },
-    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }]
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "" }]
   };
 }
 function makeEmptySite() {
