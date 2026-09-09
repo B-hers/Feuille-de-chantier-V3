@@ -1548,7 +1548,7 @@ function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder,
     </div>
   );
 }
-function StringRow({ idx, row, onChange, onRemove, maxOnd, mppts }) {
+function StringRow({ idx, row, onChange, onRemove, maxOnd, mppts, total, onMove }) {
   return (
     <div style={{ padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -1580,7 +1580,11 @@ function StringRow({ idx, row, onChange, onRemove, maxOnd, mppts }) {
           </div>
         </div>
       </div>
-      <button onClick={onRemove} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginTop: 22 }}>×</button>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, marginTop: 14 }}>
+        <button onClick={function(){ onMove(-1); }} disabled={idx === 0} title="Monter" style={{ fontSize: 12, lineHeight: 1, color: idx === 0 ? "#ccc" : MUTED, background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", padding: 0 }}>▲</button>
+        <button onClick={function(){ onMove(1); }} disabled={idx === total - 1} title="Descendre" style={{ fontSize: 12, lineHeight: 1, color: idx === total - 1 ? "#ccc" : MUTED, background: "none", border: "none", cursor: idx === total - 1 ? "default" : "pointer", padding: 0 }}>▼</button>
+        <button onClick={onRemove} title="Supprimer" style={{ fontSize: 17, lineHeight: 1, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: "2px 0 0" }}>×</button>
+      </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, marginLeft: 4, fontSize: 12, flexWrap: "wrap" }}>
         {mppts && mppts.length > 0 && (
@@ -1873,6 +1877,8 @@ function InstallationBlock(props) {
   var onAddMppt = props.onAddMppt;
   var onUpdMppt = props.onUpdMppt;
   var onDelMppt = props.onDelMppt;
+  var onMoveMppt = props.onMoveMppt;
+  var onMoveString = props.onMoveString;
   var onUpdString = props.onUpdString;
   var onDelString = props.onDelString;
   var onRemove = props.onRemove;
@@ -2090,12 +2096,16 @@ function InstallationBlock(props) {
                 <select value={m.onduleur || "1"} onChange={function(e){ onUpdMppt(instIdx, mi, Object.assign({}, m, { onduleur: e.target.value })); }} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER }}>
                   {Array.from({ length: Math.max(1, tech.onduleurs.length) }, function(_, i){ return <option key={i + 1} value={String(i + 1)}>{i + 1}</option>; })}
                 </select>
-                <button onClick={function(){ onDelMppt(instIdx, mi); }} style={{ marginLeft: "auto", fontSize: 18, color: MUTED, background: "none", border: "none", cursor: "pointer" }}>×</button>
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+                  <button onClick={function(){ onMoveMppt(instIdx, mi, -1); }} disabled={mi === 0} title="Monter" style={{ fontSize: 12, color: mi === 0 ? "#ccc" : MUTED, background: "none", border: "none", cursor: mi === 0 ? "default" : "pointer", padding: 0 }}>▲</button>
+                  <button onClick={function(){ onMoveMppt(instIdx, mi, 1); }} disabled={mi === mppts.length - 1} title="Descendre" style={{ fontSize: 12, color: mi === mppts.length - 1 ? "#ccc" : MUTED, background: "none", border: "none", cursor: mi === mppts.length - 1 ? "default" : "pointer", padding: 0 }}>▼</button>
+                  <button onClick={function(){ onDelMppt(instIdx, mi); }} title="Supprimer" style={{ fontSize: 17, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: 0 }}>×</button>
+                </span>
               </div>
             ); })}
           </div>
         )}
-        {strings.map(function(row, i) { return <StringRow key={i} idx={i} row={row} onChange={function(r){ onUpdString(instIdx, i, r); }} onRemove={function(){ onDelString(instIdx, i); }} maxOnd={Math.max(1, tech.onduleurs.length)} mppts={mppts} />; })}
+        {strings.map(function(row, i) { return <StringRow key={i} idx={i} row={row} onChange={function(r){ onUpdString(instIdx, i, r); }} onRemove={function(){ onDelString(instIdx, i); }} maxOnd={Math.max(1, tech.onduleurs.length)} mppts={mppts} total={strings.length} onMove={function(dir){ onMoveString(instIdx, i, dir); }} />; })}
         {strings.length > 0 && (
           <div style={{ marginTop: 12, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
             <strong style={{ color: TEXT }}>Résumé : </strong>
@@ -3351,6 +3361,28 @@ function App() {
       var removed = (inst.mppts || [])[mIdx];
       inst.mppts = (inst.mppts || []).filter(function(_, i){ return i !== mIdx; });
       if (removed) inst.strings = (inst.strings || []).map(function(s){ return s.mppt === removed.id ? Object.assign({}, s, { mppt: "" }) : s; });
+      return arr;
+    });
+  };
+  const moveMppt = function(siteIdx, pvIdx, mIdx, dir) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var list = arr[siteIdx].pvInstallations[pvIdx].mppts || [];
+      var j = mIdx + dir;
+      if (j < 0 || j >= list.length) return prev;
+      var tmp = list[mIdx]; list[mIdx] = list[j]; list[j] = tmp;
+      arr[siteIdx].pvInstallations[pvIdx].mppts = list;
+      return arr;
+    });
+  };
+  const moveString = function(siteIdx, pvIdx, strIdx, dir) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var list = arr[siteIdx].pvInstallations[pvIdx].strings || [];
+      var j = strIdx + dir;
+      if (j < 0 || j >= list.length) return prev;
+      var tmp = list[strIdx]; list[strIdx] = list[j]; list[j] = tmp;
+      arr[siteIdx].pvInstallations[pvIdx].strings = list;
       return arr;
     });
   };
@@ -4696,6 +4728,8 @@ function App() {
                     onAddMppt: function(pvIdx2){ addMppt(siteIdx, pvIdx2); },
                     onUpdMppt: function(pvIdx2, mi, row){ updMppt(siteIdx, pvIdx2, mi, row); },
                     onDelMppt: function(pvIdx2, mi){ delMppt(siteIdx, pvIdx2, mi); },
+                    onMoveMppt: function(pvIdx2, mi, dir){ moveMppt(siteIdx, pvIdx2, mi, dir); },
+                    onMoveString: function(pvIdx2, si, dir){ moveString(siteIdx, pvIdx2, si, dir); },
                     onUpdString: function(pvIdx2, si, row){ updString(siteIdx, pvIdx2, si, row); },
                     onDelString: function(pvIdx2, si){ delString(siteIdx, pvIdx2, si); },
                     onRemove: function(pvIdx2){ removePVInst(siteIdx, pvIdx2); }
