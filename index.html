@@ -1548,9 +1548,10 @@ function PhotoZone({ catKey, label, items, onAdd, onDelete, onUpdate, onReorder,
     </div>
   );
 }
-function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
+function StringRow({ idx, row, onChange, onRemove, maxOnd, mppts }) {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${BORDER}` }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
       <div style={{ minWidth: 96 }}>
         <label style={LBL}>Nom</label>
         <input value={row.name || ""} onChange={e => onChange({ ...row, name: e.target.value })} placeholder={"String " + (idx + 1)} style={{ width: "100%", fontWeight: 700, color: GREEN }} />
@@ -1580,6 +1581,28 @@ function StringRow({ idx, row, onChange, onRemove, maxOnd }) {
         </div>
       </div>
       <button onClick={onRemove} style={{ fontSize: 20, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginTop: 22 }}>×</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, marginLeft: 4, fontSize: 12, flexWrap: "wrap" }}>
+        {mppts && mppts.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: MUTED }}>MPPT</span>
+            <select value={row.mppt || ""} onChange={function(e){ onChange({ ...row, mppt: e.target.value }); }} style={{ fontSize: 12, padding: "3px 6px" }}>
+              <option value="">— Aucun —</option>
+              {mppts.map(function(m, mi){ return <option key={m.id} value={m.id}>{m.name && m.name.trim() ? m.name : ("MPPT " + (mi + 1))}</option>; })}
+            </select>
+          </label>
+        )}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <input type="checkbox" checked={row.optim === "OUI"} onChange={function(e){ onChange({ ...row, optim: e.target.checked ? "OUI" : null, optimCount: e.target.checked ? (row.optimCount || "") : "" }); }} />
+          <span>Optimiseurs sur ce string</span>
+        </label>
+        {row.optim === "OUI" && (
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input type="number" min="1" value={row.optimCount || ""} onChange={function(e){ onChange({ ...row, optimCount: e.target.value }); }} placeholder="Nb" style={{ width: 60, fontSize: 12, padding: "3px 6px" }} />
+            <span style={{ color: MUTED }}>pièce(s)</span>
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -1670,6 +1693,10 @@ function PreviewDoc({ data }) {
             {/* PV installations */}
             {(site.pvInstallations || []).map(function(inst, instIdx) {
               var t = inst.tech; var strs = inst.strings;
+              var hasOptim = (strs || []).some(function(s){ return s.optim === "OUI"; });
+              var mpptsList = inst.mppts || [];
+              var mpptName = function(id){ for (var k = 0; k < mpptsList.length; k++){ if (mpptsList[k].id === id) return (mpptsList[k].name && mpptsList[k].name.trim()) ? mpptsList[k].name : ("MPPT " + (k + 1)); } return ""; };
+              var hasMppt = strs.some(function(s){ return s.mppt && mpptName(s.mppt); });
               return (
                 <div key={instIdx} style={{ marginBottom: 18 }}>
                   {(site.pvInstallations||[]).length > 1 && (
@@ -1692,14 +1719,15 @@ function PreviewDoc({ data }) {
                     {t.ems && t.ems.inclus === "OUI" && <tr><th>EMS</th><td>{t.ems.modele || "OUI"}</td></tr>}
                     {t.compteurVert === "OUI" && <tr><th>Compteur vert</th><td>OUI</td></tr>}
                     {t.greenbox === "OUI" && <tr><th>Greenbox</th><td>OUI</td></tr>}
+                    {t.optimiseur && t.optimiseur.inclus === "OUI" && <tr><th>Optimiseurs</th><td>{[t.optimiseur.qty && (t.optimiseur.qty + " pc"), t.optimiseur.modele].filter(Boolean).join(" — ") || "OUI"}</td></tr>}
                   </tbody></table>
                   {strs && strs.length > 0 && (
                     <div style={{ marginTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Configuration de strings</div>
                       <table className="preview-table">
-                        <thead><tr>{["String","Onduleur","Panneaux","Tension","Orientation"].map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
+                        <thead><tr>{["String"].concat(hasMppt ? ["MPPT"] : []).concat(["Onduleur","Panneaux","Tension"]).concat(hasOptim ? ["Optim."] : []).concat(["Orientation"]).map(function(h){ return <th key={h} style={{ background: GREEN, color: WHITE }}>{h}</th>; })}</tr></thead>
                         <tbody>
-                          {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>{s.name && s.name.trim() ? s.name : ("String " + (i+1))}</td><td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.tension ? (String(s.tension).match(/[a-zA-Z]/) ? s.tension : s.tension + " V") : "—"}</td><td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
+                          {strs.map(function(s, i) { return <tr key={i}><td style={{ fontWeight: 600 }}>{s.name && s.name.trim() ? s.name : ("String " + (i+1))}</td>{hasMppt ? <td>{mpptName(s.mppt) || "—"}</td> : null}<td>Onduleur {s.onduleur}</td><td>{s.count || "—"}</td><td>{s.tension ? (String(s.tension).match(/[a-zA-Z]/) ? s.tension : s.tension + " V") : "—"}</td>{hasOptim ? <td>{s.optim === "OUI" ? (s.optimCount ? s.optimCount + " pc" : "Oui") : "—"}</td> : null}<td>{s.orient === "Libre" ? (s.orientLibre || "—") : (s.orient || "—")}</td></tr>; })}
                         </tbody>
                       </table>
                     </div>
@@ -1784,6 +1812,7 @@ function makeEmptyInst() {
       batterie: { inclus: null, qty: "1", kwh: "", type: "" },
       borne: { inclus: null, qty: "1", type: "" },
       ems: { inclus: null, modele: "" },
+      optimiseur: { inclus: null, qty: "", modele: "" },
       compteurVert: null,
       greenbox: null,
       accessoires: "",
@@ -1793,7 +1822,8 @@ function makeEmptyInst() {
       branchementOnduleur: null,
       distances: { onduleurTGBT: "", onduleurTD: "", borneTGBT: "" }
     },
-    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "" }]
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "", optim: null, optimCount: "", mppt: "" }],
+    mppts: []
   };
 }
 
@@ -1820,9 +1850,11 @@ function makeEmptyPVInst() {
       batterie: { inclus: null, qty: "1", kwh: "", type: "" },
       borne: { inclus: null, qty: "1", type: "" },
       ems: { inclus: null, modele: "" },
+      optimiseur: { inclus: null, qty: "", modele: "" },
       compteurVert: null, greenbox: null, accessoires: "",
     },
-    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "" }]
+    strings: [{ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "", optim: null, optimCount: "", mppt: "" }],
+    mppts: []
   };
 }
 function makeEmptySite() {
@@ -1837,12 +1869,17 @@ function InstallationBlock(props) {
   var onSetT = props.onSetT;
   var onSetTech = props.onSetTech;
   var onAddString = props.onAddString;
+  var mppts = props.mppts || [];
+  var onAddMppt = props.onAddMppt;
+  var onUpdMppt = props.onUpdMppt;
+  var onDelMppt = props.onDelMppt;
   var onUpdString = props.onUpdString;
   var onDelString = props.onDelString;
   var onRemove = props.onRemove;
 
   function setT(path, val) { onSetT(instIdx, path, val); }
   function setTech(updater) { onSetTech(instIdx, updater); }
+  function setOptim(patch) { setTech(function(tt){ var cur = tt.optimiseur || { inclus: null, qty: "", modele: "" }; return Object.assign({}, tt, { optimiseur: Object.assign({}, cur, patch) }); }); }
 
   return (
     <div>
@@ -2015,6 +2052,19 @@ function InstallationBlock(props) {
             </div>
           </div>
 
+          <div>
+            <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Optimiseurs</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Toggle value={(tech.optimiseur || {}).inclus || null} onChange={function(v){ setOptim({ inclus: v }); }} />
+              {(tech.optimiseur || {}).inclus === "OUI" && (
+                <React.Fragment>
+                  <input type="number" min="1" value={(tech.optimiseur || {}).qty || ""} onChange={function(e){ setOptim({ qty: e.target.value }); }} placeholder="Nb" style={{ width: 70, fontSize: 13, padding: "5px 8px", borderRadius: 6, border: "1px solid " + BORDER }} />
+                  <input value={(tech.optimiseur || {}).modele || ""} onChange={function(e){ setOptim({ modele: e.target.value }); }} placeholder="Modèle (ex: Tigo TS4-A-O)" style={{ flex: 1, minWidth: 150, fontSize: 13, padding: "5px 8px", borderRadius: 6, border: "1px solid " + BORDER }} />
+                </React.Fragment>
+              )}
+            </div>
+          </div>
+
           <Field label="Autres accessoires" value={tech.accessoires} onChange={function(v){ setT("accessoires", v); }} placeholder="Ex: Optimiseurs, câblage spécifique…" />
 
         </div>
@@ -2024,10 +2074,28 @@ function InstallationBlock(props) {
       <div style={Object.assign({}, CARD, { marginTop: 10 })}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={SH}><span>📊</span> Configuration de strings</div>
-          <button onClick={function(){ onAddString(instIdx); }} style={{ fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginBottom: 14 }}>+ Ajouter un string</button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button onClick={function(){ onAddMppt(instIdx); }} style={{ fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>+ MPPT</button>
+            <button onClick={function(){ onAddString(instIdx); }} style={{ fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>+ Ajouter un string</button>
+          </div>
         </div>
         {strings.length === 0 && <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: "#aaa" }}>Aucun string — cliquez sur + Ajouter</div>}
-        {strings.map(function(row, i) { return <StringRow key={i} idx={i} row={row} onChange={function(r){ onUpdString(instIdx, i, r); }} onRemove={function(){ onDelString(instIdx, i); }} maxOnd={Math.max(1, tech.onduleurs.length)} />; })}
+        {mppts.length > 0 && (
+          <div style={{ marginBottom: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            {mppts.map(function(m, mi){ return (
+              <div key={m.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: GREEN_LIGHT, borderRadius: 6, padding: "6px 10px" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: GREEN }}>MPPT</span>
+                <input value={m.name || ""} onChange={function(e){ onUpdMppt(instIdx, mi, Object.assign({}, m, { name: e.target.value })); }} placeholder={"MPPT " + (mi + 1)} style={{ width: 120, fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER }} />
+                <span style={{ fontSize: 12, color: MUTED }}>Onduleur</span>
+                <select value={m.onduleur || "1"} onChange={function(e){ onUpdMppt(instIdx, mi, Object.assign({}, m, { onduleur: e.target.value })); }} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER }}>
+                  {Array.from({ length: Math.max(1, tech.onduleurs.length) }, function(_, i){ return <option key={i + 1} value={String(i + 1)}>{i + 1}</option>; })}
+                </select>
+                <button onClick={function(){ onDelMppt(instIdx, mi); }} style={{ marginLeft: "auto", fontSize: 18, color: MUTED, background: "none", border: "none", cursor: "pointer" }}>×</button>
+              </div>
+            ); })}
+          </div>
+        )}
+        {strings.map(function(row, i) { return <StringRow key={i} idx={i} row={row} onChange={function(r){ onUpdString(instIdx, i, r); }} onRemove={function(){ onDelString(instIdx, i); }} maxOnd={Math.max(1, tech.onduleurs.length)} mppts={mppts} />; })}
         {strings.length > 0 && (
           <div style={{ marginTop: 12, padding: "8px 12px", background: GREEN_LIGHT, borderRadius: 6, fontSize: 12, color: MUTED }}>
             <strong style={{ color: TEXT }}>Résumé : </strong>
@@ -3259,10 +3327,37 @@ function App() {
     });
   };
   // Strings
+  const addMppt = function(siteIdx, pvIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var inst = arr[siteIdx].pvInstallations[pvIdx];
+      if (!inst.mppts) inst.mppts = [];
+      inst.mppts.push({ id: "m" + Date.now() + "_" + Math.floor(Math.random() * 1000), name: "", onduleur: "1" });
+      return arr;
+    });
+  };
+  const updMppt = function(siteIdx, pvIdx, mIdx, row) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var inst = arr[siteIdx].pvInstallations[pvIdx];
+      inst.mppts = (inst.mppts || []).map(function(m, i){ return i === mIdx ? row : m; });
+      return arr;
+    });
+  };
+  const delMppt = function(siteIdx, pvIdx, mIdx) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      var inst = arr[siteIdx].pvInstallations[pvIdx];
+      var removed = (inst.mppts || [])[mIdx];
+      inst.mppts = (inst.mppts || []).filter(function(_, i){ return i !== mIdx; });
+      if (removed) inst.strings = (inst.strings || []).map(function(s){ return s.mppt === removed.id ? Object.assign({}, s, { mppt: "" }) : s; });
+      return arr;
+    });
+  };
   const addString = function(siteIdx, pvIdx) {
     setSites(function(prev) {
       var arr = JSON.parse(JSON.stringify(prev));
-      arr[siteIdx].pvInstallations[pvIdx].strings.push({ onduleur: "1", count: "", orient: "Sud", orientLibre: "" }); return arr;
+      arr[siteIdx].pvInstallations[pvIdx].strings.push({ onduleur: "1", count: "", orient: "Sud", orientLibre: "", name: "", tension: "", optim: null, optimCount: "", mppt: "" }); return arr;
     });
   };
   const updString = function(siteIdx, pvIdx, strIdx, row) {
@@ -3980,6 +4075,12 @@ function App() {
         // Greenbox
         if (r.greenbox) next.greenbox = "OUI";
 
+        // Optimiseurs (total indépendant du détail par string)
+        if (r.optim && (r.optim.qty || r.optim.modele)) {
+          var curOpt = next.optimiseur || { inclus: null, qty: "", modele: "" };
+          next.optimiseur = { inclus: "OUI", qty: r.optim.qty ? String(r.optim.qty) : (curOpt.qty || ""), modele: r.optim.modele || curOpt.modele || "" };
+        }
+
         arr[0].pvInstallations[0].tech = next;
         return arr;
       });
@@ -3992,6 +4093,7 @@ function App() {
         r.batts.some(function(b){ return b.kwh; }) && "batterie",
         r.bornes.length && "borne",
         r.greenbox && "greenbox",
+        (r.optim && (r.optim.qty || r.optim.modele)) && "optimiseurs",
         r.manager && "PM"
       ].filter(Boolean);
 
@@ -4083,6 +4185,7 @@ function App() {
         (r.batts || []).some(function(b){ return b.kwh; }) && "batterie",
         (r.bornes || []).length && "borne",
         r.greenbox && "greenbox",
+        (r.optim && (r.optim.qty || r.optim.modele)) && "optimiseurs",
         r.manager && "PM"
       ].filter(Boolean);
       setOdooMsg(found.length > 0 ? ("✓ Odoo : " + found.join(" · ") + (r.name ? "  [" + r.name + "]" : "")) : "Commande trouvée mais aucune donnée exploitable.");
@@ -4585,11 +4688,14 @@ function App() {
                 {/* Installations PV du site */}
                 {site.pvInstallations.map(function(inst, pvIdx) {
                   return React.createElement(InstallationBlock, {
-                    key: pvIdx, tech: inst.tech, strings: inst.strings,
+                    key: pvIdx, tech: inst.tech, strings: inst.strings, mppts: inst.mppts || [],
                     instIdx: pvIdx, total: site.pvInstallations.length,
                     onSetT: function(pvIdx2, path, val){ setT(siteIdx, pvIdx2, path, val); },
                     onSetTech: function(pvIdx2, upd){ setInstTech(siteIdx, pvIdx2, upd); },
                     onAddString: function(pvIdx2){ addString(siteIdx, pvIdx2); },
+                    onAddMppt: function(pvIdx2){ addMppt(siteIdx, pvIdx2); },
+                    onUpdMppt: function(pvIdx2, mi, row){ updMppt(siteIdx, pvIdx2, mi, row); },
+                    onDelMppt: function(pvIdx2, mi){ delMppt(siteIdx, pvIdx2, mi); },
                     onUpdString: function(pvIdx2, si, row){ updString(siteIdx, pvIdx2, si, row); },
                     onDelString: function(pvIdx2, si){ delString(siteIdx, pvIdx2, si); },
                     onRemove: function(pvIdx2){ removePVInst(siteIdx, pvIdx2); }
