@@ -3547,6 +3547,8 @@ function App() {
           if (item.type === "section") {
             result.push({ type:"section", id:item.id, label:item.label });
           } else if (item.type === "sheet" && item.id) {
+            // Rétro-compat : ignore un id déjà présent (doublons créés par l'ancien bug)
+            if (result.find(function(o){ return o.type==="sheet" && o.data && o.data.id===item.id; })) return;
             var s = list.find(function(sh){ return sh.id === item.id; });
             if (s) result.push({ type:"sheet", data:s });
           }
@@ -4574,7 +4576,8 @@ function App() {
               onSwitch={switchSheet}
               onCreate={function(row){
                 setSheets(function(prev){ return prev.concat([row]); });
-                setOrdered(function(prev){ return prev.concat([{type:"sheet",data:row}]); });
+                // NOTE: l'ajout à `ordered` est déjà fait par persistOrder() dans handleCreate.
+                // Ne pas le refaire ici, sinon la feuille apparaît en double (même id).
                 switchSheet(row.id);
               }}
               onRename={function(id, label){
