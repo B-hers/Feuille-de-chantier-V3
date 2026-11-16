@@ -917,6 +917,41 @@ const Field = ({ label, value, onChange, placeholder = "", type = "text", unit }
     </div>
   </div>
 );
+// Contrôle discret de renommage : roulette (⚙) ou bouton texte, qui révèle un champ éditable.
+function GearRename({ value, onChange, placeholder, trigger, addLabel, accent }) {
+  var [open, setOpen] = useState(false);
+  var ACC = accent || GREEN;
+  var hasName = value && value.trim();
+  var editor = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <input autoFocus value={value || ""} onChange={function(e){ onChange(e.target.value); }} placeholder={placeholder || "Nom…"}
+        onKeyDown={function(e){ if (e.key === "Enter") setOpen(false); }}
+        style={{ fontSize: 13, fontWeight: 600, padding: "4px 10px", border: "1px solid " + ACC, borderRadius: 8, maxWidth: 220 }} />
+      <button onClick={function(){ setOpen(false); }} title="Valider"
+        style={{ background: ACC, color: "#fff", border: "none", borderRadius: 6, width: 26, height: 26, fontSize: 13, cursor: "pointer", flexShrink: 0 }}>✓</button>
+    </span>
+  );
+  if (trigger === "text") {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {!open && (
+          <button onClick={function(){ setOpen(true); }}
+            style={{ background: "none", border: "1px solid " + BORDER, color: MUTED, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            {hasName ? "Renommer" : (addLabel || "Ajouter un nom")}
+          </button>
+        )}
+        {open && editor}
+      </span>
+    );
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <button onClick={function(){ setOpen(function(o){ return !o; }); }} title="Renommer"
+        style={{ background: open ? ACC : "none", color: open ? "#fff" : MUTED, border: "1px solid " + (open ? ACC : BORDER), borderRadius: 7, width: 28, height: 28, fontSize: 14, cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>⚙</button>
+      {open && editor}
+    </span>
+  );
+}
 
 function AnnotationModal({ imageUrl, initialTextObjects, onSave, onClose }) {
   var canvasRef = useRef();
@@ -1674,6 +1709,7 @@ function PreviewDoc({ data }) {
             <tr><th>Accès toiture</th><td>{data.logistique.acces === "Autre" ? (data.logistique.autreAcces || "Autre") : tv(data.logistique.acces)}</td></tr>
             {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(([k]) => data.logistique[k] === "OUI").length > 0 && <tr><th>Engins</th><td>{[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(function(p){ return data.logistique[p[0]] === "OUI"; }).map(function(p){ return p[1]; }).join(", ")}</td></tr>}
             {data.logistique.reserve && <tr><th>Réservé</th><td>{data.logistique.reserve === "OUI" ? ([data.logistique.reserveContact, data.logistique.reserveTel, data.logistique.reserveNote].filter(Boolean).join(" · ") || "Oui") : "Non"}</td></tr>}
+            {data.logistique.transport && <tr><th>Transport</th><td>{data.logistique.transport === "OUI" ? ("Oui" + (data.logistique.transportReserve === "OUI" ? " · Réservé" + (data.logistique.transportReserveNote ? " (" + data.logistique.transportReserveNote + ")" : "") : data.logistique.transportReserve === "NON" ? " · Non réservé" : "")) : "Non"}</td></tr>}
             <tr><th>Tuiles réserve</th><td>{tv(data.logistique.tuileReserve)}</td></tr>
           </tbody></table>
         </div>
@@ -1927,14 +1963,13 @@ function InstallationBlock(props) {
   return (
     <div>
       {/* Banner */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: instIdx > 0 ? 16 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, marginTop: instIdx > 0 ? 16 : 0, flexWrap: "wrap" }}>
+        <GearRename value={tech.installName || ""} onChange={function(v){ setT("installName", v); }} placeholder="Nom de l'installation" accent={GREEN} />
         <div style={{ background: `linear-gradient(90deg, ${GREEN} 0%, #2e8b57 100%)`, color: "#fff", borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: 14, letterSpacing: "0.04em", display: "inline-flex", alignItems: "center", gap: 8 }}>
-          ⚡ Installation {instIdx + 1}
+          ⚡ Installation {instIdx + 1}{tech.installName && tech.installName.trim() ? " · " + tech.installName : ""}
         </div>
-        <input value={tech.installName || ""} onChange={function(e){ setT("installName", e.target.value); }} placeholder="Nom (optionnel)"
-          style={{ flex: 1, minWidth: 0, maxWidth: 240, marginLeft: 10, fontSize: 13, fontWeight: 600, padding: "5px 10px", border: "1px solid " + BORDER, borderRadius: 8 }} />
         {total > 1 && (
-          <button onClick={function() { onRemove(instIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>
+          <button onClick={function() { onRemove(instIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>
             Supprimer
           </button>
         )}
@@ -2733,133 +2768,134 @@ function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
             </div>
           </div>
 
-          {/* Câblage AC — distance */}
-          <div>
-            <div style={{ ...SUBH }}>Distance câblage AC</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["< 5m", "5–10m", "10–20m", "20–50m", "50–100m", "100–200m", "> 200m"].map(function(d) {
-                return <button key={d} onClick={function(){ set("cablageAC.distance", d); }}
-                  style={{ ...chipSt(inst.cablageAC.distance === d), borderColor: inst.cablageAC.distance === d ? BR_BLUE : BORDER, background: inst.cablageAC.distance === d ? "#eaf4fd" : WHITE, color: inst.cablageAC.distance === d ? BR_BLUE : MUTED, fontSize: 12 }}>{d}</button>;
-              })}
-            </div>
-          </div>
+          {/* ===== Groupe : Câblage & raccordement ===== */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: BR_BLUE, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #d9e9f5", paddingBottom: 5 }}>Câblage &amp; raccordement</div>
 
-          {/* Câble de recharge type B */}
-          <div>
-            <div style={{ ...SUBH }}>Câble de recharge type B</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {[["non_inclus","Non inclus — pas à prévoir"],["inclus","Inclus"],["a_prevoir","À prévoir séparément (+120€ HTVA)"]].map(function(p) {
-                return <button key={p[0]} onClick={function(){ set("cableRecharge", p[0]); }}
-                  style={{ ...chipSt(inst.cableRecharge === p[0]), borderColor: inst.cableRecharge === p[0] ? BR_BLUE : BORDER, background: inst.cableRecharge === p[0] ? "#eaf4fd" : WHITE, color: inst.cableRecharge === p[0] ? BR_BLUE : MUTED }}>{p[1]}</button>;
-              })}
-            </div>
-          </div>
-
-          {/* Coffret électrique */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div>
-              <div style={{ ...SUBH }}>Coffret électrique</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <Toggle value={inst.coffret.inclus} onChange={function(v){ set("coffret.inclus", v); }} />
-                {inst.coffret.inclus === "OUI" && (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {["Intérieur","Extérieur"].map(function(t) {
-                      return <button key={t} onClick={function(){ set("coffret.type", t.toLowerCase()); }}
-                        style={{ ...chipSt(inst.coffret.type === t.toLowerCase()), borderColor: inst.coffret.type === t.toLowerCase() ? BR_BLUE : BORDER, background: inst.coffret.type === t.toLowerCase() ? "#eaf4fd" : WHITE, color: inst.coffret.type === t.toLowerCase() ? BR_BLUE : MUTED }}>{t}</button>;
-                    })}
-                  </div>
-                )}
+              <div style={{ ...SUBH }}>Distance câblage AC</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {["< 5m", "5–10m", "10–20m", "20–50m", "50–100m", "100–200m", "> 200m"].map(function(d) {
+                  return <button key={d} onClick={function(){ set("cablageAC.distance", d); }}
+                    style={{ ...chipSt(inst.cablageAC.distance === d), borderColor: inst.cablageAC.distance === d ? BR_BLUE : BORDER, background: inst.cablageAC.distance === d ? "#eaf4fd" : WHITE, color: inst.cablageAC.distance === d ? BR_BLUE : MUTED, fontSize: 12 }}>{d}</button>;
+                })}
               </div>
             </div>
-          </div>
 
-          {/* Câble internet + Tube PVC */}
-          <div style={G2}>
-            <Field label="Câble internet" value={inst.cableInternet} onChange={function(v){ set("cableInternet", v); }} placeholder="Longueur, type…" />
-            <Field label="Tube PVC" value={inst.tubePVC} onChange={function(v){ set("tubePVC", v); }} placeholder="Longueur, diamètre…" />
-          </div>
-
-          {/* Toggles : RFID, Booster, Prises CPL */}
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Carte RFID</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <Toggle value={inst.rfid.inclus} onChange={function(v){ set("rfid.inclus", v); }} />
-                {inst.rfid.inclus === "OUI" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input type="number" min="1" value={inst.rfid.qty} onChange={function(e){ set("rfid.qty", e.target.value); }} style={{ width: 60, textAlign: "center" }} />
-                    <span style={{ fontSize: 12, color: MUTED }}>carte(s)</span>
-                  </div>
-                )}
+              <div style={{ ...SUBH }}>Câble de recharge type B</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[["non_inclus","Non inclus — pas à prévoir"],["inclus","Inclus"],["a_prevoir","À prévoir séparément (+120€ HTVA)"]].map(function(p) {
+                  return <button key={p[0]} onClick={function(){ set("cableRecharge", p[0]); }}
+                    style={{ ...chipSt(inst.cableRecharge === p[0]), borderColor: inst.cableRecharge === p[0] ? BR_BLUE : BORDER, background: inst.cableRecharge === p[0] ? "#eaf4fd" : WHITE, color: inst.cableRecharge === p[0] ? BR_BLUE : MUTED }}>{p[1]}</button>;
+                })}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Booster / Load Balancing</div>
-              <Toggle value={inst.booster} onChange={function(v){ set("booster", v); }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Prises CPL</div>
-              <Toggle value={inst.prisesCPL} onChange={function(v){ set("prisesCPL", v); }} />
-            </div>
-          </div>
 
-          {/* Poteau / Piédestal */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Poteau / Piédestal</div>
-              <Toggle value={inst.poteau.inclus} onChange={function(v){ set("poteau.inclus", v); }} />
-            </div>
-            {inst.poteau.inclus === "OUI" && <Field label="Modèle / Référence" value={inst.poteau.modele} onChange={function(v){ set("poteau.modele", v); }} placeholder="Modèle…" />}
-          </div>
-
-          {/* Dalle de béton */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Dalle de béton</div>
-              <Toggle value={inst.dalle.inclus} onChange={function(v){ set("dalle.inclus", v); }} />
-            </div>
-            {inst.dalle.inclus === "OUI" && <Field label="Dimensions / Type" value={inst.dalle.modele} onChange={function(v){ set("dalle.modele", v); }} placeholder="Ex: 40×40 cm…" />}
-          </div>
-
-          {/* Tranchée */}
-          <div>
-            <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Tranchée</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <Toggle value={inst.tranchee.inclus} onChange={function(v){ set("tranchee.inclus", v); }} />
-              {inst.tranchee.inclus === "OUI" && (<>
-                <Field label="Mètres" value={inst.tranchee.metres} onChange={function(v){ set("tranchee.metres", v); }} type="number" unit="m" />
-                <div>
-                  <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Type de revêtement</div>
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                    {["Terre / Gazon","Clinkers","Béton","Autre"].map(function(r) {
-                      return <button key={r} onClick={function(){ set("tranchee.revetement", r); }}
-                        style={{ ...chipSt(inst.tranchee.revetement === r), borderColor: inst.tranchee.revetement === r ? BR_BLUE : BORDER, background: inst.tranchee.revetement === r ? "#eaf4fd" : WHITE, color: inst.tranchee.revetement === r ? BR_BLUE : MUTED, fontSize: 12 }}>{r}</button>;
-                    })}
-                  </div>
-                  {inst.tranchee.revetement === "Autre" && (
-                    <input value={inst.tranchee.autreRevetement || ""} onChange={function(e){ set("tranchee.autreRevetement", e.target.value); }} placeholder="Préciser…" style={{ marginTop: 6, fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER, width: "100%", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ ...SUBH }}>Coffret électrique</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <Toggle value={inst.coffret.inclus} onChange={function(v){ set("coffret.inclus", v); }} />
+                  {inst.coffret.inclus === "OUI" && (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {["Intérieur","Extérieur"].map(function(t) {
+                        return <button key={t} onClick={function(){ set("coffret.type", t.toLowerCase()); }}
+                          style={{ ...chipSt(inst.coffret.type === t.toLowerCase()), borderColor: inst.coffret.type === t.toLowerCase() ? BR_BLUE : BORDER, background: inst.coffret.type === t.toLowerCase() ? "#eaf4fd" : WHITE, color: inst.coffret.type === t.toLowerCase() ? BR_BLUE : MUTED }}>{t}</button>;
+                      })}
+                    </div>
                   )}
                 </div>
-              </>)}
+              </div>
+              <div style={{ flex: "1 1 260px", minWidth: 220, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label="Câble internet" value={inst.cableInternet} onChange={function(v){ set("cableInternet", v); }} placeholder="Longueur, type…" />
+                <Field label="Tube PVC" value={inst.tubePVC} onChange={function(v){ set("tubePVC", v); }} placeholder="Longueur, diamètre…" />
+              </div>
             </div>
           </div>
 
-          {/* Fourreau flex rouge */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Fourreau flex rouge</div>
-              <Toggle value={inst.fourreau.inclus} onChange={function(v){ set("fourreau.inclus", v); }} />
+          {/* ===== Groupe : Options & accessoires ===== */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: BR_BLUE, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #d9e9f5", paddingBottom: 5 }}>Options &amp; accessoires</div>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Carte RFID</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <Toggle value={inst.rfid.inclus} onChange={function(v){ set("rfid.inclus", v); }} />
+                  {inst.rfid.inclus === "OUI" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <input type="number" min="1" value={inst.rfid.qty} onChange={function(e){ set("rfid.qty", e.target.value); }} style={{ width: 60, textAlign: "center" }} />
+                      <span style={{ fontSize: 12, color: MUTED }}>carte(s)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Booster / Load Balancing</div>
+                <Toggle value={inst.booster} onChange={function(v){ set("booster", v); }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Prises CPL</div>
+                <Toggle value={inst.prisesCPL} onChange={function(v){ set("prisesCPL", v); }} />
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Connexion alarme incendie</div>
+                  <Toggle value={inst.alarme.inclus} onChange={function(v){ set("alarme.inclus", v); }} />
+                </div>
+                {inst.alarme.inclus === "OUI" && <Field label="Mètres" value={inst.alarme.metres} onChange={function(v){ set("alarme.metres", v); }} type="number" unit="m" />}
+              </div>
             </div>
-            {inst.fourreau.inclus === "OUI" && <Field label="Mètres" value={inst.fourreau.metres} onChange={function(v){ set("fourreau.metres", v); }} type="number" unit="m" />}
           </div>
 
-          {/* Connexion alarme incendie */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Connexion alarme incendie</div>
-              <Toggle value={inst.alarme.inclus} onChange={function(v){ set("alarme.inclus", v); }} />
+          {/* ===== Groupe : Génie civil ===== */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: BR_BLUE, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #d9e9f5", paddingBottom: 5 }}>Génie civil</div>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Poteau / Piédestal</div>
+                  <Toggle value={inst.poteau.inclus} onChange={function(v){ set("poteau.inclus", v); }} />
+                </div>
+                {inst.poteau.inclus === "OUI" && <Field label="Modèle / Référence" value={inst.poteau.modele} onChange={function(v){ set("poteau.modele", v); }} placeholder="Modèle…" />}
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Dalle de béton</div>
+                  <Toggle value={inst.dalle.inclus} onChange={function(v){ set("dalle.inclus", v); }} />
+                </div>
+                {inst.dalle.inclus === "OUI" && <Field label="Dimensions / Type" value={inst.dalle.modele} onChange={function(v){ set("dalle.modele", v); }} placeholder="Ex: 40×40 cm…" />}
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Fourreau flex rouge</div>
+                  <Toggle value={inst.fourreau.inclus} onChange={function(v){ set("fourreau.inclus", v); }} />
+                </div>
+                {inst.fourreau.inclus === "OUI" && <Field label="Mètres" value={inst.fourreau.metres} onChange={function(v){ set("fourreau.metres", v); }} type="number" unit="m" />}
+              </div>
             </div>
-            {inst.alarme.inclus === "OUI" && <Field label="Mètres" value={inst.alarme.metres} onChange={function(v){ set("alarme.metres", v); }} type="number" unit="m" />}
+
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, fontWeight: 500, marginBottom: 7 }}>Tranchée</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <Toggle value={inst.tranchee.inclus} onChange={function(v){ set("tranchee.inclus", v); }} />
+                {inst.tranchee.inclus === "OUI" && (<>
+                  <Field label="Mètres" value={inst.tranchee.metres} onChange={function(v){ set("tranchee.metres", v); }} type="number" unit="m" />
+                  <div>
+                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>Type de revêtement</div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      {["Terre / Gazon","Clinkers","Béton","Autre"].map(function(r) {
+                        return <button key={r} onClick={function(){ set("tranchee.revetement", r); }}
+                          style={{ ...chipSt(inst.tranchee.revetement === r), borderColor: inst.tranchee.revetement === r ? BR_BLUE : BORDER, background: inst.tranchee.revetement === r ? "#eaf4fd" : WHITE, color: inst.tranchee.revetement === r ? BR_BLUE : MUTED, fontSize: 12 }}>{r}</button>;
+                      })}
+                    </div>
+                    {inst.tranchee.revetement === "Autre" && (
+                      <input value={inst.tranchee.autreRevetement || ""} onChange={function(e){ set("tranchee.autreRevetement", e.target.value); }} placeholder="Préciser…" style={{ marginTop: 6, fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid " + BORDER, width: "100%", boxSizing: "border-box" }} />
+                    )}
+                  </div>
+                </>)}
+              </div>
+            </div>
           </div>
 
         </div>
@@ -3237,7 +3273,7 @@ function App() {
   const [date, setDate] = useState("");
   const [sites, setSites] = useState([makeEmptySite()]);
   const [comments, setComments] = useState("");
-  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON", reserve: null, reserveContact: "", reserveTel: "", reserveNote: "" });
+  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON", reserve: null, reserveContact: "", reserveTel: "", reserveNote: "", transport: null, transportReserve: null, transportReserveNote: "" });
 
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
   const [acGroups, setAcGroups] = useState([]); // sections AC dupliquées (plusieurs tableaux)
@@ -3370,6 +3406,13 @@ function App() {
       var parts = path.split("."); var o = arr[siteIdx].electrical;
       for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
       o[parts[parts.length - 1]] = val; return arr;
+    });
+  };
+  // Champ simple sur un site (ex : siteName)
+  const setSiteField = function(siteIdx, key, val) {
+    setSites(function(prev) {
+      var arr = JSON.parse(JSON.stringify(prev));
+      arr[siteIdx][key] = val; return arr;
     });
   };
   // PV tech deep setter (siteIdx, pvIdx, "panneaux.type", val)
@@ -4771,6 +4814,30 @@ function App() {
                     <input value={logistique.reserveNote} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveNote: v }); }); }} placeholder="Note (ex : heure de réservation)" style={{ fontSize: 13, padding: "7px 10px", border: "1px solid " + BORDER, borderRadius: 8 }} />
                   </div>
                 )}
+
+                {/* Transport nécessaire */}
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "6px 10px", background: logistique.transport === "OUI" ? GREEN_LIGHT : BG, borderRadius: 6, border: "1px solid " + (logistique.transport === "OUI" ? GREEN_MID : BORDER) }}>
+                    <span style={{ fontSize: 13, fontWeight: logistique.transport === "OUI" ? 600 : 400 }}>Transport nécessaire</span>
+                    <Toggle value={logistique.transport} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { transport: v }); }); }} />
+                  </div>
+                  {logistique.transport === "OUI" && (
+                    <div style={{ marginTop: 8, padding: "10px 12px", background: GREEN_LIGHT, border: "1px solid " + GREEN_MID, borderRadius: 8, display: "grid", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Réservé</span>
+                        <div style={{ display: "inline-flex", border: "1px solid " + BORDER, borderRadius: 999, overflow: "hidden" }}>
+                          <button onClick={function(){ setLogistique(function(p){ return Object.assign({}, p, { transportReserve: p.transportReserve === "OUI" ? null : "OUI" }); }); }}
+                            style={{ border: "none", cursor: "pointer", padding: "5px 14px", fontSize: 12, fontWeight: 700, background: logistique.transportReserve === "OUI" ? "#1f7a4d" : "transparent", color: logistique.transportReserve === "OUI" ? "#fff" : MUTED }}>Oui</button>
+                          <button onClick={function(){ setLogistique(function(p){ return Object.assign({}, p, { transportReserve: p.transportReserve === "NON" ? null : "NON" }); }); }}
+                            style={{ border: "none", cursor: "pointer", padding: "5px 14px", fontSize: 12, fontWeight: 700, background: logistique.transportReserve === "NON" ? "#b42a2a" : "transparent", color: logistique.transportReserve === "NON" ? "#fff" : MUTED }}>Non</button>
+                        </div>
+                      </div>
+                      {logistique.transportReserve === "OUI" && (
+                        <input value={logistique.transportReserveNote} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { transportReserveNote: v }); }); }} placeholder="Note de réservation (Paul, Logistique)" style={{ fontSize: 13, padding: "7px 10px", border: "1px solid " + BORDER, borderRadius: 8 }} />
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -4779,19 +4846,18 @@ function App() {
           {sites.map(function(site, siteIdx) {
             return (
               <div key={siteIdx}>
-                {/* Site banner (si plusieurs sites) */}
-                {sites.length > 1 && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "16px 0 8px" }}>
-                    <div style={{ background: "#555", color: "#fff", borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: 14 }}>
-                      📍 Site {siteIdx + 1}
-                    </div>
-                    {sites.length > 1 && (
-                      <button onClick={function(){ removeSite(siteIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>
-                        Supprimer ce site
-                      </button>
-                    )}
+                {/* Site banner (nom + gestion) */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: siteIdx > 0 ? "16px 0 8px" : "0 0 8px", flexWrap: "wrap" }}>
+                  <div style={{ background: "#555", color: "#fff", borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: 14 }}>
+                    📍 Site {siteIdx + 1}{site.siteName && site.siteName.trim() ? " · " + site.siteName : ""}
                   </div>
-                )}
+                  <GearRename value={site.siteName || ""} onChange={function(v){ setSiteField(siteIdx, "siteName", v); }} placeholder="Nom du site" trigger="text" addLabel="Ajouter un nom" accent="#555" />
+                  {sites.length > 1 && (
+                    <button onClick={function(){ removeSite(siteIdx); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>
+                      Supprimer ce site
+                    </button>
+                  )}
+                </div>
 
                 {/* Bloc électrique — 1x par site */}
                 <SiteElectricalBlock
@@ -4934,9 +5000,9 @@ function App() {
                 <div key={g.id} style={{ marginBottom: 16, padding: 12, border: "1px solid " + GREEN_MID, borderRadius: 10, background: "#fbfdfb" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: "#c0392b", background: "#fdecea", padding: "2px 7px", borderRadius: 4 }}>AC HD</span>
-                    <input value={g.name || ""} onChange={function(e){ renameAcGroup(g.id, e.target.value); }} placeholder={"Section AC " + (gi + 2) + " (ex : Tableau 2)"}
-                      style={{ flex: 1, minWidth: 0, maxWidth: 280, fontSize: 13, fontWeight: 600, padding: "5px 10px", border: "1px solid " + BORDER, borderRadius: 8 }} />
-                    <button onClick={function(){ removeAcGroup(g.id); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>Supprimer</button>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#c0392b" }}>{g.name && g.name.trim() ? g.name : "Installation " + (gi + 2)}</span>
+                    <GearRename value={g.name || ""} onChange={function(v){ renameAcGroup(g.id, v); }} placeholder="Nom de l'installation liée" accent="#c0392b" />
+                    <button onClick={function(){ removeAcGroup(g.id); }} style={{ background: "none", border: "1px solid #e74c3c", color: "#e74c3c", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>Supprimer</button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12 }}>
                     {gcats.map(function(c){
@@ -4946,7 +5012,7 @@ function App() {
                 </div>
               );
             })}
-            <button onClick={addAcGroup} style={{ marginBottom: 20, fontSize: 13, color: "#c0392b", background: "none", border: "1px dashed #e0a0a0", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontWeight: 600 }}>+ Dupliquer la section AC (nouveau tableau)</button>
+            <button onClick={addAcGroup} style={{ marginBottom: 20, fontSize: 13, color: "#c0392b", background: "none", border: "1px dashed #e0a0a0", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontWeight: 600 }}>+ Dupliquer la section AC (nouvelle installation)</button>
 
             {/* Extra */}
             <div>
