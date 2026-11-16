@@ -3219,7 +3219,7 @@ function SheetBar({ refChantier, sheets, ordered, setOrdered, currentId, loading
 }
 
 // ── GearPanel (⚙️ — options avancées) ────────────────────────────────────────
-function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
+function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON, onOpenHistory }) {
   var [url, setUrl] = useState("");
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
@@ -3266,6 +3266,17 @@ function GearPanel({ onClose, currentRef, onImport, onExport, onImportJSON }) {
           <div style={{ fontWeight:700,fontSize:15,color:TEXT }}>⚙️ Options avancées</div>
           {!loading && <button onClick={onClose} style={{ background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED }}>×</button>}
         </div>
+
+        {/* ── Historique ── */}
+        {currentRef && (
+          <div style={{ marginBottom:16 }}>
+            <button onClick={function(){ if(onOpenHistory) onOpenHistory(); onClose(); }}
+              style={{ width:"100%",display:"flex",alignItems:"center",gap:8,background:"#f0f0fc",border:"1px solid #c0c0e0",color:"#3a3a80",borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:700,cursor:"pointer" }}>
+              <span style={{ fontSize:16 }}>📋</span> Historique des versions &amp; journal
+            </button>
+            <div style={{ fontSize:11,color:MUTED,marginTop:6,fontStyle:"italic" }}>Versions restaurables et journal des actions sur ce briefing.</div>
+          </div>
+        )}
 
         {/* ── Import depuis un autre briefing ── */}
         <div style={{ borderTop:"1px solid "+BORDER,paddingTop:14 }}>
@@ -4652,9 +4663,6 @@ function App() {
           {!isContractor && (
             <button onClick={function(){ setShowSearch(true); }} title="Rechercher un autre briefing" style={{ ...btnSt(false), fontSize: 12, background: GREEN_LIGHT, borderColor: GREEN_MID, color: GREEN, fontWeight: 700 }}>🔍 Rechercher</button>
           )}
-          {ref && (
-            <button onClick={function(){ setShowHistory(true); }} style={{ ...btnSt(false), fontSize: 12, background: "#f0f0fc", borderColor: "#c0c0e0", color: "#3a3a80" }}>📋 Historique</button>
-          )}
           {/* Lien Rapport de suivi de chantier */}
           {ref && (
             <a href={"https://b-hers.github.io/Rapport-de-chantier-SAV-Maintenance/?ref=" + encodeURIComponent(ref)}
@@ -4712,6 +4720,7 @@ function App() {
           onImport={handleGearImport}
           onExport={exportData}
           onImportJSON={importData}
+          onOpenHistory={function(){ setShowHistory(true); }}
         />
       )}
 
