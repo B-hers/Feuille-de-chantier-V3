@@ -69,7 +69,7 @@ button { font-family: inherit; cursor: pointer; }
 .wg-row:first-of-type { border-top: none; }
 .wg-row .lab { flex: 1; min-width: 0; font-size: 14px; }
 .wg-row .sub { font-size: 12px; color: #6f6d65; }
-.wg-detail { background: #f6f5f1; border-radius: 10px; padding: 10px 12px; margin: 0 0 6px; display: grid; gap: 8px; }
+.wg-detail { background: #f6f5f1; border-radius: 10px; padding: 10px 12px; margin: 0 0 6px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .wg-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .wg-badge.ok { background: #e3f1e9; color: #1B6B3A; }
 .wg-badge.ko { background: #f8e4e4; color: #b42a2a; }
@@ -501,36 +501,135 @@ var LOGI_CONTACTS = {
 };
 LOGI_CONTACTS.manitou = LOGI_CONTACTS.nacelle; // Nacelles et Manitou : même catégorie
 
-// Choix du prestataire (liste pré-enregistrée + Autre). La valeur est stockée en clair
-// (nom, tél., email) pour que les anciens briefings et le PDF restent lisibles.
-function ProviderPicker({ kind, value, onChange }) {
-  var list = LOGI_CONTACTS[kind] || [];
-  var v = value || {};
-  var sel = v.id || (v.nom ? "autre" : "");
-  var cur = list.filter(function(c){ return c.id === v.id; })[0];
+// Prestataires enregistrés (liste non exhaustive) : suggestions, autocomplétion, actions rapides.
+// Ne stocke rien de nouveau : remplit les champs de réservation existants, qui restent éditables.
+var LOGI_CAT_LABEL = { lift: "Lifts", nacelle: "Nacelles / Manitou", grue: "Camions grues", transport: "Transports" };
+var BXL_COMMUNES = ["bruxelles","brussel","anderlecht","auderghem","oudergem","berchem","etterbeek","evere","forest","vorst","ganshoren","ixelles","elsene","jette","koekelberg","molenbeek","saint-gilles","sint-gillis","saint-josse","schaerbeek","schaarbeek","uccle","ukkel","watermael","boitsfort","woluwe","laeken","haren","neder-over-heembeek"];
+// Région du chantier déduite de l'adresse (code postal, sinon nom de commune)
+function chantierRegion(addr) {
+  var a = normTxt(addr || ""); if (!a) return null;
+  var m = a.match(/\b(\d{4})\b/);
+  if (m) {
+    var cp = parseInt(m[1], 10);
+    if (cp >= 1000 && cp < 1300) return "bruxelles";
+    if (cp >= 1300 && cp < 1500) return "brabant wallon";
+    if (cp >= 4000 && cp < 5000) return "liege";
+    if (cp >= 5000 && cp < 6000) return "namur";
+    if (cp >= 7000 && cp < 7100) return "mons";
+    if (cp >= 7100 && cp < 7200) return "la louviere";
+    if (cp >= 7800 && cp < 7900) return "ath";
+  }
+  if (BXL_COMMUNES.some(function(c){ return a.indexOf(c) !== -1; })) return "bruxelles";
+  var named = ["liege","namur","mons","la louviere","ath","nivelles","grez"].filter(function(c){ return a.indexOf(c) !== -1; })[0];
+  if (named === "nivelles" || named === "grez") return "brabant wallon";
+  return named || null;
+}
+function providerScore(c, region) {
+  var r = normTxt(c.region);
+  if (region && (r === region || (region === "brabant wallon" && (r === "nivelles" || r === "grez")))) return 2;
+  if (r === "belgique") return 1;
+  return 0;
+}
+function providerList(kinds, region) {
+  var cats = [];
+  (kinds || []).forEach(function(k){ var key = k === "manitou" ? "nacelle" : k; if (cats.indexOf(key) === -1 && LOGI_CONTACTS[key]) cats.push(key); });
+  var out = [];
+  cats.forEach(function(cat){ LOGI_CONTACTS[cat].forEach(function(c, i){ out.push(Object.assign({ cat: cat, near: providerScore(c, region) === 2, _o: out.length }, c)); }); });
+  out.sort(function(x, y){ return (providerScore(y, region) - providerScore(x, region)) || (x._o - y._o); });
+  return out;
+}
+function findListed(name) {
+  if (!name) return null;
+  var all = [].concat(LOGI_CONTACTS.lift, LOGI_CONTACTS.nacelle, LOGI_CONTACTS.grue, LOGI_CONTACTS.transport);
+  return all.filter(function(c){ return c.nom === name; })[0] || null;
+}
+function contactLine(c) { return c.nom + " · " + (c.tel || c.email || ""); }
+
+// Puces de suggestion (1 clic)
+function ProviderChips({ kinds, region, selectedName, onPick, max }) {
+  // panachage : les meilleurs de chaque catégorie (proches du chantier d'abord)
+  var full = providerList(kinds, region), cats = [];
+  full.forEach(function(c){ if (cats.indexOf(c.cat) === -1) cats.push(c.cat); });
+  var per = Math.max(1, Math.floor((max || 4) / Math.max(1, cats.length)));
+  var list = [];
+  cats.forEach(function(cat){ list = list.concat(full.filter(function(c){ return c.cat === cat; }).slice(0, cats.length === 1 ? (max || 4) : Math.max(2, per))); });
+  if (!list.length) return null;
   return (
-    <div className="wg-detail" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span className="wg-pl">Prestataire</span>
-        <select value={sel} onChange={function(e){
-          var id = e.target.value;
-          if (!id) onChange(null);
-          else if (id === "autre") onChange({ id: "autre", nom: v.id === "autre" ? v.nom : "", tel: v.id === "autre" ? v.tel : "", email: "" });
-          else { var c = list.filter(function(x){ return x.id === id; })[0]; onChange({ id: c.id, nom: c.nom, tel: c.tel || "", email: c.email || "" }); }
-        }} style={{ width: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 999, paddingLeft: 14, textOverflow: "ellipsis" }}>
-          <option value="">Choisir…</option>
-          {list.map(function(c){ return <option key={c.id} value={c.id}>{c.nom} · {c.region}{c.rem ? " (" + c.rem + ")" : ""}</option>; })}
-          <option value="autre">Autre (saisie manuelle)</option>
-        </select>
-        {cur && cur.tel && <a href={"tel:" + cur.tel.replace(/[^0-9+]/g, "")} style={{ fontSize: 13, color: GREEN, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>📞 {cur.tel}</a>}
-        {cur && cur.email && <a href={"mailto:" + cur.email} style={{ fontSize: 13, color: GREEN, textDecoration: "none", whiteSpace: "nowrap" }}>✉ {cur.email}</a>}
-      </div>
-      {sel === "autre" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-          <input value={v.nom || ""} onChange={function(e){ onChange(Object.assign({}, v, { id: "autre", nom: e.target.value })); }} placeholder="Nom du prestataire" style={{ width: "100%" }} />
-          <input value={v.tel || ""} onChange={function(e){ onChange(Object.assign({}, v, { id: "autre", tel: e.target.value })); }} placeholder="Téléphone" style={{ width: "100%" }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span className="wg-pl" style={{ fontSize: 12 }}>Suggestions</span>
+      {list.map(function(c){
+        var on = selectedName === c.nom;
+        return (
+          <button key={c.cat + c.id} type="button" onClick={function(){ onPick(on ? null : c); }} title={(c.tel || c.email || "") + (c.rem ? " · " + c.rem : "")}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid " + (on ? GREEN : "#dcd9cf"), background: on ? GREEN_LIGHT : "#fff", color: on ? GREEN : TEXT, borderRadius: 999, padding: "4px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {c.near ? "📍 " : ""}{c.nom}<span style={{ fontWeight: 400, color: MUTED }}>{c.region}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Champ texte avec autocomplétion sur les prestataires enregistrés (saisie libre conservée)
+function ProviderCombo({ kinds, region, value, onText, onPick, placeholder }) {
+  var [open, setOpen] = useState(false);
+  var [hi, setHi] = useState(0);
+  var all = providerList(kinds, region);
+  var q = normTxt(value || "");
+  var exact = all.some(function(c){ return c.nom === value; });
+  var list = (!q || exact) ? all : all.filter(function(c){ return normTxt(c.nom + " " + c.region).indexOf(q) !== -1; });
+  function pick(c){ setOpen(false); onPick(c); }
+  function onKey(e){
+    if (!open && (e.key === "ArrowDown")) { setOpen(true); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setHi(function(h){ return Math.min(h + 1, list.length); }); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi(function(h){ return Math.max(h - 1, 0); }); }
+    else if (e.key === "Enter" && open) { e.preventDefault(); if (list[hi]) pick(list[hi]); else setOpen(false); }
+    else if (e.key === "Escape") setOpen(false);
+  }
+  var lastCat = null;
+  return (
+    <div style={{ position: "relative", minWidth: 0 }}>
+      <input value={value || ""} placeholder={placeholder} autoComplete="off"
+        onChange={function(e){ onText(e.target.value); setOpen(true); setHi(0); }}
+        onFocus={function(){ setOpen(true); setHi(0); }} onBlur={function(){ setTimeout(function(){ setOpen(false); }, 120); }} onKeyDown={onKey}
+        style={{ width: "100%" }} />
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, minWidth: 260, zIndex: 40, background: "#fff", border: "1px solid #dcd9cf", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", maxHeight: 300, overflowY: "auto", padding: 4 }}>
+          {list.map(function(c, i){
+            var head = c.cat !== lastCat && (kinds || []).length > 1 ? LOGI_CAT_LABEL[c.cat] : null; lastCat = c.cat;
+            return (
+              <React.Fragment key={c.cat + c.id}>
+                {head && <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: MUTED, padding: "8px 10px 4px" }}>{head}</div>}
+                <div onMouseDown={function(e){ e.preventDefault(); pick(c); }} onMouseEnter={function(){ setHi(i); }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: i === hi ? GREEN_LIGHT : "transparent" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nom}</div>
+                    <div style={{ fontSize: 11, color: MUTED }}>{c.near ? "📍 Proche du chantier · " : ""}{c.region}{c.rem ? " · " + c.rem : ""}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{c.tel || c.email || ""}</span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+          <div onMouseDown={function(e){ e.preventDefault(); setOpen(false); }} onMouseEnter={function(){ setHi(list.length); }}
+            style={{ padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: MUTED, borderTop: "1px solid #efede6", marginTop: 2, background: hi === list.length ? "#f3f1eb" : "transparent" }}>
+            ✎ Autre prestataire : continuer la saisie manuelle
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Actions rapides pour un prestataire enregistré
+function ProviderActions({ name }) {
+  var c = findListed(name);
+  if (!c) return null;
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13 }}>
+      {c.tel && <a href={"tel:" + c.tel.replace(/[^0-9+]/g, "")} style={{ color: GREEN, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>📞 Appeler {c.nom}</a>}
+      {c.email && <a href={"mailto:" + c.email} style={{ color: GREEN, textDecoration: "none", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
+      {c.rem && <span style={{ color: MUTED }}>ℹ {c.rem}</span>}
     </div>
   );
 }
@@ -5165,16 +5264,13 @@ function App() {
             </div>
 
             <div className="wg-gt" style={{ marginTop: 18 }}>Levage, manutention et transport</div>
-            <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", columnGap: 28 }}>
               {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(function(item) {
                 var k = item[0], lbl = item[1];
                 return (
-                  <div key={k} style={{ borderTop: "1px solid #efede6" }}>
-                    <div className="wg-row">
-                      <span className="lab" style={{ fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}{logistique[k] === "OUI" && logistique.prestataires && logistique.prestataires[k] && logistique.prestataires[k].nom ? <span className="sub"> · {logistique.prestataires[k].nom}</span> : null}</span>
-                      <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
-                    </div>
-                    {logistique[k] === "OUI" && <ProviderPicker kind={k} value={(logistique.prestataires || {})[k]} onChange={function(v){ setLogistique(function(p){ var pr = Object.assign({}, p.prestataires || {}); if (v) pr[k] = v; else delete pr[k]; return Object.assign({}, p, { prestataires: pr }); }); }} />}
+                  <div key={k} className="wg-row" style={{ borderTop: "1px solid #efede6" }}>
+                    <span className="lab" style={{ fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}</span>
+                    <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
                   </div>
                 );
               })}
@@ -5188,10 +5284,23 @@ function App() {
                 </div>
                 {logistique.reserve === "OUI" && (
                   <div className="wg-detail">
-                    {(logistique.reserveContact || logistique.reserveTel) && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-                      <input value={logistique.reserveContact} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveContact: v }); }); }} placeholder="Équipementier / personne de contact" style={{ width: "100%" }} />
+                    {!logistique.reserveContact && (
+                      <ProviderChips kinds={["lift","nacelle","manitou","grue"].filter(function(k){ return logistique[k] === "OUI"; })} region={chantierRegion(client.adresse)} selectedName={logistique.reserveContact}
+                        onPick={function(c){ setLogistique(function(p){ return c ? Object.assign({}, p, { reserveContact: c.nom, reserveTel: c.tel || c.email || "" }) : p; }); }} />
+                    )}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                      <ProviderCombo kinds={["lift","nacelle","manitou","grue"].filter(function(k){ return logistique[k] === "OUI"; })} region={chantierRegion(client.adresse)}
+                        value={logistique.reserveContact} placeholder="Équipementier / personne de contact"
+                        onText={function(v){ setLogistique(function(p){
+                          // si l'on remplace un prestataire enregistré par une saisie libre, on retire aussi son numéro
+                          var prev = findListed(p.reserveContact), tel = p.reserveTel;
+                          if (prev && tel === (prev.tel || prev.email || "") && !findListed(v)) tel = "";
+                          return Object.assign({}, p, { reserveContact: v, reserveTel: tel });
+                        }); }}
+                        onPick={function(c){ setLogistique(function(p){ return Object.assign({}, p, { reserveContact: c.nom, reserveTel: c.tel || c.email || "" }); }); }} />
                       <input value={logistique.reserveTel} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveTel: v }); }); }} placeholder="Numéro" style={{ width: "100%" }} />
-                    </div>}
+                    </div>
+                    <ProviderActions name={logistique.reserveContact} />
                     <input value={logistique.reserveNote} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveNote: v }); }); }} placeholder="Note (ex : heure de réservation)" style={{ width: "100%" }} />
                   </div>
                 )}
@@ -5203,7 +5312,6 @@ function App() {
               <span className="lab" style={{ fontWeight: logistique.transport === "OUI" ? 600 : 400 }}>Transport nécessaire</span>
               <Toggle value={logistique.transport} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { transport: v }); }); }} />
             </div>
-            {logistique.transport === "OUI" && <ProviderPicker kind="transport" value={(logistique.prestataires || {}).transport} onChange={function(v){ setLogistique(function(p){ var pr = Object.assign({}, p.prestataires || {}); if (v) pr["transport"] = v; else delete pr["transport"]; return Object.assign({}, p, { prestataires: pr }); }); }} />}
             {logistique.transport === "OUI" && (
               <>
                 <div className="wg-row" style={{ borderTop: "1px solid #efede6" }}>
@@ -5213,6 +5321,14 @@ function App() {
                 </div>
                 {logistique.transportReserve === "OUI" && (
                   <div className="wg-detail">
+                    <ProviderChips kinds={["transport"]} region={chantierRegion(client.adresse)}
+                      selectedName={(LOGI_CONTACTS.transport.filter(function(c){ return (logistique.transportReserveNote || "").indexOf(contactLine(c)) === 0; })[0] || {}).nom}
+                      onPick={function(c){ setLogistique(function(p){
+                        var note = p.transportReserveNote || "";
+                        LOGI_CONTACTS.transport.forEach(function(x){ var pre = contactLine(x); if (note.indexOf(pre) === 0) note = note.slice(pre.length).replace(/^\s*·\s*/, ""); });
+                        return Object.assign({}, p, { transportReserveNote: c ? contactLine(c) + (note ? " · " + note : "") : note });
+                      }); }} />
+                    <ProviderActions name={(LOGI_CONTACTS.transport.filter(function(c){ return (logistique.transportReserveNote || "").indexOf(contactLine(c)) === 0; })[0] || {}).nom} />
                     <input value={logistique.transportReserveNote} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { transportReserveNote: v }); }); }} placeholder="Note de réservation (Paul, logistique)" style={{ width: "100%" }} />
                   </div>
                 )}
