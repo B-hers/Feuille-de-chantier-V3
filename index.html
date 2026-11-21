@@ -40,7 +40,7 @@ button { font-family: inherit; cursor: pointer; }
 .wg-show-m { display: none; }
 .wg-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 9px 0; flex: 1; min-width: 0; }
 .wg-tabs::-webkit-scrollbar { display: none; }
-.wg-tab { border: 1px solid transparent; background: none; font-size: 13px; font-weight: 600; color: #5d5b54; padding: 6px 13px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
+.wg-tab { border: 1px solid transparent; background: none; font-size: 13px; font-weight: 600; color: #5d5b54; padding: 6px 11px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
 .wg-tab:hover { background: #efede6; color: #1b1b19; }
 .wg-tab.on { background: #fff; border-color: #dcd9cf; color: #1B6B3A; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
 .wg-seg { display: inline-flex; background: #ebe9e2; border-radius: 999px; padding: 3px; }
@@ -48,7 +48,9 @@ button { font-family: inherit; cursor: pointer; }
 .wg-seg button.on { background: #fff; color: #1b1b19; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .wg-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dcd9cf; background: #fff; color: #1b1b19; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 999px; cursor: pointer; text-decoration: none; white-space: nowrap; }
 .wg-pill:hover { background: #f3f1eb; }
-.wg-search { color: #6f6d65; font-weight: 500; min-width: 210px; }
+.wg-search { color: #6f6d65; font-weight: 500; flex-shrink: 0; padding: 6px 12px; }
+.wg-tab.sub { font-weight: 500; font-size: 12.5px; padding: 6px 10px; }
+.wg-tab-group { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1B6B3A; padding: 0 2px 0 10px; margin-left: 4px; border-left: 1px solid #dcd9cf; white-space: nowrap; align-self: center; cursor: pointer; }
 .wg-kbd { margin-left: auto; font-size: 11px; border: 1px solid #dcd9cf; border-radius: 5px; padding: 0 5px; color: #8a887f; }
 .wg-ibtn { width: 36px; height: 36px; border-radius: 999px; border: 1px solid #dcd9cf; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; padding: 0; }
 .wg-ibtn.on { background: #1b1b19; color: #fff; border-color: #1b1b19; }
@@ -57,7 +59,7 @@ button { font-family: inherit; cursor: pointer; }
 .wg-yn button.y { background: #1B6B3A; color: #fff; }
 .wg-yn button.n { background: #fff; color: #1b1b19; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 .wg-yn button.r { background: #b42a2a; color: #fff; }
-.wg-props { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px 12px; align-items: start; align-content: start; }
+.wg-props { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px 12px; align-items: start; align-content: start; }
 .wg-props > .wg-pl { padding-top: 8px; }
 .wg-props > .wg-val { padding-top: 7px; }
 .wg-props input:not([type="date"]):not([type="checkbox"]) { width: 100%; }
@@ -95,7 +97,7 @@ button { font-family: inherit; cursor: pointer; }
   .wg-nav-id { display: none; }
   .wg-seg button { padding: 7px 11px; }
   .wg-tab { padding: 7px 12px; }
-  .wg-search { min-width: 0; flex: 1 1 100%; order: 9; }
+  .wg-search { padding: 6px 10px; }
   .wg-kbd, .wg-hide-m { display: none !important; }
   /* Prevent bounce scrolling issues */
   * { -webkit-tap-highlight-color: transparent; }
@@ -465,8 +467,74 @@ function detectEntity(ref) {
 function odooOrderUrl(entity, id) {
   var base = ((ENTITIES[entity] || ENTITIES.wge).odooUrl || "").match(/^https?:\/\/[^\/]+/);
   base = base ? base[0] : "https://me-green.odoo.com";
-  return base + "/web#id=" + id + "&model=sale.order&view_type=form";
+  var cids = ((ENTITIES[entity] || ENTITIES.wge).odooUrl || "").match(/cids=(\d+)/);
+  return base + "/web#id=" + id + "&cids=" + (cids ? cids[1] : "2") + "&menu_id=176&action=292&model=sale.order&view_type=form";
 }
+
+// Annuaire logistique PV (source : Contacts_logistiques_PV_par_categories.xlsx, onglets 01 à 04)
+var LOGI_CONTACTS = {
+  lift: [
+    { id: "lift-florin", nom: "Lift Florin", region: "Bruxelles", tel: "+32 466 31 57 87" },
+    { id: "mega-lift", nom: "Mega Lift", region: "Bruxelles", tel: "+32 476 84 00 90", rem: "Plus de 20 m" },
+    { id: "kaiser-lift", nom: "Kaiser Lift Bruxelles", region: "Bruxelles", tel: "+32 476 67 01 01" },
+    { id: "xl-lift", nom: "XL Lift", region: "Bruxelles", tel: "+32 474 26 11 58" },
+    { id: "fdo-service", nom: "Fdo Service", region: "Liège", tel: "+32 496 82 09 04" },
+    { id: "lift-liege", nom: "Lift", region: "Liège", tel: "+32 493 96 09 60" },
+    { id: "lift-ath", nom: "Lift Ath", region: "Ath", tel: "+32 470 12 17 22" },
+    { id: "bel-demenagement", nom: "Bel déménagement", region: "Namur", tel: "+32 487 59 21 94" },
+    { id: "lift-pro", nom: "Lift Pro", region: "Mons", tel: "+32 473 29 17 28" },
+    { id: "go-lift", nom: "Go lift", region: "La Louvière", tel: "+32 498 59 05 08" }
+  ],
+  transport: [
+    { id: "eks", nom: "EKS", region: "Belgique", tel: "+32 475 41 82 24", email: "eks@hotmail.be" },
+    { id: "zipmend", nom: "Zipmend Express", region: "International", email: "mail@zipmend.com", rem: "Transport à l'étranger" }
+  ],
+  nacelle: [
+    { id: "skybel", nom: "Skybel", region: "Belgique", tel: "+32 477 60 73 82", email: "location@skybel.be" },
+    { id: "tvh", nom: "TVH Equipment", region: "Nivelles", tel: "067 79 43 70", email: "location.nivelles@tvhequipment.com" },
+    { id: "loxam", nom: "Loxam", region: "Bruxelles", tel: "02 663 86 00", email: "bruxelles@loxam.be" }
+  ],
+  grue: [
+    { id: "lift-express", nom: "Lift Express et Loca Grue", region: "Belgique", tel: "0479/67.41.65", email: "louis.p@liftexpress.be" },
+    { id: "bigmat-grez", nom: "Big Mat Grez", region: "Grez", tel: "010 84 15 28", email: "info@bigmat-belmeco.be" }
+  ]
+};
+LOGI_CONTACTS.manitou = LOGI_CONTACTS.nacelle; // Nacelles et Manitou : même catégorie
+
+// Choix du prestataire (liste pré-enregistrée + Autre). La valeur est stockée en clair
+// (nom, tél., email) pour que les anciens briefings et le PDF restent lisibles.
+function ProviderPicker({ kind, value, onChange }) {
+  var list = LOGI_CONTACTS[kind] || [];
+  var v = value || {};
+  var sel = v.id || (v.nom ? "autre" : "");
+  var cur = list.filter(function(c){ return c.id === v.id; })[0];
+  return (
+    <div className="wg-detail" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className="wg-pl">Prestataire</span>
+        <select value={sel} onChange={function(e){
+          var id = e.target.value;
+          if (!id) onChange(null);
+          else if (id === "autre") onChange({ id: "autre", nom: v.id === "autre" ? v.nom : "", tel: v.id === "autre" ? v.tel : "", email: "" });
+          else { var c = list.filter(function(x){ return x.id === id; })[0]; onChange({ id: c.id, nom: c.nom, tel: c.tel || "", email: c.email || "" }); }
+        }} style={{ width: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 999, paddingLeft: 14, textOverflow: "ellipsis" }}>
+          <option value="">Choisir…</option>
+          {list.map(function(c){ return <option key={c.id} value={c.id}>{c.nom} · {c.region}{c.rem ? " (" + c.rem + ")" : ""}</option>; })}
+          <option value="autre">Autre (saisie manuelle)</option>
+        </select>
+        {cur && cur.tel && <a href={"tel:" + cur.tel.replace(/[^0-9+]/g, "")} style={{ fontSize: 13, color: GREEN, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>📞 {cur.tel}</a>}
+        {cur && cur.email && <a href={"mailto:" + cur.email} style={{ fontSize: 13, color: GREEN, textDecoration: "none", whiteSpace: "nowrap" }}>✉ {cur.email}</a>}
+      </div>
+      {sel === "autre" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+          <input value={v.nom || ""} onChange={function(e){ onChange(Object.assign({}, v, { id: "autre", nom: e.target.value })); }} placeholder="Nom du prestataire" style={{ width: "100%" }} />
+          <input value={v.tel || ""} onChange={function(e){ onChange(Object.assign({}, v, { id: "autre", tel: e.target.value })); }} placeholder="Téléphone" style={{ width: "100%" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+function providerTxt(pv) { return pv && pv.nom ? pv.nom + (pv.tel ? " (" + pv.tel + ")" : "") : ""; }
 
 // Extrait la ref Odoo brute depuis une ref complète (ex: "WC-S05041" → "S05041")
 function rawRef(fullRef, entityKey) {
@@ -1946,6 +2014,9 @@ function PreviewDoc({ data }) {
             <tr><th>Accès toiture</th><td>{data.logistique.acces === "Autre" ? (data.logistique.autreAcces || "Autre") : tv(data.logistique.acces)}</td></tr>
             {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(([k]) => data.logistique[k] === "OUI").length > 0 && <tr><th>Engins</th><td>{[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].filter(function(p){ return data.logistique[p[0]] === "OUI"; }).map(function(p){ return p[1]; }).join(", ")}</td></tr>}
             {data.logistique.reserve && <tr><th>Réservé</th><td>{data.logistique.reserve === "OUI" ? ([data.logistique.reserveContact, data.logistique.reserveTel, data.logistique.reserveNote].filter(Boolean).join(" · ") || "Oui") : "Non"}</td></tr>}
+            {data.logistique.prestataires && ["lift","nacelle","manitou","grue","transport"].filter(function(k){ return data.logistique.prestataires[k] && data.logistique.prestataires[k].nom && (k === "transport" ? data.logistique.transport === "OUI" : data.logistique[k] === "OUI"); }).map(function(k){
+              return <tr key={"pv-" + k}><th>Prestataire {({ lift: "LIFT", nacelle: "Nacelle", manitou: "Manitou", grue: "Grue", transport: "Transport" })[k]}</th><td>{providerTxt(data.logistique.prestataires[k])}</td></tr>;
+            })}
             {data.logistique.transport && <tr><th>Transport</th><td>{data.logistique.transport === "OUI" ? ("Oui" + (data.logistique.transportReserve === "OUI" ? " · Réservé" + (data.logistique.transportReserveNote ? " (" + data.logistique.transportReserveNote + ")" : "") : data.logistique.transportReserve === "NON" ? " · Non réservé" : "")) : "Non"}</td></tr>}
             <tr><th>Tuiles réserve</th><td>{tv(data.logistique.tuileReserve)}</td></tr>
           </tbody></table>
@@ -2213,8 +2284,16 @@ function InstallationBlock(props) {
       </div>
 
       {/* Tech card */}
-      <div style={CARD}>
-        <div className="sh" style={SH}><span>🔧</span> Informations techniques</div>
+      <div id={props.anchorBase ? props.anchorBase + "-tech" : undefined} className={props.anchorBase ? "sec-anchor" : undefined} style={CARD}>
+        <div className="sh" style={Object.assign({}, SH, { flexWrap: "wrap" })}><span>🔧</span> Informations techniques
+          {props.onRefreshOdoo && (
+            <button onClick={props.onRefreshOdoo} disabled={props.odooLoading} title="Met à jour panneaux, onduleurs, batterie et borne depuis la commande Odoo (utile si le PM a modifié le matériel)"
+              className="wg-pill" style={{ marginLeft: "auto", fontSize: 12, padding: "6px 12px", opacity: props.odooLoading ? 0.6 : 1, cursor: props.odooLoading ? "wait" : "pointer" }}>
+              {props.odooLoading ? <>⏳ Import <span className="odoo">Odoo</span>…</> : <>🔄 Actualiser depuis <span className="odoo">Odoo</span></>}
+            </button>
+          )}
+        </div>
+        {props.onRefreshOdoo && props.odooMsg && <div style={{ fontSize: 12, fontWeight: 600, color: props.odooMsg.charAt(0) === "✓" ? GREEN : "#b42a2a", background: props.odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "6px 10px", borderRadius: 8, margin: "-6px 0 12px" }}><OdooTxt text={props.odooMsg} /></div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
           <div><div style={SUBH}>Panneaux</div>
@@ -2388,7 +2467,7 @@ function InstallationBlock(props) {
       </div>
 
       {/* Strings card */}
-      <div style={Object.assign({}, CARD, { marginTop: 10 })}>
+      <div id={props.anchorBase ? props.anchorBase + "-str" : undefined} className={props.anchorBase ? "sec-anchor" : undefined} style={Object.assign({}, CARD, { marginTop: 10 })}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div className="sh" style={SH}><span>📊</span> Configuration de strings</div>
           <button onClick={function(){ onAddMppt(instIdx); }} style={{ fontSize: 12, color: GREEN, background: "none", border: "1px dashed " + GREEN_MID, borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginBottom: 14 }}>+ MPPT</button>
@@ -2903,12 +2982,12 @@ function VoiceNoteBlock({ notes, onChange, chantierRef, chantierEntity }) {
   );
 }
 
-function SiteElectricalBlock({ electrical, onSet }) {
+function SiteElectricalBlock({ electrical, onSet, anchorId }) {
   function setE(path, val) {
     onSet(path, val);
   }
   return (
-    <div style={CARD}>
+    <div id={anchorId} className={anchorId ? "sec-anchor" : undefined} style={CARD}>
       <div className="sh" style={SH}><span>⚡</span> Installation électrique</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
@@ -2947,7 +3026,7 @@ function SiteElectricalBlock({ electrical, onSet }) {
   );
 }
 
-function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
+function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove, anchorId }) {
   var BR_BLUE = "#2980b9";
   function set(path, val) { onSet(instIdx, path, val); }
   var BCARD = Object.assign({}, CARD, { borderColor: "#bde0f5" });
@@ -2962,7 +3041,7 @@ function BRInstallationBlock({ inst, instIdx, total, onSet, onRemove }) {
           Supprimer
         </button>
       </div>
-      <div style={BCARD}>
+      <div id={anchorId} className={anchorId ? "sec-anchor" : undefined} style={BCARD}>
         <div style={BSH}><span>🔌</span> Borne de recharge</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
@@ -3521,7 +3600,7 @@ function App() {
   const [date, setDate] = useState("");
   const [sites, setSites] = useState([makeEmptySite()]);
   const [comments, setComments] = useState("");
-  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON", reserve: null, reserveContact: "", reserveTel: "", reserveNote: "", transport: null, transportReserve: null, transportReserveNote: "" });
+  const [logistique, setLogistique] = useState({ parking: null, hauteurCorniche: "", hauteurToitPlat: "", inclinaisonRue: "", acces: null, autreAcces: "", tuileReserve: null, lift: "NON", nacelle: "NON", manitou: "NON", grue: "NON", reserve: null, reserveContact: "", reserveTel: "", reserveNote: "", transport: null, transportReserve: null, transportReserveNote: "", prestataires: {} });
 
   const [photos, setPhotos] = useState(Object.fromEntries(PHOTO_CATS.map(c => [c.key, []])));
   const [acGroups, setAcGroups] = useState([]); // sections AC dupliquées (plusieurs tableaux)
@@ -3797,7 +3876,7 @@ function App() {
         if (Array.isArray(d.sites) && d.sites.length > 0) setSites(d.sites.map(function(s){ return Object.assign({electrical:makeEmptyElectrical(),pvInstallations:[makeEmptyPVInst()],brInstallations:[]},s); }));
         else if (Array.isArray(d.installations) && d.installations.length > 0) setSites([{electrical:{reseau:d.installations[0].tech.reseau||null,amperageDisj:d.installations[0].tech.amperageDisj||"",compteur:Object.assign({serie:"",ean:""},d.installations[0].tech.compteur||{}),branchementOnduleur:d.installations[0].tech.branchementOnduleur||null,distances:Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""},d.installations[0].tech.distances||{})},pvInstallations:d.installations.map(function(inst){return {tech:inst.tech,strings:inst.strings};}),brInstallations:d.brInstallations||[]}]);
         if (typeof d.comments === "string") setComments(d.comments);
-        if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, { prestataires: {} }, d.logistique); });
         if (d.photos && typeof d.photos === "object") setPhotos(hydratePhotos(d.photos));
         if (Array.isArray(d.acGroups)) setAcGroups(d.acGroups);
         if (typeof d.tdNote === "string") setTdNote(d.tdNote);
@@ -3825,7 +3904,7 @@ function App() {
       if (Array.isArray(d.sites) && d.sites.length > 0) setSites(d.sites);
       else if (Array.isArray(d.installations) && d.installations.length > 0) setSites([{electrical:{reseau:d.installations[0].tech.reseau||null,amperageDisj:d.installations[0].tech.amperageDisj||"",compteur:Object.assign({serie:"",ean:""},d.installations[0].tech.compteur||{}),branchementOnduleur:d.installations[0].tech.branchementOnduleur||null,distances:Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""},d.installations[0].tech.distances||{})},pvInstallations:d.installations.map(function(inst){return {tech:inst.tech,strings:inst.strings};}),brInstallations:d.brInstallations||[]}]);
       if (typeof d.comments === "string") setComments(d.comments);
-      if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+      if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, { prestataires: {} }, d.logistique); });
       if (typeof d.tdNote === "string") setTdNote(d.tdNote);
       if (typeof d.schemaNote === "string") setSchemaNote(d.schemaNote);
       if (typeof d.pmNote === "string") setPmNote(d.pmNote);
@@ -3961,7 +4040,7 @@ function App() {
           setSites([{ electrical: electrical, pvInstallations: [pvInst], brInstallations: [] }]);
         }
         if (typeof d.comments === "string") setComments(d.comments);
-        if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (d.logistique && typeof d.logistique === "object") setLogistique(function(p){ return Object.assign({}, p, { prestataires: {} }, d.logistique); });
         if (d.photos && typeof d.photos === "object") {
           var loadedPhotos = d.photos;
           var merged = hydratePhotos(loadedPhotos);
@@ -4483,6 +4562,22 @@ function App() {
 
   // ── Actualiser depuis Odoo : import direct de la commande via Edge Function ──
   // Réutilise exactement la même logique d'application au state que le drag-drop PDF.
+  // Identifiant de la commande Odoo : cache navigateur, sinon recherche discrète à l'ouverture
+  useEffect(function(){
+    if (!ref) return;
+    var key = "wge_odoo_id_" + ref, cached = null;
+    try { cached = localStorage.getItem(key); } catch(e) {}
+    if (cached) { setOdooOrderId(cached); return; }
+    var cancelled = false;
+    fetch(ODOO_FN_URL, { method: "POST", headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ ref: rawRef(ref, entity), entity: entity }) })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(out){
+        var o = out && (out.order || out);
+        if (!cancelled && o && o.id) { setOdooOrderId(o.id); try { localStorage.setItem(key, String(o.id)); } catch(e) {} }
+      }).catch(function(){});
+    return function(){ cancelled = true; };
+  }, [ref, entity]);
+
   const refreshFromOdoo = async function() {
     if (!ref) { setOdooMsg("Aucune référence chantier (ajoutez ?ref=... dans l'URL)."); return; }
     setOdooLoading(true); setOdooMsg("");
@@ -4508,7 +4603,7 @@ function App() {
         setOdooLoading(false); return;
       }
       var r = out.order || out;
-      if (r.id) setOdooOrderId(r.id);
+      if (r.id) { setOdooOrderId(r.id); try { localStorage.setItem("wge_odoo_id_" + ref, String(r.id)); } catch(e) {} }
 
       // Client + adresse chantier
       if (r.client && (r.client.nom || r.client.adresse || r.client.tel || r.client.email)) {
@@ -4717,7 +4812,7 @@ function App() {
         if (typeof d.date === "string") setDate(d.date);
         (Array.isArray(d.sites) && d.sites.length > 0) ? setSites(d.sites) : (Array.isArray(d.installations) && d.installations.length > 0) && setSites([{ electrical: d.installations[0].tech ? { reseau: d.installations[0].tech.reseau||null, amperageDisj: d.installations[0].tech.amperageDisj||"", compteur: Object.assign({serie:"",ean:""}, d.installations[0].tech.compteur||{}), branchementOnduleur: d.installations[0].tech.branchementOnduleur||null, distances: Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""}, d.installations[0].tech.distances||{}) } : makeEmptyElectrical(), pvInstallations: d.installations.map(function(inst){ return { tech: inst.tech, strings: inst.strings }; }), brInstallations: d.brInstallations || [] }]);
         if (typeof d.comments === "string") setComments(d.comments);
-        if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, d.logistique); });
+        if (d.logistique) setLogistique(function(p){ return Object.assign({}, p, { prestataires: {} }, d.logistique); });
         if (d.photos && typeof d.photos === "object") {
           setPhotos(hydratePhotos(d.photos));
           if (Array.isArray(d.acGroups)) setAcGroups(d.acGroups);
@@ -4751,7 +4846,7 @@ function App() {
       if (typeof vData.date === "string") setDate(vData.date);
       (Array.isArray(vData.sites) && vData.sites.length > 0) ? setSites(vData.sites) : (Array.isArray(vData.installations) && vData.installations.length > 0) && setSites([{ electrical: vData.installations[0].tech ? { reseau: vData.installations[0].tech.reseau||null, amperageDisj: vData.installations[0].tech.amperageDisj||"", compteur: Object.assign({serie:"",ean:""}, vData.installations[0].tech.compteur||{}), branchementOnduleur: vData.installations[0].tech.branchementOnduleur||null, distances: Object.assign({onduleurTGBT:"",onduleurTD:"",borneTGBT:""}, vData.installations[0].tech.distances||{}) } : makeEmptyElectrical(), pvInstallations: vData.installations.map(function(inst){ return { tech: inst.tech, strings: inst.strings }; }), brInstallations: vData.brInstallations || [] }]);
       if (typeof vData.comments === "string") setComments(vData.comments);
-      if (vData.logistique) setLogistique(function(p){ return Object.assign({}, p, vData.logistique); });
+      if (vData.logistique) setLogistique(function(p){ return Object.assign({}, p, { prestataires: {} }, vData.logistique); });
       if (typeof vData.tdNote === "string") setTdNote(vData.tdNote);
       if (typeof vData.schemaNote === "string") setSchemaNote(vData.schemaNote);
       if (typeof vData.pmNote === "string") setPmNote(vData.pmNote);
@@ -4781,6 +4876,14 @@ function App() {
     return function(){ window.removeEventListener("scroll", onScroll); };
   }, []);
   useEffect(function(){
+    // garde l'onglet actif visible dans la barre (défilement horizontal)
+    var nav = document.querySelector(".wg-tabs"), on = nav && nav.querySelector(".wg-tab.on");
+    if (nav && on) {
+      var l = on.offsetLeft - nav.offsetLeft, r = l + on.offsetWidth;
+      if (l < nav.scrollLeft + 8 || r > nav.scrollLeft + nav.clientWidth - 8) nav.scrollTo({ left: Math.max(0, l - 40), behavior: "smooth" });
+    }
+  }, [activeSec]);
+  useEffect(function(){
     function onKey(e){
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K") && !isContractor) { e.preventDefault(); setShowSearch(true); }
     }
@@ -4791,36 +4894,48 @@ function App() {
   var hasBR = sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; });
   var entColor = (ENTITIES[entity] || ENTITIES.wge).color;
   var navSections = [{ id: "sec-client", label: "Client" }, { id: "sec-logistique", label: "Logistique" }]
-    .concat(sites.map(function(st, i){ return { id: "sec-site-" + i, label: "Site " + (i + 1) + (st.siteName && st.siteName.trim() ? " · " + st.siteName : "") }; }))
+    .concat([].concat.apply([], sites.map(function(st, i){
+      var many = sites.length > 1, out = [];
+      if (many) out.push({ id: "sec-site-" + i, label: "Site " + (i + 1) + (st.siteName && st.siteName.trim() ? " · " + st.siteName : ""), group: true });
+      out.push({ id: "sec-s" + i + "-elec", label: "Électricité", sub: many });
+      (st.pvInstallations || []).forEach(function(inst, j){
+        var n = (st.pvInstallations.length > 1) ? " " + (j + 1) : "";
+        out.push({ id: "sec-s" + i + "-pv" + j + "-tech", label: "Infos techniques" + n, sub: many });
+        out.push({ id: "sec-s" + i + "-pv" + j + "-str", label: "Strings" + n, sub: many });
+      });
+      (st.brInstallations || []).forEach(function(b, k){
+        out.push({ id: "sec-s" + i + "-br" + k, label: "Borne" + (st.brInstallations.length > 1 ? " " + (k + 1) : ""), sub: many });
+      });
+      return out;
+    })))
     .concat([{ id: "sec-calepinage", label: "Calepinage" }, { id: "sec-notes", label: "Note PM" }, { id: "sec-photos", label: "Photos" }]);
 
   // ── Login guard géré par HTML/JS pur (voir avant <div id="root">) ─────────
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto", padding: "1rem 0.75rem", display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0.75rem 0.75rem 1rem", display: "flex", flexDirection: "column", gap: 12 }}>
 
-      {/* Header fixe + navigation de sections */}
+      {/* Header + navigation de sections (fixe) */}
       <div id="no-print" className="wg-top">
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 300px", minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>{(ENTITIES[entity] || ENTITIES.wge).label} · {hasBR ? "Briefing de chantier PV + BR" : "Briefing de chantier PV"}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, marginTop: 2 }}>
-              <div style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.25, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{client.nom && client.nom.trim() ? client.nom : "Briefing de chantier"}</div>
-              {ref && <span title="Numéro de bon de commande (Odoo)" style={{ fontSize: 12, fontWeight: 700, color: entColor, background: entColor + "14", border: "1px solid " + entColor + "40", borderRadius: 999, padding: "2px 10px", whiteSpace: "nowrap" }}>{rawRef(ref, entity)}</span>}
-              {ref && <a href={odooOrderId ? odooOrderUrl(entity, odooOrderId) : (ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" title={odooOrderId ? ("Ouvrir la commande " + rawRef(ref, entity) + " dans Odoo") : "Ouvrir Odoo"} className="odoo" style={{ fontSize: 12, textDecoration: "none", border: "1px solid #714B6740", background: "#714B670f", borderRadius: 999, padding: "2px 10px", whiteSpace: "nowrap" }}>Odoo ↗</a>}
+          <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: GREEN, textTransform: "uppercase", letterSpacing: "0.08em" }}>{(ENTITIES[entity] || ENTITIES.wge).label} · {hasBR ? "Briefing de chantier PV + BR" : "Briefing de chantier PV"}</span>
+              {!ref && <span style={{ fontSize: 12, color: "#9a6a00" }}>⚠ Pas de référence : ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</span>}
+              {ref && <span style={{ fontSize: 12, color: saveStatus === "saving" ? "#9a6a00" : saveStatus === "error" ? "#b42a2a" : saveStatus === "loading" ? MUTED : GREEN }}>
+                {saveStatus === "saving" && "⏳ Sauvegarde en cours…"}
+                {saveStatus === "loading" && "⏳ Chargement…"}
+                {saveStatus === "error" && "⚠ Erreur de sauvegarde"}
+                {saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
+              </span>}
             </div>
-            {!ref && <div style={{ fontSize: 12, color: "#9a6a00", marginTop: 3 }}>⚠ Pas de référence : ajoutez ?ref=S0XXXX dans l'URL pour activer la sauvegarde</div>}
-            {ref && <div style={{ fontSize: 12, marginTop: 3, color: saveStatus === "saving" ? "#9a6a00" : saveStatus === "error" ? "#b42a2a" : saveStatus === "loading" ? MUTED : GREEN }}>
-              {saveStatus === "saving" && "⏳ Sauvegarde en cours…"}
-              {saveStatus === "loading" && "⏳ Chargement…"}
-              {saveStatus === "error" && "⚠ Erreur de sauvegarde"}
-              {saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
-            </div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, marginTop: 2 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.25, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{client.nom && client.nom.trim() ? client.nom : "Briefing de chantier"}</div>
+              {ref && <span title="Numéro de bon de commande (Odoo)" style={{ fontSize: 12, fontWeight: 700, color: entColor, background: entColor + "14", border: "1px solid " + entColor + "40", borderRadius: 999, padding: "2px 10px", whiteSpace: "nowrap" }}>{rawRef(ref, entity)}</span>}
+              {ref && <a href={odooOrderId ? odooOrderUrl(entity, odooOrderId) : (ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" title={odooOrderId ? ("Ouvrir la commande " + rawRef(ref, entity) + " dans Odoo") : "Ouvrir les commandes dans Odoo"} className="odoo" style={{ fontSize: 12, textDecoration: "none", border: "1px solid #714B6740", background: "#714B670f", borderRadius: 999, padding: "2px 10px", whiteSpace: "nowrap" }}>Odoo ↗</a>}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginLeft: "auto", justifyContent: "flex-end" }}>
-            {!isContractor && (
-              <button onClick={function(){ setShowSearch(true); }} title="Rechercher un briefing (Ctrl+K / ⌘K)" className="wg-pill wg-search">🔍 Rechercher un briefing <span className="wg-kbd">⌘K</span></button>
-            )}
             {!isContractor && (
               <div className="wg-seg">
                 <button className={mode === "form" ? "on" : ""} onClick={function(){ setMode("form"); }}>Formulaire</button>
@@ -4865,15 +4980,15 @@ function App() {
       </div>
       {mode !== "preview" && (
         <div id="no-print" className="wg-nav">
-          <div className="wg-nav-id" title={(client.nom || "") + (ref ? " · " + rawRef(ref, entity) : "")}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{client.nom && client.nom.trim() ? client.nom : "Briefing"}</span>
-            {ref && <span style={{ fontSize: 11, color: entColor, background: entColor + "14", borderRadius: 999, padding: "1px 8px" }}>{rawRef(ref, entity)}</span>}
-          </div>
           <nav className="wg-tabs" aria-label="Sections du briefing">
             {navSections.map(function(sec){
-              return <button key={sec.id} className={"wg-tab" + (activeSec === sec.id ? " on" : "")} onClick={function(){ goSec(sec.id); }}>{sec.label}</button>;
+              if (sec.group) return <span key={sec.id} className="wg-tab-group" onClick={function(){ goSec(sec.id); }}>{sec.label}</span>;
+              return <button key={sec.id} className={"wg-tab" + (sec.sub ? " sub" : "") + (activeSec === sec.id ? " on" : "")} onClick={function(){ goSec(sec.id); }}>{sec.label}</button>;
             })}
           </nav>
+          {!isContractor && (
+            <button onClick={function(){ setShowSearch(true); }} title="Rechercher un briefing (Ctrl+K / ⌘K)" className="wg-pill wg-search">🔍 <span className="wg-hide-m">Rechercher</span> <span className="wg-kbd">⌘K</span></button>
+          )}
         </div>
       )}
 
@@ -4903,43 +5018,6 @@ function App() {
 
       {mode === "preview" ? <PreviewDoc data={data} /> : (
         <>
-          {/* Actualiser depuis Odoo + bon de commande · deux cases cote a cote */}
-          <div id="no-print" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch" }}>
-
-            {/* Actualiser depuis Odoo · import direct de la commande (si reference) */}
-            {ref && (
-              <div style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, background: WHITE, border: "1px solid " + BORDER, borderRadius: 14, padding: "14px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <button onClick={refreshFromOdoo} disabled={odooLoading}
-                    className="wg-pill" style={{ opacity: odooLoading ? 0.6 : 1, cursor: odooLoading ? "wait" : "pointer" }}>
-                    {odooLoading ? <>⏳ Import <span className="odoo">Odoo</span>…</> : <>🔄 Actualiser depuis <span className="odoo">Odoo</span></>}
-                  </button>
-                  {odooMsg && <span style={{ fontSize: 12, fontWeight: 600, color: odooMsg.charAt(0) === "✓" ? GREEN : "#c0392b", background: odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "4px 10px", borderRadius: 6 }}><OdooTxt text={odooMsg} /></span>}
-                </div>
-                <span style={{ fontSize: 12, color: MUTED }}>Récupère client, adresse, PM et matériel directement depuis la commande {rawRef(ref, entity)}.</span>
-              </div>
-            )}
-
-            {/* BDC drop zone */}
-            <div
-              onDragOver={e => { e.preventDefault(); setBcDrag(true); }}
-              onDragLeave={() => setBcDrag(false)}
-              onDrop={e => { e.preventDefault(); setBcDrag(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) parseBDC(f); }}
-              onClick={() => { const i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,image/*"; i.onchange = e => e.target.files && e.target.files[0] && parseBDC(e.target.files[0]); i.click(); }}
-              style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", border: `2px dashed ${bcDrag ? GREEN : "#c8c8c0"}`, background: bcDrag ? GREEN_LIGHT : "#fafaf8", borderRadius: 12, padding: "1rem 1.5rem", textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}>
-              {bcLoading
-                ? <div style={{ color: GREEN, fontSize: 14, fontWeight: 600 }}>⏳ Extraction en cours…</div>
-                : <>
-                    <div style={{ fontSize: 22, marginBottom: 4 }}>📋</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>Déposer le bon de commande client ici</div>
-                    <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>PDF ou image. Client, adresse du chantier et PM extraits automatiquement</div>
-                    {bcMsg && <div style={{ fontSize: 12, color: GREEN, marginTop: 6, fontWeight: 600, background: GREEN_LIGHT, padding: "4px 10px", borderRadius: 6, display: "inline-block" }}>{bcMsg}</div>}
-                  </>
-              }
-            </div>
-
-          </div>
-
           {/* ── SheetBar · multi-feuilles ── */}
           {ref && (
             <SheetBar
@@ -4982,7 +5060,15 @@ function App() {
 
           {/* ── 1. Client + WGE ── */}
           <div id="sec-client" className="sec-anchor" style={CARD}>
-            <div className="sh" style={SH}><span>👤</span> Client et chantier</div>
+            <div className="sh" style={Object.assign({}, SH, { flexWrap: "wrap" })}><span>👤</span> Client et chantier
+              {ref && (
+                <button onClick={refreshFromOdoo} disabled={odooLoading} title={"Récupère client, adresse, PM et matériel depuis la commande " + rawRef(ref, entity)}
+                  className="wg-pill" style={{ marginLeft: "auto", fontSize: 12, padding: "6px 12px", opacity: odooLoading ? 0.6 : 1, cursor: odooLoading ? "wait" : "pointer" }}>
+                  {odooLoading ? <>⏳ Import <span className="odoo">Odoo</span>…</> : <>🔄 Actualiser depuis <span className="odoo">Odoo</span></>}
+                </button>
+              )}
+            </div>
+            {odooMsg && <div style={{ fontSize: 12, fontWeight: 600, color: odooMsg.charAt(0) === "✓" ? GREEN : "#b42a2a", background: odooMsg.charAt(0) === "✓" ? GREEN_LIGHT : "#fdecea", padding: "6px 10px", borderRadius: 8, margin: "-6px 0 12px" }}><OdooTxt text={odooMsg} /></div>}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "14px 28px" }}>
               <div className="wg-props">
                 <label className="wg-pl">Client</label>
@@ -4991,10 +5077,10 @@ function App() {
                 <div style={{ minWidth: 0 }}>
                   <input value={client.adresse} onChange={e => setClient(p => ({ ...p, adresse: e.target.value }))} placeholder="Rue, numéro, CP, ville" />
                   {client.adresse && client.adresse.trim() && (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, fontSize: 12, flexWrap: "wrap" }}>
-                      <span style={{ color: MUTED }}>🧭 Itinéraire</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, fontSize: 12, flexWrap: "nowrap", whiteSpace: "nowrap" }}>
+                      <span style={{ color: MUTED }}>🧭<span className="wg-hide-m"> Itinéraire</span></span>
                       {[
-                        { label: "Google Maps", url: "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(client.adresse) },
+                        { label: "Google", url: "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(client.adresse) },
                         { label: "Waze", url: "https://waze.com/ul?q=" + encodeURIComponent(client.adresse) + "&navigate=yes" },
                         { label: "Plans", url: "https://maps.apple.com/?daddr=" + encodeURIComponent(client.adresse) }
                       ].map(function(it){ return (
@@ -5079,13 +5165,16 @@ function App() {
             </div>
 
             <div className="wg-gt" style={{ marginTop: 18 }}>Levage, manutention et transport</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 28 }}>
+            <div>
               {[["lift","LIFT"],["nacelle","Nacelle"],["manitou","Manitou"],["grue","Grue"]].map(function(item) {
                 var k = item[0], lbl = item[1];
                 return (
-                  <div key={k} className="wg-row" style={{ borderTop: "1px solid #efede6" }}>
-                    <span className="lab" style={{ fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}</span>
-                    <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
+                  <div key={k} style={{ borderTop: "1px solid #efede6" }}>
+                    <div className="wg-row">
+                      <span className="lab" style={{ fontWeight: logistique[k] === "OUI" ? 600 : 400 }}>{lbl}{logistique[k] === "OUI" && logistique.prestataires && logistique.prestataires[k] && logistique.prestataires[k].nom ? <span className="sub"> · {logistique.prestataires[k].nom}</span> : null}</span>
+                      <Toggle value={logistique[k]} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { [k]: v }); }); }} />
+                    </div>
+                    {logistique[k] === "OUI" && <ProviderPicker kind={k} value={(logistique.prestataires || {})[k]} onChange={function(v){ setLogistique(function(p){ var pr = Object.assign({}, p.prestataires || {}); if (v) pr[k] = v; else delete pr[k]; return Object.assign({}, p, { prestataires: pr }); }); }} />}
                   </div>
                 );
               })}
@@ -5099,10 +5188,10 @@ function App() {
                 </div>
                 {logistique.reserve === "OUI" && (
                   <div className="wg-detail">
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                    {(logistique.reserveContact || logistique.reserveTel) && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
                       <input value={logistique.reserveContact} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveContact: v }); }); }} placeholder="Équipementier / personne de contact" style={{ width: "100%" }} />
                       <input value={logistique.reserveTel} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveTel: v }); }); }} placeholder="Numéro" style={{ width: "100%" }} />
-                    </div>
+                    </div>}
                     <input value={logistique.reserveNote} onChange={function(e){ var v = e.target.value; setLogistique(function(p){ return Object.assign({}, p, { reserveNote: v }); }); }} placeholder="Note (ex : heure de réservation)" style={{ width: "100%" }} />
                   </div>
                 )}
@@ -5114,6 +5203,7 @@ function App() {
               <span className="lab" style={{ fontWeight: logistique.transport === "OUI" ? 600 : 400 }}>Transport nécessaire</span>
               <Toggle value={logistique.transport} onChange={function(v){ setLogistique(function(p){ return Object.assign({}, p, { transport: v }); }); }} />
             </div>
+            {logistique.transport === "OUI" && <ProviderPicker kind="transport" value={(logistique.prestataires || {}).transport} onChange={function(v){ setLogistique(function(p){ var pr = Object.assign({}, p.prestataires || {}); if (v) pr["transport"] = v; else delete pr["transport"]; return Object.assign({}, p, { prestataires: pr }); }); }} />}
             {logistique.transport === "OUI" && (
               <>
                 <div className="wg-row" style={{ borderTop: "1px solid #efede6" }}>
@@ -5149,6 +5239,7 @@ function App() {
 
                 {/* Bloc électrique · 1x par site */}
                 <SiteElectricalBlock
+                  anchorId={"sec-s" + siteIdx + "-elec"}
                   electrical={site.electrical}
                   onSet={function(path, val){ setSiteE(siteIdx, path, val); }}
                 />
@@ -5157,6 +5248,9 @@ function App() {
                 {site.pvInstallations.map(function(inst, pvIdx) {
                   return React.createElement(InstallationBlock, {
                     key: pvIdx, tech: inst.tech, strings: inst.strings, mppts: inst.mppts || [],
+                    anchorBase: "sec-s" + siteIdx + "-pv" + pvIdx,
+                    onRefreshOdoo: (ref && siteIdx === 0 && pvIdx === 0) ? refreshFromOdoo : null,
+                    odooLoading: odooLoading, odooMsg: odooMsg,
                     instIdx: pvIdx, total: site.pvInstallations.length,
                     onSetT: function(pvIdx2, path, val){ setT(siteIdx, pvIdx2, path, val); },
                     onSetTech: function(pvIdx2, upd){ setInstTech(siteIdx, pvIdx2, upd); },
@@ -5176,6 +5270,7 @@ function App() {
                 {site.brInstallations.map(function(brInst, brIdx) {
                   return React.createElement(BRInstallationBlock, {
                     key: brIdx, inst: brInst, instIdx: brIdx, total: site.brInstallations.length,
+                    anchorId: "sec-s" + siteIdx + "-br" + brIdx,
                     onSet: function(brIdx2, path, val){ setBRInst(siteIdx, brIdx2, path, val); },
                     onRemove: function(brIdx2){ removeBRInst(siteIdx, brIdx2); }
                   });
