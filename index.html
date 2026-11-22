@@ -489,21 +489,23 @@ var LOGI_CONTACTS = {
     { id: "eks", nom: "EKS", region: "Belgique", tel: "+32 475 41 82 24", email: "eks@hotmail.be" },
     { id: "zipmend", nom: "Zipmend Express", region: "International", email: "mail@zipmend.com", rem: "Transport à l'étranger" }
   ],
+  // prio : ordre de préférence imposé (1 = premier choix), prioritaire sur la proximité
   nacelle: [
-    { id: "skybel", nom: "Skybel", region: "Belgique", tel: "+32 477 60 73 82", email: "location@skybel.be" },
-    { id: "tvh", nom: "TVH Equipment", region: "Nivelles", tel: "067 79 43 70", email: "location.nivelles@tvhequipment.com" },
-    { id: "loxam", nom: "Loxam", region: "Bruxelles", tel: "02 663 86 00", email: "bruxelles@loxam.be" }
+    { id: "skybel", nom: "Skybel", region: "Belgique", tel: "+32 477 60 73 82", email: "location@skybel.be", prio: 1 },
+    { id: "loxam", nom: "Loxam", region: "Bruxelles", tel: "02 663 86 00", email: "bruxelles@loxam.be", prio: 2 }
+  ],
+  manitou: [
+    { id: "loxam", nom: "Loxam", region: "Bruxelles", tel: "02 663 86 00", email: "bruxelles@loxam.be", prio: 1 }
   ],
   grue: [
-    { id: "lift-express", nom: "Lift Express et Loca Grue", region: "Belgique", tel: "0479/67.41.65", email: "louis.p@liftexpress.be" },
-    { id: "bigmat-grez", nom: "Big Mat Grez", region: "Grez", tel: "010 84 15 28", email: "info@bigmat-belmeco.be" }
+    { id: "lift-express", nom: "Lift Express et Loca Grue", region: "Belgique", tel: "0479/67.41.65", email: "louis.p@liftexpress.be", prio: 1 },
+    { id: "bigmat-grez", nom: "Big Mat Grez", region: "Grez", tel: "010 84 15 28", email: "info@bigmat-belmeco.be", prio: 2 }
   ]
 };
-LOGI_CONTACTS.manitou = LOGI_CONTACTS.nacelle; // Nacelles et Manitou : même catégorie
 
 // Prestataires enregistrés (liste non exhaustive) : suggestions, autocomplétion, actions rapides.
 // Ne stocke rien de nouveau : remplit les champs de réservation existants, qui restent éditables.
-var LOGI_CAT_LABEL = { lift: "Lifts", nacelle: "Nacelles / Manitou", grue: "Camions grues", transport: "Transports" };
+var LOGI_CAT_LABEL = { lift: "Lifts", nacelle: "Nacelles", manitou: "Manitou", grue: "Camions grues", transport: "Transports" };
 var BXL_COMMUNES = ["bruxelles","brussel","anderlecht","auderghem","oudergem","berchem","etterbeek","evere","forest","vorst","ganshoren","ixelles","elsene","jette","koekelberg","molenbeek","saint-gilles","sint-gillis","saint-josse","schaerbeek","schaarbeek","uccle","ukkel","watermael","boitsfort","woluwe","laeken","haren","neder-over-heembeek"];
 // Région du chantier déduite de l'adresse (code postal, sinon nom de commune)
 function chantierRegion(addr) {
@@ -531,41 +533,73 @@ function providerScore(c, region) {
   return 0;
 }
 function providerList(kinds, region) {
-  var cats = [];
-  (kinds || []).forEach(function(k){ var key = k === "manitou" ? "nacelle" : k; if (cats.indexOf(key) === -1 && LOGI_CONTACTS[key]) cats.push(key); });
   var out = [];
-  cats.forEach(function(cat){ LOGI_CONTACTS[cat].forEach(function(c, i){ out.push(Object.assign({ cat: cat, near: providerScore(c, region) === 2, _o: out.length }, c)); }); });
-  out.sort(function(x, y){ return (providerScore(y, region) - providerScore(x, region)) || (x._o - y._o); });
+  (kinds || []).forEach(function(cat){
+    if (!LOGI_CONTACTS[cat] || out.some(function(x){ return x.cat === cat; })) return;
+    var rows = LOGI_CONTACTS[cat].map(function(c, i){ return Object.assign({ cat: cat, near: providerScore(c, region) === 2, _o: i }, c); });
+    rows.sort(function(x, y){ return ((x.prio || 99) - (y.prio || 99)) || (providerScore(y, region) - providerScore(x, region)) || (x._o - y._o); });
+    out = out.concat(rows);
+  });
   return out;
 }
 function findListed(name) {
   if (!name) return null;
-  var all = [].concat(LOGI_CONTACTS.lift, LOGI_CONTACTS.nacelle, LOGI_CONTACTS.grue, LOGI_CONTACTS.transport);
+  var all = [].concat(LOGI_CONTACTS.lift, LOGI_CONTACTS.nacelle, LOGI_CONTACTS.manitou, LOGI_CONTACTS.grue, LOGI_CONTACTS.transport);
   return all.filter(function(c){ return c.nom === name; })[0] || null;
 }
 function contactLine(c) { return c.nom + " · " + (c.tel || c.email || ""); }
 
-// Puces de suggestion (1 clic)
-function ProviderChips({ kinds, region, selectedName, onPick, max }) {
-  // panachage : les meilleurs de chaque catégorie (proches du chantier d'abord)
-  var full = providerList(kinds, region), cats = [];
+// Liste de suggestions toujours visible : plusieurs prestataires, classés (priorité, puis proximité).
+// Le prestataire choisi est coché, les autres restent proposés.
+function ProviderSuggestList({ kinds, region, selectedName, onPick, perCat }) {
+  var [showAll, setShowAll] = useState(false);
+  var full = providerList(kinds, region);
+  if (!full.length) return null;
+  var cats = [];
   full.forEach(function(c){ if (cats.indexOf(c.cat) === -1) cats.push(c.cat); });
-  var per = Math.max(1, Math.floor((max || 4) / Math.max(1, cats.length)));
-  var list = [];
-  cats.forEach(function(cat){ list = list.concat(full.filter(function(c){ return c.cat === cat; }).slice(0, cats.length === 1 ? (max || 4) : Math.max(2, per))); });
-  if (!list.length) return null;
+  var limit = perCat || 3, hidden = 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-      <span className="wg-pl" style={{ fontSize: 12 }}>Suggestions</span>
-      {list.map(function(c){
-        var on = selectedName === c.nom;
+    <div style={{ background: "#fff", border: "1px solid #e6e3da", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: MUTED, padding: "8px 12px 6px" }}>📇 Prestataires suggérés</div>
+      {cats.map(function(cat){
+        var rows = full.filter(function(c){ return c.cat === cat; });
+        var shown = showAll ? rows : rows.slice(0, limit);
+        if (!showAll && rows.length > limit) {
+          // le prestataire choisi reste toujours visible
+          var sel = rows.filter(function(c){ return c.nom === selectedName; })[0];
+          if (sel && shown.indexOf(sel) === -1) shown = shown.slice(0, limit - 1).concat([sel]);
+          hidden += rows.length - shown.length;
+        }
         return (
-          <button key={c.cat + c.id} type="button" onClick={function(){ onPick(on ? null : c); }} title={(c.tel || c.email || "") + (c.rem ? " · " + c.rem : "")}
-            style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid " + (on ? GREEN : "#dcd9cf"), background: on ? GREEN_LIGHT : "#fff", color: on ? GREEN : TEXT, borderRadius: 999, padding: "4px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {c.near ? "📍 " : ""}{c.nom}<span style={{ fontWeight: 400, color: MUTED }}>{c.region}</span>
-          </button>
+          <div key={cat}>
+            {cats.length > 1 && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9a978d", padding: "6px 12px 2px", borderTop: "1px solid #f0eee8" }}>{LOGI_CAT_LABEL[cat]}</div>}
+            {shown.map(function(c){
+              var on = selectedName === c.nom;
+              return (
+                <div key={cat + c.id} role="button" tabIndex={0} onClick={function(){ onPick(on ? null : c); }}
+                  onKeyDown={function(e){ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(on ? null : c); } }}
+                  title={on ? "Retirer ce prestataire" : "Choisir ce prestataire"}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", borderTop: "1px solid #f0eee8", background: on ? GREEN_LIGHT : "transparent" }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, border: "1.5px solid " + (on ? GREEN : "#cfccc2"), background: on ? GREEN : "#fff", color: "#fff", fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: on ? GREEN : TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.nom}{c.prio === 1 && rows.length > 1 ? <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, background: GREEN_LIGHT, borderRadius: 999, padding: "1px 7px", marginLeft: 6 }}>1er choix</span> : null}
+                    </div>
+                    <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.near ? "📍 Proche du chantier · " : ""}{c.region}{c.rem ? " · " + c.rem : ""}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{c.tel || c.email || ""}</span>
+                </div>
+              );
+            })}
+          </div>
         );
       })}
+      {(hidden > 0 || showAll) && (
+        <button type="button" onClick={function(){ setShowAll(!showAll); }}
+          style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid #f0eee8", background: "#faf9f6", color: GREEN, fontSize: 12, fontWeight: 600, padding: "8px 12px", cursor: "pointer" }}>
+          {showAll ? "Afficher moins" : "Afficher les " + hidden + " autres prestataires"}
+        </button>
+      )}
     </div>
   );
 }
@@ -5284,10 +5318,12 @@ function App() {
                 </div>
                 {logistique.reserve === "OUI" && (
                   <div className="wg-detail">
-                    {!logistique.reserveContact && (
-                      <ProviderChips kinds={["lift","nacelle","manitou","grue"].filter(function(k){ return logistique[k] === "OUI"; })} region={chantierRegion(client.adresse)} selectedName={logistique.reserveContact}
-                        onPick={function(c){ setLogistique(function(p){ return c ? Object.assign({}, p, { reserveContact: c.nom, reserveTel: c.tel || c.email || "" }) : p; }); }} />
-                    )}
+                    <ProviderSuggestList kinds={["lift","nacelle","manitou","grue"].filter(function(k){ return logistique[k] === "OUI"; })} region={chantierRegion(client.adresse)} selectedName={logistique.reserveContact}
+                      onPick={function(c){ setLogistique(function(p){
+                        if (c) return Object.assign({}, p, { reserveContact: c.nom, reserveTel: c.tel || c.email || "" });
+                        var prev = findListed(p.reserveContact);
+                        return Object.assign({}, p, { reserveContact: "", reserveTel: prev && p.reserveTel === (prev.tel || prev.email || "") ? "" : p.reserveTel });
+                      }); }} />
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
                       <ProviderCombo kinds={["lift","nacelle","manitou","grue"].filter(function(k){ return logistique[k] === "OUI"; })} region={chantierRegion(client.adresse)}
                         value={logistique.reserveContact} placeholder="Équipementier / personne de contact"
@@ -5321,7 +5357,7 @@ function App() {
                 </div>
                 {logistique.transportReserve === "OUI" && (
                   <div className="wg-detail">
-                    <ProviderChips kinds={["transport"]} region={chantierRegion(client.adresse)}
+                    <ProviderSuggestList kinds={["transport"]} region={chantierRegion(client.adresse)}
                       selectedName={(LOGI_CONTACTS.transport.filter(function(c){ return (logistique.transportReserveNote || "").indexOf(contactLine(c)) === 0; })[0] || {}).nom}
                       onPick={function(c){ setLogistique(function(p){
                         var note = p.transportReserveNote || "";
