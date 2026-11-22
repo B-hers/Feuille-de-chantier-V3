@@ -69,6 +69,7 @@ button { font-family: inherit; cursor: pointer; }
 .wg-row:first-of-type { border-top: none; }
 .wg-row .lab { flex: 1; min-width: 0; font-size: 14px; }
 .wg-row .sub { font-size: 12px; color: #6f6d65; }
+.wg-pothers::-webkit-scrollbar { display: none; }
 .wg-detail { background: #f6f5f1; border-radius: 10px; padding: 10px 12px; margin: 0 0 6px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .wg-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .wg-badge.ok { background: #e3f1e9; color: #1B6B3A; }
@@ -93,6 +94,8 @@ button { font-family: inherit; cursor: pointer; }
   .wg-top button, .wg-top a, .wg-nav button { min-height: 0; }
   .wg-show-m { display: inline; }
   .wg-yn button { min-height: 34px; padding: 6px 14px; }
+  .wg-pchip { min-height: 0 !important; padding: 4px 10px !important; }
+  .wg-pothers { padding-left: 12px !important; }
   .wg-props { grid-template-columns: 92px minmax(0, 1fr); }
   .wg-nav-id { display: none; }
   .wg-seg button { padding: 7px 11px; }
@@ -549,57 +552,64 @@ function findListed(name) {
 }
 function contactLine(c) { return c.nom + " · " + (c.tel || c.email || ""); }
 
-// Liste de suggestions toujours visible : plusieurs prestataires, classés (priorité, puis proximité).
-// Le prestataire choisi est coché, les autres restent proposés.
-function ProviderSuggestList({ kinds, region, selectedName, onPick, perCat }) {
-  var [showAll, setShowAll] = useState(false);
+// Suggestions toujours visibles, par catégorie : en tête le prestataire n° 1 (ou celui choisi),
+// juste en dessous une ligne compacte avec les autres prestataires suggérés (1 clic pour basculer).
+function ProviderSuggestList({ kinds, region, selectedName, onPick, maxOthers }) {
+  var [expanded, setExpanded] = useState({});
   var full = providerList(kinds, region);
   if (!full.length) return null;
   var cats = [];
   full.forEach(function(c){ if (cats.indexOf(c.cat) === -1) cats.push(c.cat); });
-  var limit = perCat || 3, hidden = 0;
+  var MAXO = maxOthers || 3;
   return (
     <div style={{ background: "#fff", border: "1px solid #e6e3da", borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: MUTED, padding: "8px 12px 6px" }}>📇 Prestataires suggérés</div>
-      {cats.map(function(cat){
+      {cats.map(function(cat, ci){
         var rows = full.filter(function(c){ return c.cat === cat; });
-        var shown = showAll ? rows : rows.slice(0, limit);
-        if (!showAll && rows.length > limit) {
-          // le prestataire choisi reste toujours visible
-          var sel = rows.filter(function(c){ return c.nom === selectedName; })[0];
-          if (sel && shown.indexOf(sel) === -1) shown = shown.slice(0, limit - 1).concat([sel]);
-          hidden += rows.length - shown.length;
-        }
+        var sel = rows.filter(function(c){ return c.nom === selectedName; })[0];
+        var hero = sel || rows[0];
+        var others = rows.filter(function(c){ return c !== hero; });
+        var isOpen = !!expanded[cat];
+        var shown = isOpen ? others : others.slice(0, MAXO);
+        var on = !!sel;
         return (
-          <div key={cat}>
-            {cats.length > 1 && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9a978d", padding: "6px 12px 2px", borderTop: "1px solid #f0eee8" }}>{LOGI_CAT_LABEL[cat]}</div>}
-            {shown.map(function(c){
-              var on = selectedName === c.nom;
-              return (
-                <div key={cat + c.id} role="button" tabIndex={0} onClick={function(){ onPick(on ? null : c); }}
-                  onKeyDown={function(e){ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(on ? null : c); } }}
-                  title={on ? "Retirer ce prestataire" : "Choisir ce prestataire"}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", borderTop: "1px solid #f0eee8", background: on ? GREEN_LIGHT : "transparent" }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, border: "1.5px solid " + (on ? GREEN : "#cfccc2"), background: on ? GREEN : "#fff", color: "#fff", fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: on ? GREEN : TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {c.nom}{c.prio === 1 && rows.length > 1 ? <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, background: GREEN_LIGHT, borderRadius: 999, padding: "1px 7px", marginLeft: 6 }}>1er choix</span> : null}
-                    </div>
-                    <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.near ? "📍 Proche du chantier · " : ""}{c.region}{c.rem ? " · " + c.rem : ""}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{c.tel || c.email || ""}</span>
+          <div key={cat} style={{ borderTop: ci > 0 ? "1px solid #e6e3da" : "none" }}>
+            <div role="button" tabIndex={0} onClick={function(){ onPick(on ? null : hero); }}
+              onKeyDown={function(e){ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(on ? null : hero); } }}
+              title={on ? "Retirer ce prestataire" : "Choisir ce prestataire"}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", cursor: "pointer", background: on ? GREEN_LIGHT : "transparent" }}>
+              <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, border: "1.5px solid " + (on ? GREEN : "#cfccc2"), background: on ? GREEN : "#fff", color: "#fff", fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9a978d" }}>
+                  {LOGI_CAT_LABEL[cat]} · {on ? "choisi" : (hero.prio === 1 && rows.length > 1 ? "1er choix" : "suggéré")}
                 </div>
-              );
-            })}
+                <div style={{ fontSize: 14, fontWeight: 700, color: on ? GREEN : TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hero.nom}</div>
+                <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hero.near ? "📍 Proche du chantier · " : ""}{hero.region}{hero.rem ? " · " + hero.rem : ""}<span className="wg-show-m">{(hero.tel || hero.email) ? " · " + (hero.tel || hero.email) : ""}</span></div>
+              </div>
+              <span className="wg-hide-m" style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{hero.tel || hero.email || ""}</span>
+              {!on && <span className="wg-hide-m" style={{ fontSize: 12, fontWeight: 600, color: GREEN, border: "1px solid " + GREEN_MID, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>Choisir</span>}
+            </div>
+            {others.length > 0 && (
+              <div className="wg-pothers" style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px 9px 40px", flexWrap: isOpen ? "wrap" : "nowrap", overflowX: isOpen ? "visible" : "auto", scrollbarWidth: "none" }}>
+                <span style={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", flexShrink: 0 }}>Autres :</span>
+                {shown.map(function(c){
+                  return (
+                    <button key={c.id} type="button" className="wg-pchip" onClick={function(){ onPick(c); }} title={(c.tel || c.email || "") + (c.rem ? " · " + c.rem : "")}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, border: "1px solid #dcd9cf", background: "#fff", color: TEXT, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      {c.near ? "📍 " : ""}{c.nom}{normTxt(c.nom).indexOf(normTxt(c.region)) === -1 && <span style={{ fontWeight: 400, color: MUTED }}>{c.region}</span>}
+                    </button>
+                  );
+                })}
+                {others.length > MAXO && (
+                  <button type="button" onClick={function(){ setExpanded(function(x){ var n = Object.assign({}, x); n[cat] = !isOpen; return n; }); }}
+                    style={{ flexShrink: 0, border: "none", background: "none", color: GREEN, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", padding: "3px 4px" }}>
+                    {isOpen ? "Moins" : "+ " + (others.length - MAXO) + " autres"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
-      {(hidden > 0 || showAll) && (
-        <button type="button" onClick={function(){ setShowAll(!showAll); }}
-          style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid #f0eee8", background: "#faf9f6", color: GREEN, fontSize: 12, fontWeight: 600, padding: "8px 12px", cursor: "pointer" }}>
-          {showAll ? "Afficher moins" : "Afficher les " + hidden + " autres prestataires"}
-        </button>
-      )}
     </div>
   );
 }
