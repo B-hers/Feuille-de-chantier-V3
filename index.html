@@ -70,6 +70,7 @@ button { font-family: inherit; cursor: pointer; }
 .wg-row .lab { flex: 1; min-width: 0; font-size: 14px; }
 .wg-row .sub { font-size: 12px; color: #6f6d65; }
 .wg-pothers::-webkit-scrollbar { display: none; }
+@media (max-width: 385px) { .wg-tools .wg-pill .wg-show-m { display: none; } }
 .wg-detail { background: #f6f5f1; border-radius: 10px; padding: 10px 12px; margin: 0 0 6px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .wg-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .wg-badge.ok { background: #e3f1e9; color: #1B6B3A; }
@@ -98,7 +99,10 @@ button { font-family: inherit; cursor: pointer; }
   .wg-pothers { padding-left: 12px !important; }
   .wg-props { grid-template-columns: 92px minmax(0, 1fr); }
   .wg-nav-id { display: none; }
-  .wg-seg button { padding: 7px 11px; }
+  .wg-seg button { padding: 7px 9px; }
+  .wg-tools { gap: 6px !important; }
+  .wg-tools .wg-ibtn { width: 34px; height: 34px; }
+  .wg-tools .wg-pill { padding: 7px 11px; }
   .wg-tab { padding: 7px 12px; }
   .wg-search { padding: 6px 10px; }
   .wg-kbd, .wg-hide-m { display: none !important; }
@@ -1242,7 +1246,10 @@ function briefIdxWrite(items) {
   try { localStorage.setItem(BRIEF_IDX_KEY, JSON.stringify({ at: Date.now(), items: items.map(function(r){ return { id: r.id, ref: r.ref, nom: r.nom, adresse: r.adresse, entity: r.entity, updated_at: r.updated_at }; }) })); } catch(e) {}
 }
 function briefPrep(r) { r._s = normTxt((r.nom || "") + " " + (r.adresse || "") + " " + (r.ref || "")); return r; }
-function SearchBriefings({ onClose }) {
+function SearchBriefings({ onClose, entity }) {
+  // Périmètre : uniquement les briefings de l'entité du briefing ouvert (préfixe de la référence)
+  var ent = ENTITIES[entity] ? entity : "wge";
+  var [allEnt, setAllEnt] = useState(false);
   var [q, setQ] = useState("");
   var [all, setAll] = useState(function(){
     if (_briefingsCache) return _briefingsCache;
@@ -1330,8 +1337,9 @@ function SearchBriefings({ onClose }) {
   }, []);
 
   // Filtrage local instantané : chaque mot tapé doit apparaître (sans accents ni majuscules)
+  var scoped = allEnt ? all : all.filter(function(r){ return detectEntity(r.ref) === ent; });
   var words = normTxt(q).split(/\s+/).filter(Boolean);
-  var results = words.length === 0 ? all.slice(0, 30) : all.filter(function(r){
+  var results = words.length === 0 ? scoped.slice(0, 30) : scoped.filter(function(r){
     for (var i = 0; i < words.length; i++) { if (r._s.indexOf(words[i]) === -1) return false; }
     return true;
   }).slice(0, 50);
@@ -1365,9 +1373,21 @@ function SearchBriefings({ onClose }) {
           {q && <button onClick={function(){ setQ(""); if (inputRef.current) inputRef.current.focus(); }} title="Effacer" style={{ background: "#eee", border: "none", color: MUTED, cursor: "pointer", fontSize: 10, borderRadius: 999, width: 20, height: 20, minWidth: 20, minHeight: 20, padding: 0, lineHeight: 1, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>✕</button>}
           <button onClick={onClose} title="Fermer" style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}>×</button>
         </div>
-        <div style={{ padding: "6px 14px", fontSize: 11, color: MUTED, borderBottom: "1px solid #f0efe9", display: "flex", justifyContent: "space-between", gap: 8 }}>
-          <span>{all.length + " briefings"}{progress ? " · mise à jour des noms " + progress.done + "/" + progress.total : (loading && !all.length ? " · chargement…" : "")}{error ? " · ⚠ " + error : ""}</span>
-          <span>{words.length ? results.length + (results.length === 50 ? "+" : "") + " résultat(s)" : "Récents"}</span>
+        <div style={{ padding: "6px 14px", fontSize: 11, color: MUTED, borderBottom: "1px solid #f0efe9", display: "flex", justifyContent: "space-between", gap: "4px 8px", flexWrap: "wrap" }}>
+          <span style={{ minWidth: 0 }}>
+            {allEnt
+              ? <b style={{ color: TEXT }}>Toutes les entités</b>
+              : <b style={{ color: ENTITIES[ent].color }}>{ENTITIES[ent].flag} {ENTITIES[ent].label}</b>}
+            {" · " + scoped.length + " briefings"}{progress ? " · mise à jour des noms " + progress.done + "/" + progress.total : (loading && !all.length ? " · chargement…" : "")}{error ? " · ⚠ " + error : ""}
+          </span>
+          <span style={{ display: "inline-flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+            <span>{words.length ? results.length + (results.length === 50 ? "+" : "") + " résultat(s)" : "Récents"}</span>
+            <button type="button" onClick={function(){ setAllEnt(!allEnt); setActive(0); if (inputRef.current) inputRef.current.focus(); }}
+              title={allEnt ? "Limiter à l'entité du briefing ouvert" : "Chercher aussi dans les autres entités"}
+              style={{ border: "none", background: "none", padding: 0, minHeight: 0, color: GREEN, fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+              {allEnt ? "Uniquement " + ENTITIES[ent].label : "Toutes les entités"}
+            </button>
+          </span>
         </div>
         <div ref={listRef} style={{ overflow: "auto", flex: 1 }}>
           {results.length === 0 && !loading && (
@@ -3753,6 +3773,9 @@ function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const saveTimer = useRef(null);
   const photoSaveTimer = useRef(null);
+  const manualSaving = useRef(false);
+  const [manualBusy, setManualBusy] = useState(false);
+  const saveNowRef = useRef(null);
   const isLoading = useRef(false);
   const latestDataRef = useRef(null);
   const currentSheetIdRef = useRef(null); // toujours à jour · évite les stale closures
@@ -4239,12 +4262,8 @@ function App() {
   // Keep userRef in sync with user state
   useEffect(function() { userRef.current = user; }, [user]);
 
-  // ── Auto-save on any data change ───────────────────────────────────────────
-  useEffect(function() {
-    if (!ref || isLoading.current) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    setSaveStatus("saving");
-    saveTimer.current = setTimeout(async function() {
+  // ── Procédure de sauvegarde (utilisée par l'auto-save et par le bouton Enregistrer) ──
+  const performSave = async function() {
       // Utilise supaUpdateSheetById si on a un id, sinon crée la feuille
       async function smartSave(data) {
         var sid = currentSheetIdRef.current;
@@ -4296,7 +4315,25 @@ function App() {
           prevDataRef.current = slimCurrent;
         }
       } else setSaveStatus("error");
-    }, 1200);
+  };
+
+  // Sauvegarde manuelle immédiate (bouton + Ctrl/⌘+S)
+  const saveNow = async function() {
+    if (!ref || isLoading.current || manualSaving.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (photoSaveTimer.current) clearTimeout(photoSaveTimer.current);
+    manualSaving.current = true; setManualBusy(true);
+    setSaveStatus("saving");
+    try { await performSave(); } catch(e) { console.error("saveNow:", e); setSaveStatus("error"); }
+    manualSaving.current = false; setManualBusy(false);
+  };
+
+  // ── Auto-save on any data change ───────────────────────────────────────────
+  useEffect(function() {
+    if (!ref || isLoading.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveStatus("saving");
+    saveTimer.current = setTimeout(performSave, 1200);
   }, [client, weGreen, entity, date, sites, comments, logistique, tdNote, schemaNote, pmNote, voiceNotes, acGroups]);
 
   // ── Photos auto-save : upload Storage puis JSON léger ────────────────────
@@ -5029,10 +5066,12 @@ function App() {
   useEffect(function(){
     function onKey(e){
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K") && !isContractor) { e.preventDefault(); setShowSearch(true); }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) { e.preventDefault(); if (saveNowRef.current) saveNowRef.current(); }
     }
     window.addEventListener("keydown", onKey);
     return function(){ window.removeEventListener("keydown", onKey); };
   }, [isContractor]);
+  saveNowRef.current = saveNow;
   var goSec = function(id){ var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
   var hasBR = sites.some(function(s){ return s.brInstallations && s.brInstallations.length > 0; });
   var entColor = (ENTITIES[entity] || ENTITIES.wge).color;
@@ -5071,6 +5110,7 @@ function App() {
                 {saveStatus === "error" && "⚠ Erreur de sauvegarde"}
                 {saveStatus === "saved" && lastSaved && ("✓ Sauvegardé " + (function(d){ var now = new Date(); var diff = Math.round((now - new Date(d))/1000); if (diff < 60) return "à l'instant"; if (diff < 3600) return "il y a " + Math.round(diff/60) + " min"; return new Date(d).toLocaleTimeString("fr-BE", {hour:"2-digit",minute:"2-digit"}); })(lastSaved))}
               </span>}
+
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, marginTop: 2 }}>
               <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.25, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{client.nom && client.nom.trim() ? client.nom : "Briefing de chantier"}</div>
@@ -5078,7 +5118,7 @@ function App() {
               {ref && <a href={odooOrderId ? odooOrderUrl(entity, odooOrderId) : (ENTITIES[entity] || ENTITIES.wge).odooUrl} target="_blank" rel="noreferrer" title={odooOrderId ? ("Ouvrir la commande " + rawRef(ref, entity) + " dans Odoo") : "Ouvrir les commandes dans Odoo"} className="odoo" style={{ fontSize: 12, textDecoration: "none", border: "1px solid #714B6740", background: "#714B670f", borderRadius: 999, padding: "2px 10px", whiteSpace: "nowrap" }}>Odoo ↗</a>}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginLeft: "auto", justifyContent: "flex-end" }}>
+          <div className="wg-tools" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginLeft: "auto", justifyContent: "flex-end" }}>
             {!isContractor && (
               <div className="wg-seg">
                 <button className={mode === "form" ? "on" : ""} onClick={function(){ setMode("form"); }}>Formulaire</button>
@@ -5092,6 +5132,14 @@ function App() {
                 className="wg-pill" style={{ background: GREEN, borderColor: GREEN, color: WHITE }}>
                 ✅ <span className="wg-hide-m">Rapport de suivi</span><span className="wg-show-m">Suivi</span>
               </a>
+            )}
+            {ref && (
+              <button type="button" onClick={saveNow} disabled={manualBusy || saveStatus === "loading"}
+                title={saveStatus === "error" ? "Erreur de sauvegarde : réessayer (Ctrl+S / ⌘S)" : "Enregistrer maintenant (Ctrl+S / ⌘S)"}
+                aria-label="Enregistrer maintenant" className="wg-ibtn"
+                style={{ borderColor: saveStatus === "error" ? "#b42a2a" : undefined, background: saveStatus === "error" ? "#fdecea" : undefined, color: saveStatus === "error" ? "#b42a2a" : undefined, opacity: (manualBusy || saveStatus === "loading") ? 0.55 : 1, cursor: (manualBusy || saveStatus === "loading") ? "default" : "pointer" }}>
+                {manualBusy ? "⏳" : saveStatus === "error" ? "↻" : "💾"}
+              </button>
             )}
             {ref && (
               <button onClick={function(){ setShowGear(function(v){return !v;}); }} title="Paramètres et historique" className={"wg-ibtn" + (showGear ? " on" : "")}>⚙</button>
@@ -5137,7 +5185,7 @@ function App() {
 
       {/* History panel + overlay */}
       {showSearch && !isContractor && (
-        <SearchBriefings onClose={function(){ setShowSearch(false); }} />
+        <SearchBriefings entity={entity} onClose={function(){ setShowSearch(false); }} />
       )}
 
       {showHistory && ref && (
