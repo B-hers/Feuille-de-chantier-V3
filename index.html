@@ -70,6 +70,33 @@ button { font-family: inherit; cursor: pointer; }
 .wg-row .lab { flex: 1; min-width: 0; font-size: 14px; }
 .wg-row .sub { font-size: 12px; color: #6f6d65; }
 .wg-pothers::-webkit-scrollbar { display: none; }
+.wg-doc-head, .wg-doc-row { display: grid; grid-template-columns: minmax(0, 2.6fr) 78px 170px 128px minmax(0, 1fr) 70px 104px; gap: 10px; align-items: center; padding: 8px 12px; }
+.wg-doc-head { background: #faf9f6; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8a887f; border-bottom: 1px solid #e6e3da; }
+.wg-doc-row { border-top: 1px solid #f0eee8; font-size: 12px; }
+.wg-doc-row:first-of-type { border-top: none; }
+.wg-doc-row:hover { background: #faf9f6; }
+.wg-doc-file { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.wg-doc-file:hover span span:first-child { color: #1B6B3A; text-decoration: underline; }
+.wg-doc-d { color: #6f6d65; }
+.wg-doc-tc { display: contents; }
+.wg-doc-meta-m { display: none; font-size: 11px; color: #6f6d65; }
+.wg-doc-act { display: inline-flex; gap: 4px; justify-content: flex-end; }
+.wg-doc-act button, .wg-doc-act a { width: 30px; height: 30px; min-height: 0; padding: 0; border: 1px solid #e6e3da; background: #fff; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; text-decoration: none; color: #1b1b19; }
+.wg-doc-act button:hover, .wg-doc-act a:hover { background: #f0eee8; }
+@media (max-width: 760px) {
+  .wg-doc-head { display: none; }
+  .wg-doc-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "file act" "meta meta"; row-gap: 6px; }
+  .wg-doc-file { grid-area: file; }
+  .wg-doc-act { grid-area: act; }
+  .wg-doc-d { display: none; }
+  .wg-doc-meta-m { display: block; }
+  .wg-doc-tc { grid-area: meta; display: flex; align-items: center; gap: 8px; min-width: 0; padding-left: 44px; }
+  .wg-doc-cat { min-width: 0; }
+  .wg-doc-cat select { max-width: 100%; font-size: 14px !important; padding: 5px 30px 5px 12px !important; }
+  .wg-doc-filters { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; margin-left: -2px; }
+  .wg-doc-filters::-webkit-scrollbar { display: none; }
+  .wg-doc-filters button { flex-shrink: 0; min-height: 0 !important; }
+}
 @media (max-width: 385px) { .wg-tools .wg-pill .wg-show-m { display: none; } }
 .wg-detail { background: #f6f5f1; border-radius: 10px; padding: 10px 12px; margin: 0 0 6px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .wg-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
@@ -1060,7 +1087,7 @@ function HistoryPanel({ refChantier, onRestore, onClose }) {
     return d.toLocaleDateString("fr-BE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " +
            d.toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
   }
-  var ACT = { save: "💾 Sauvegarde", photo_delete: "🗑️ Photo supprimée", restore: "↩️ Restauration", load: "👁️ Consultation" };
+  var ACT = { save: "💾 Sauvegarde", photo_delete: "🗑️ Photo supprimée", restore: "↩️ Restauration", load: "👁️ Consultation", doc_add: "📎 Document ajouté", doc_delete: "🗑️ Document retiré", doc_restore: "↩️ Document restauré" };
   return (
     <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(460px, 100vw)", background: "#fff", boxShadow: "-4px 0 28px rgba(0,0,0,0.15)", zIndex: 9990, display: "flex", flexDirection: "column", fontFamily: "inherit" }}>
       <div style={{ padding: "13px 16px", borderBottom: "1px solid #e8e8e4", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1B6B3A", color: "#fff", flexShrink: 0 }}>
@@ -1418,6 +1445,292 @@ function SearchBriefings({ onClose, entity }) {
         </div>
       </div>
     </>
+  );
+}
+
+// ── Documents du briefing (stockage Supabase, prévu pour la liaison Odoo) ──
+// Table briefing_documents (une ligne par document, rattachée à la référence BDC et à la commande Odoo)
+// Fichiers dans le bucket "chantier-documents". Suppression logique uniquement : le fichier est conservé.
+var DOC_BUCKET = "chantier-documents";
+var DOC_MAX = 50 * 1024 * 1024;
+var DOC_CATEGORIES = ["Installation PV", "Schémas unifilaires", "Rapport de conformité", "Fiches techniques", "Plans et calepinage", "Photos", "Borne de recharge", "Administratif", "Autre"];
+var DOC_TYPE_STYLE = {
+  PDF: { bg: "#d64545", fg: "#fff" }, Photo: { bg: "#e8a33d", fg: "#fff" }, "Schéma": { bg: "#714B67", fg: "#fff" },
+  Excel: { bg: "#1f7a4d", fg: "#fff" }, Word: { bg: "#2b6cb0", fg: "#fff" }, Plan: { bg: "#0f7c8c", fg: "#fff" }, Autre: { bg: "#8a887f", fg: "#fff" }
+};
+function docExt(name) { var m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ""; }
+function docGuessCategory(name, mime) {
+  var n = normTxt(name);
+  if (/unifilaire|schema|schéma/.test(n)) return "Schémas unifilaires";
+  if (/conformit|rgie|controle|contrôle|vincotte|aib|btv|rce-/.test(n)) return "Rapport de conformité";
+  if (/fiche|datasheet|data sheet|spec|notice|manuel/.test(n)) return "Fiches techniques";
+  if (/plan|calepin|layout|implantation/.test(n)) return "Plans et calepinage";
+  if (/borne|wallbox|recharge|smappee|ev /.test(n)) return "Borne de recharge";
+  if (/facture|devis|contrat|bdc|bon de commande|offre|invoice|prime/.test(n)) return "Administratif";
+  if ((mime || "").indexOf("image/") === 0) return "Photos";
+  return "Installation PV";
+}
+function docTypeOf(name, mime, category) {
+  var e = docExt(name);
+  if (category === "Schémas unifilaires" && e !== "pdf") return "Schéma";
+  if ((mime || "").indexOf("image/") === 0 || ["jpg","jpeg","png","heic","heif","webp","gif"].indexOf(e) !== -1) return "Photo";
+  if (e === "pdf" || mime === "application/pdf") return "PDF";
+  if (["xls","xlsx","csv","ods"].indexOf(e) !== -1) return "Excel";
+  if (["doc","docx","odt","rtf"].indexOf(e) !== -1) return "Word";
+  if (["dwg","dxf","skp"].indexOf(e) !== -1) return "Plan";
+  return "Autre";
+}
+function docSize(b) {
+  if (!b && b !== 0) return "";
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1).replace(".", ",") + " Ko";
+  return (b / 1024 / 1024).toFixed(1).replace(".", ",") + " Mo";
+}
+function docDate(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  return d.toLocaleDateString("fr-BE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + d.toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
+}
+function docSafeName(name) {
+  var n = String(name || "document").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_");
+  return n.slice(-120) || "document";
+}
+function docUploadFile(path, file, onProgress) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", SUPA_URL + "/storage/v1/object/" + DOC_BUCKET + "/" + path.split("/").map(encodeURIComponent).join("/"));
+    xhr.setRequestHeader("apikey", SUPA_KEY);
+    xhr.setRequestHeader("Authorization", "Bearer " + SUPA_KEY);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = function(e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = function() { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error("envoi refusé (HTTP " + xhr.status + ")")); };
+    xhr.onerror = function() { reject(new Error("problème de connexion")); };
+    xhr.send(file);
+  });
+}
+function docApi(method, query, body) {
+  return fetch(SUPA_URL + "/rest/v1/briefing_documents" + (query || ""), {
+    method: method,
+    headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json", "Prefer": "return=representation" },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+function DocTypeBadge({ type }) {
+  var st = DOC_TYPE_STYLE[type] || DOC_TYPE_STYLE.Autre;
+  return <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, background: st.bg, color: st.fg, borderRadius: 999, padding: "2px 9px", whiteSpace: "nowrap" }}>{type}</span>;
+}
+
+function DocumentsPanel({ refChantier, entity, odooOrderId, user, isContractor, onCount }) {
+  var [docs, setDocs] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [loadErr, setLoadErr] = useState("");
+  var [queue, setQueue] = useState([]);
+  var [cat, setCat] = useState("");
+  var [q, setQ] = useState("");
+  var [showDeleted, setShowDeleted] = useState(false);
+  var [drag, setDrag] = useState(false);
+  var [lightbox, setLightbox] = useState(null);
+  var inputRef = useRef(null);
+  var canManage = !isContractor;
+
+  function reload() {
+    if (!refChantier) { setLoading(false); return; }
+    setLoading(true);
+    docApi("GET", "?ref=eq." + encodeURIComponent(refChantier) + "&order=created_at.desc&select=*")
+      .then(function(rows) { setDocs(Array.isArray(rows) ? rows : []); setLoadErr(""); })
+      .catch(function(e) { setLoadErr("Documents indisponibles (" + e.message + ")"); })
+      .then(function() { setLoading(false); });
+  }
+  useEffect(reload, [refChantier]);
+  var active = docs.filter(function(d) { return !d.deleted_at; });
+  var deleted = docs.filter(function(d) { return !!d.deleted_at; });
+  useEffect(function() { if (onCount) onCount(active.length); }, [active.length]);
+  useEffect(function() { if (showDeleted && deleted.length === 0) setShowDeleted(false); }, [showDeleted, deleted.length]);
+
+  function addFiles(fileList) {
+    if (!refChantier) return;
+    var files = Array.prototype.slice.call(fileList || []);
+    files.forEach(function(file) {
+      var qid = Math.random().toString(36).slice(2);
+      var category = docGuessCategory(file.name, file.type);
+      setQueue(function(p) { return p.concat([{ id: qid, name: file.name, progress: 0, status: "upload" }]); });
+      if (file.size > DOC_MAX) {
+        setQueue(function(p) { return p.map(function(x) { return x.id === qid ? Object.assign({}, x, { status: "error", msg: "fichier trop lourd (50 Mo max)" }) : x; }); });
+        return;
+      }
+      var d = new Date();
+      var stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0") + "-" + qid.slice(0, 6);
+      var path = docSafeName(refChantier) + "/" + stamp + "-" + docSafeName(file.name);
+      docUploadFile(path, file, function(pr) {
+        setQueue(function(p) { return p.map(function(x) { return x.id === qid ? Object.assign({}, x, { progress: pr }) : x; }); });
+      }).then(function() {
+        var url = SUPA_URL + "/storage/v1/object/public/" + DOC_BUCKET + "/" + path.split("/").map(encodeURIComponent).join("/");
+        var oid = parseInt(odooOrderId, 10);
+        return docApi("POST", "", {
+          ref: refChantier, entity: entity || null, odoo_order_id: isNaN(oid) ? null : oid,
+          name: file.name, category: category, doc_type: docTypeOf(file.name, file.type, category),
+          mime: file.type || null, size_bytes: file.size, storage_path: path, url: url,
+          uploaded_by: user ? user.email : null, uploaded_by_name: user ? user.name : null
+        });
+      }).then(function(rows) {
+        var row = rows && rows[0];
+        if (row) setDocs(function(p) { return [row].concat(p); });
+        setQueue(function(p) { return p.filter(function(x) { return x.id !== qid; }); });
+        supaLogAudit(refChantier, user, "doc_add", { changes: [file.name + " (" + category + ")"] });
+      }).catch(function(e) {
+        setQueue(function(p) { return p.map(function(x) { return x.id === qid ? Object.assign({}, x, { status: "error", msg: e.message }) : x; }); });
+      });
+    });
+  }
+  function patchDoc(doc, fields, auditAction, auditTxt) {
+    var prev = doc;
+    setDocs(function(p) { return p.map(function(x) { return x.id === doc.id ? Object.assign({}, x, fields) : x; }); });
+    docApi("PATCH", "?id=eq." + doc.id, fields).then(function() {
+      if (auditAction) supaLogAudit(refChantier, user, auditAction, { changes: [auditTxt] });
+    }).catch(function(e) {
+      setDocs(function(p) { return p.map(function(x) { return x.id === doc.id ? prev : x; }); });
+      window.alert("Modification non enregistrée : " + e.message);
+    });
+  }
+  function changeCategory(doc, c) { patchDoc(doc, { category: c, doc_type: docTypeOf(doc.name, doc.mime, c) }); }
+  function removeDoc(doc) {
+    if (!window.confirm("Retirer « " + doc.name + " » des documents du briefing ?\n\nLe fichier est conservé et peut être restauré.")) return;
+    patchDoc(doc, { deleted_at: new Date().toISOString(), deleted_by: user ? user.email : null }, "doc_delete", doc.name);
+  }
+  function restoreDoc(doc) { patchDoc(doc, { deleted_at: null, deleted_by: null }, "doc_restore", doc.name); }
+  function openDoc(doc) {
+    if (doc.doc_type === "Photo") setLightbox(doc);
+    else window.open(doc.url, "_blank", "noopener");
+  }
+
+  var counts = {};
+  active.forEach(function(d) { var c = d.category || "Autre"; counts[c] = (counts[c] || 0) + 1; });
+  var words = normTxt(q).split(/\s+/).filter(Boolean);
+  var list = (showDeleted ? deleted : active).filter(function(d) {
+    if (cat && (d.category || "Autre") !== cat) return false;
+    var s = normTxt(d.name + " " + (d.category || "") + " " + (d.uploaded_by_name || ""));
+    return words.every(function(w) { return s.indexOf(w) !== -1; });
+  });
+
+  var onDrop = function(e) { e.preventDefault(); setDrag(false); if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); };
+
+  return (
+    <div id="sec-documents" className="sec-anchor" style={Object.assign({}, CARD, drag ? { outline: "2px dashed " + GREEN, outlineOffset: -6 } : {})}
+      onDragOver={function(e){ if (refChantier) { e.preventDefault(); setDrag(true); } }} onDragLeave={function(e){ if (e.currentTarget === e.target) setDrag(false); }} onDrop={onDrop}>
+      <div className="sh" style={Object.assign({}, SH, { flexWrap: "wrap" })}><span>📁</span> Documents
+        {active.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: GREEN, background: GREEN_LIGHT, borderRadius: 999, padding: "2px 9px" }}>{active.length}</span>}
+        {refChantier && (
+          <button type="button" onClick={function(){ if (inputRef.current) inputRef.current.click(); }} className="wg-pill"
+            style={{ marginLeft: "auto", background: GREEN, borderColor: GREEN, color: "#fff", fontSize: 12, padding: "6px 13px" }}>＋ Ajouter des documents</button>
+        )}
+        <input ref={inputRef} type="file" multiple style={{ display: "none" }} onChange={function(e){ addFiles(e.target.files); e.target.value = ""; }} />
+      </div>
+
+      {!refChantier && <div style={{ fontSize: 13, color: MUTED }}>Ajoutez une référence au briefing (?ref=S0XXXX) pour pouvoir stocker des documents.</div>}
+
+      {refChantier && (
+        <>
+          {/* Zone de dépôt */}
+          <div onClick={function(){ if (inputRef.current) inputRef.current.click(); }} role="button" tabIndex={0}
+            onKeyDown={function(e){ if ((e.key === "Enter" || e.key === " ") && inputRef.current) { e.preventDefault(); inputRef.current.click(); } }}
+            style={{ border: "1.5px dashed " + (drag ? GREEN : "#d6d3c9"), background: drag ? GREEN_LIGHT : "#faf9f6", borderRadius: 12, padding: active.length ? "10px 14px" : "22px 14px", textAlign: "center", cursor: "pointer", color: MUTED, fontSize: 13, marginBottom: 12 }}>
+            {active.length ? "Glissez des fichiers ici ou cliquez pour ajouter" : <><div style={{ fontSize: 26, marginBottom: 4 }}>📎</div><b style={{ color: TEXT }}>Aucun document pour l'instant</b><div>Glissez des fichiers ici ou cliquez pour ajouter : schémas, rapports de conformité, fiches techniques, plans, photos…</div></>}
+            <div style={{ fontSize: 11, marginTop: 3, color: "#9a978d" }}>PDF, images, Excel, Word, plans · 50 Mo max par fichier</div>
+          </div>
+
+          {/* Envois en cours */}
+          {queue.length > 0 && (
+            <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+              {queue.map(function(x) {
+                return (
+                  <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, background: x.status === "error" ? "#fdecea" : "#f6f5f1", borderRadius: 8, padding: "7px 10px" }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.status === "error" ? "⚠ " : "⏳ "}{x.name}</span>
+                    {x.status === "error"
+                      ? <><span style={{ color: "#b42a2a", fontSize: 12 }}>{x.msg}</span><button type="button" onClick={function(){ setQueue(function(p){ return p.filter(function(y){ return y.id !== x.id; }); }); }} style={{ border: "none", background: "none", color: MUTED, cursor: "pointer", minHeight: 0, padding: 0 }}>✕</button></>
+                      : <span style={{ width: 120, height: 6, background: "#e6e3da", borderRadius: 9, overflow: "hidden", flexShrink: 0 }}><span style={{ display: "block", height: "100%", width: Math.round(x.progress * 100) + "%", background: GREEN, transition: "width .2s" }} /></span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {loadErr && <div style={{ fontSize: 12, color: "#b42a2a", background: "#fdecea", borderRadius: 8, padding: "7px 10px", marginBottom: 10 }}>⚠ {loadErr} <button type="button" onClick={reload} style={{ border: "none", background: "none", color: GREEN, fontWeight: 700, cursor: "pointer", minHeight: 0, padding: 0 }}>Réessayer</button></div>}
+          {loading && !docs.length && <div style={{ fontSize: 13, color: MUTED, padding: "6px 0" }}>⏳ Chargement des documents…</div>}
+
+          {/* Filtres */}
+          {active.length > 0 && !showDeleted && (
+            <div className="wg-doc-filters" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {[["", "Tous", active.length]].concat(DOC_CATEGORIES.filter(function(c){ return counts[c]; }).map(function(c){ return [c, c, counts[c]]; })).map(function(f) {
+                var on = cat === f[0];
+                return <button key={f[0] || "all"} type="button" onClick={function(){ setCat(f[0]); }} style={Object.assign({}, chipSt(on), { fontSize: 12, minHeight: 0 })}>{f[1]} <span style={{ opacity: 0.7 }}>{f[2]}</span></button>;
+              })}
+              {active.length > 5 && <input value={q} onChange={function(e){ setQ(e.target.value); }} placeholder="🔍 Filtrer…" style={{ marginLeft: "auto", width: 180, maxWidth: "100%", borderRadius: 999, padding: "5px 12px", fontSize: 12 }} />}
+            </div>
+          )}
+
+          {/* Liste */}
+          {list.length > 0 && (
+            <div style={{ border: "1px solid #e6e3da", borderRadius: 12, overflow: "hidden" }}>
+              <div className="wg-doc-head">
+                <span>Fichier</span><span>Type</span><span>Source</span><span>Date</span><span>Ajouté par</span><span style={{ textAlign: "right" }}>Taille</span><span></span>
+              </div>
+              {list.map(function(d) {
+                return (
+                  <div key={d.id} className="wg-doc-row" style={{ opacity: d.deleted_at ? 0.6 : 1 }}>
+                    <div className="wg-doc-file" onClick={function(){ openDoc(d); }} title={"Aperçu de " + d.name}>
+                      {d.doc_type === "Photo"
+                        ? <img src={d.url} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 6, objectFit: "cover", flexShrink: 0, background: "#eee" }} />
+                        : <span style={{ width: 34, height: 34, borderRadius: 6, background: "#f3f1eb", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>{d.doc_type === "PDF" ? "📄" : d.doc_type === "Excel" ? "📊" : d.doc_type === "Word" ? "📝" : d.doc_type === "Schéma" || d.doc_type === "Plan" ? "📐" : "📎"}</span>}
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                        <span className="wg-doc-meta-m">{docDate(d.created_at)} · {docSize(d.size_bytes)}{d.uploaded_by_name ? " · " + d.uploaded_by_name : ""}</span>
+                      </span>
+                    </div>
+                    <span className="wg-doc-tc">
+                    <span className="wg-doc-type"><DocTypeBadge type={d.doc_type || "Autre"} /></span>
+                    <span className="wg-doc-cat">
+                      {canManage && !d.deleted_at
+                        ? <select value={d.category || "Autre"} onChange={function(e){ changeCategory(d, e.target.value); }} style={{ width: "auto", maxWidth: "100%", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
+                            {DOC_CATEGORIES.concat(d.category && DOC_CATEGORIES.indexOf(d.category) === -1 ? [d.category] : []).map(function(c){ return <option key={c} value={c}>{c}</option>; })}
+                          </select>
+                        : <span style={{ fontSize: 12 }}>{d.category || "Autre"}</span>}
+                    </span>
+                    </span>
+                    <span className="wg-doc-d">{docDate(d.created_at)}</span>
+                    <span className="wg-doc-d" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.uploaded_by_name || d.uploaded_by || ""}</span>
+                    <span className="wg-doc-d" style={{ textAlign: "right" }}>{docSize(d.size_bytes)}</span>
+                    <span className="wg-doc-act">
+                      <button type="button" title="Aperçu" onClick={function(){ openDoc(d); }}>👁</button>
+                      <a title="Télécharger" href={d.url + "?download=" + encodeURIComponent(d.name)}>⬇</a>
+                      {canManage && !d.deleted_at && <button type="button" title="Retirer" onClick={function(){ removeDoc(d); }}>🗑</button>}
+                      {canManage && d.deleted_at && <button type="button" title="Restaurer" onClick={function(){ restoreDoc(d); }} style={{ width: "auto", padding: "0 8px", color: GREEN, fontWeight: 700, fontSize: 12 }}>Restaurer</button>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!loading && active.length > 0 && list.length === 0 && !showDeleted && <div style={{ fontSize: 13, color: MUTED, padding: "8px 2px" }}>Aucun document ne correspond au filtre.</div>}
+
+          {canManage && (deleted.length > 0 || showDeleted) && (
+            <button type="button" onClick={function(){ setShowDeleted(!showDeleted); setCat(""); }} style={{ marginTop: 10, border: "none", background: "none", color: MUTED, fontSize: 12, cursor: "pointer", minHeight: 0, padding: 0 }}>
+              {showDeleted ? "← Revenir aux documents" : "Documents retirés (" + deleted.length + ")"}
+            </button>
+          )}
+        </>
+      )}
+
+      {lightbox && (
+        <div onClick={function(){ setLightbox(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", zIndex: 9998, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <img src={lightbox.url} alt={lightbox.name} style={{ maxWidth: "100%", maxHeight: "82vh", borderRadius: 8 }} onClick={function(e){ e.stopPropagation(); }} />
+          <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center", color: "#fff", fontSize: 13 }} onClick={function(e){ e.stopPropagation(); }}>
+            <span style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lightbox.name}</span>
+            <a href={lightbox.url + "?download=" + encodeURIComponent(lightbox.name)} style={{ color: "#fff", fontWeight: 700 }}>⬇ Télécharger</a>
+            <button type="button" onClick={function(){ setLightbox(null); }} style={{ background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", borderRadius: 999, padding: "4px 12px", cursor: "pointer", minHeight: 0 }}>Fermer</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3809,6 +4122,7 @@ function App() {
   });
   const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [docCount, setDocCount] = useState(0);
   const userRef = useRef(null);
   const prevDataRef = useRef(null);
 
@@ -5090,7 +5404,7 @@ function App() {
       });
       return out;
     })))
-    .concat([{ id: "sec-calepinage", label: "Calepinage" }, { id: "sec-notes", label: "Note PM" }, { id: "sec-photos", label: "Photos" }]);
+    .concat([{ id: "sec-calepinage", label: "Calepinage" }, { id: "sec-notes", label: "Note PM" }, { id: "sec-photos", label: "Photos" }, { id: "sec-documents", label: "Documents" + (docCount ? " · " + docCount : "") }]);
 
   // ── Login guard géré par HTML/JS pur (voir avant <div id="root">) ─────────
 
@@ -5620,6 +5934,9 @@ function App() {
               </div>
             </div>
           </div>
+
+          {/* ── 7. Documents ── */}
+          <DocumentsPanel refChantier={ref} entity={entity} odooOrderId={odooOrderId} user={user} isContractor={isContractor} onCount={setDocCount} />
         </>
       )}
 
